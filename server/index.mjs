@@ -220,9 +220,9 @@ const apiServer = createServer(async (request, response) => {
 });
 
 function serveStatic(pathname, response) {
-  let relative = decodeURIComponent(pathname);
-  if (relative === "/") relative = "/index.html";
-  const candidate = resolve(distRoot, `.${normalize(relative)}`);
+  let requestPath = decodeURIComponent(pathname);
+  if (requestPath === "/") requestPath = "/index.html";
+  const candidate = resolve(distRoot, `.${normalize(requestPath)}`);
   const relativePath = relative(distRoot, candidate);
   if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
     response.writeHead(403); response.end("Forbidden"); return;
