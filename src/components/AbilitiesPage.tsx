@@ -1,7 +1,7 @@
 import { ABILITIES, SKILLS, type AbilityName, type Character, type SkillName } from "../data/characters";
 import { calculateCharacterStats, isClassSavingThrowProficient } from "../data/calculations";
 
-type AbilitiesPageProps = { character: Character; onChange: (updates: Partial<Character>) => void };
+type AbilitiesPageProps = { character: Character; onChange?: (updates: Partial<Character>) => void; readOnly?: boolean };
 
 const SIZES = ["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"] as const;
 const ARMOR_MODES = [
@@ -12,22 +12,22 @@ const ARMOR_MODES = [
   { value: "custom", label: "Custom AC base" },
 ] as const;
 
-export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
+export function AbilitiesPage({ character, onChange, readOnly = false }: AbilitiesPageProps) {
   const stats = calculateCharacterStats(character);
 
   function setAbilityScore(ability: AbilityName, rawValue: string) {
     const value = Number(rawValue);
     if (!Number.isInteger(value) || value < 1 || value > 30) return;
-    onChange({ abilityScores: { ...character.abilityScores, [ability]: value } });
+    onChange?.({ abilityScores: { ...character.abilityScores, [ability]: value } });
   }
 
   function setSaveProficiency(ability: AbilityName, proficient: boolean) {
-    onChange({ savingThrowProficiencies: { ...character.savingThrowProficiencies, [ability]: proficient } });
+    onChange?.({ savingThrowProficiencies: { ...character.savingThrowProficiencies, [ability]: proficient } });
   }
 
   function setSkillRank(skill: SkillName, rawRank: string) {
     const rank = Number(rawRank) as 0 | 1 | 2;
-    onChange({ skillProficiencies: { ...character.skillProficiencies, [skill]: rank } });
+    onChange?.({ skillProficiencies: { ...character.skillProficiencies, [skill]: rank } });
   }
 
   return (
@@ -46,7 +46,7 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
               {ABILITIES.map((ability) => (
                 <label className="ability-score-card" key={ability}>
                   <span>{ability}</span>
-                  <input type="number" min={1} max={30} step={1} aria-label={`${ability} score`} value={character.abilityScores[ability]} onChange={(event) => setAbilityScore(ability, event.target.value)} />
+                  <input disabled={readOnly} type="number" min={1} max={30} step={1} aria-label={`${ability} score`} value={character.abilityScores[ability]} onChange={(event) => setAbilityScore(ability, event.target.value)} />
                   <strong>{formatModifier(stats.abilityModifiers[ability])}</strong>
                 </label>
               ))}
@@ -59,7 +59,7 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
             <div className="save-grid">
               {ABILITIES.map((ability) => (
                 <label className="save-row" key={ability}>
-                  <input type="checkbox" checked={character.savingThrowProficiencies[ability] || isClassSavingThrowProficient(character, ability)} disabled={isClassSavingThrowProficient(character, ability)} onChange={(event) => setSaveProficiency(ability, event.target.checked)} />
+                  <input type="checkbox" checked={character.savingThrowProficiencies[ability] || isClassSavingThrowProficient(character, ability)} disabled={readOnly || isClassSavingThrowProficient(character, ability)} onChange={(event) => setSaveProficiency(ability, event.target.checked)} />
                   <span>{ability}{isClassSavingThrowProficient(character, ability) && <small className="class-proficiency-label">CLASS</small>}</span><b>{formatModifier(stats.savingThrows[ability])}</b>
                 </label>
               ))}
@@ -76,7 +76,7 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
                   <span className="skill-ability">{ability.slice(0, 3).toUpperCase()}</span>
                   <b>{formatModifier(stats.skillBonuses[name])}</b>
                   <label className="sr-only" htmlFor={`skill-${name.replaceAll(" ", "-")}`}>{name} proficiency</label>
-                  <select id={`skill-${name.replaceAll(" ", "-")}`} value={character.skillProficiencies[name]} onChange={(event) => setSkillRank(name, event.target.value)}>
+                  <select disabled={readOnly} id={`skill-${name.replaceAll(" ", "-")}`} value={character.skillProficiencies[name]} onChange={(event) => setSkillRank(name, event.target.value)}>
                     <option value={0}>Not proficient</option>
                     <option value={1}>Proficient</option>
                     <option value={2}>Expertise</option>
@@ -136,20 +136,20 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
 
           <details className="sheet-panel setup-panel">
             <summary>Movement, armor &amp; spell setup</summary>
-            <div className="setup-fields">
-              <label className="compact-field"><span>Size</span><select value={character.size} onChange={(event) => onChange({ size: event.target.value as Character["size"] })}>{SIZES.map((size) => <option key={size}>{size}</option>)}</select></label>
-              <label className="compact-field"><span>Base speed (feet)</span><input type="number" min={0} max={500} value={character.speedFeet} onChange={(event) => onChange({ speedFeet: numberOr(event.target.value, character.speedFeet, 0, 500) })} /></label>
-              <label className="compact-field"><span>Other speed bonus (feet)</span><input type="number" min={-500} max={500} value={character.otherSpeedBonus} onChange={(event) => onChange({ otherSpeedBonus: numberOr(event.target.value, character.otherSpeedBonus, -500, 500) })} /></label>
-              <label className="toggle-row"><input type="checkbox" checked={character.powerfulBuild} onChange={(event) => onChange({ powerfulBuild: event.target.checked })} /><span>Counts as one size larger for carrying</span></label>
-              <label className="compact-field"><span>Armor formula</span><select value={character.armorMode} onChange={(event) => onChange({ armorMode: event.target.value as Character["armorMode"] })}>{ARMOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
-              {stats.classBreakdown.some(({ name }) => name === "Barbarian") && stats.classBreakdown.some(({ name }) => name === "Monk") && <label className="compact-field"><span>Unarmored Defense choice</span><select value={character.unarmoredDefenseChoice} onChange={(event) => onChange({ unarmoredDefenseChoice: event.target.value as Character["unarmoredDefenseChoice"] })}><option value="">Use starting class</option><option value="Barbarian">Barbarian · Dex + Con</option><option value="Monk">Monk · Dex + Wis (no shield)</option></select></label>}
-              {character.armorMode !== "unarmored" && <label className="compact-field"><span>Armor base AC</span><input type="number" min={1} max={40} value={character.armorBaseAC} onChange={(event) => onChange({ armorBaseAC: numberOr(event.target.value, character.armorBaseAC, 1, 40) })} /></label>}
-              {character.armorMode === "heavy" && <label className="compact-field"><span>Armor Strength requirement</span><input type="number" min={0} max={30} value={character.armorStrengthRequirement} onChange={(event) => onChange({ armorStrengthRequirement: numberOr(event.target.value, character.armorStrengthRequirement, 0, 30) })} /></label>}
-              <label className="toggle-row"><input type="checkbox" checked={character.hasShield} onChange={(event) => onChange({ hasShield: event.target.checked })} /><span>Shield AC bonus (+2 when trained)</span></label>
-              <label className="compact-field"><span>Other AC bonus</span><input type="number" min={-20} max={20} value={character.otherAcBonus} onChange={(event) => onChange({ otherAcBonus: numberOr(event.target.value, character.otherAcBonus, -20, 20) })} /></label>
-              <label className="compact-field"><span>Spellcasting ability override</span><select value={character.spellcastingAbility} onChange={(event) => onChange({ spellcastingAbility: event.target.value as AbilityName | "" })}><option value="">Use class default</option>{ABILITIES.map((ability) => <option key={ability}>{ability}</option>)}</select></label>
+            <fieldset className="setup-fields" disabled={readOnly}>
+              <label className="compact-field"><span>Size</span><select value={character.size} onChange={(event) => onChange?.({ size: event.target.value as Character["size"] })}>{SIZES.map((size) => <option key={size}>{size}</option>)}</select></label>
+              <label className="compact-field"><span>Base speed (feet)</span><input type="number" min={0} max={500} value={character.speedFeet} onChange={(event) => onChange?.({ speedFeet: numberOr(event.target.value, character.speedFeet, 0, 500) })} /></label>
+              <label className="compact-field"><span>Other speed bonus (feet)</span><input type="number" min={-500} max={500} value={character.otherSpeedBonus} onChange={(event) => onChange?.({ otherSpeedBonus: numberOr(event.target.value, character.otherSpeedBonus, -500, 500) })} /></label>
+              <label className="toggle-row"><input type="checkbox" checked={character.powerfulBuild} onChange={(event) => onChange?.({ powerfulBuild: event.target.checked })} /><span>Counts as one size larger for carrying</span></label>
+              <label className="compact-field"><span>Armor formula</span><select value={character.armorMode} onChange={(event) => onChange?.({ armorMode: event.target.value as Character["armorMode"] })}>{ARMOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
+              {stats.classBreakdown.some(({ name }) => name === "Barbarian") && stats.classBreakdown.some(({ name }) => name === "Monk") && <label className="compact-field"><span>Unarmored Defense choice</span><select value={character.unarmoredDefenseChoice} onChange={(event) => onChange?.({ unarmoredDefenseChoice: event.target.value as Character["unarmoredDefenseChoice"] })}><option value="">Use starting class</option><option value="Barbarian">Barbarian · Dex + Con</option><option value="Monk">Monk · Dex + Wis (no shield)</option></select></label>}
+              {character.armorMode !== "unarmored" && <label className="compact-field"><span>Armor base AC</span><input type="number" min={1} max={40} value={character.armorBaseAC} onChange={(event) => onChange?.({ armorBaseAC: numberOr(event.target.value, character.armorBaseAC, 1, 40) })} /></label>}
+              {character.armorMode === "heavy" && <label className="compact-field"><span>Armor Strength requirement</span><input type="number" min={0} max={30} value={character.armorStrengthRequirement} onChange={(event) => onChange?.({ armorStrengthRequirement: numberOr(event.target.value, character.armorStrengthRequirement, 0, 30) })} /></label>}
+              <label className="toggle-row"><input type="checkbox" checked={character.hasShield} onChange={(event) => onChange?.({ hasShield: event.target.checked })} /><span>Shield AC bonus (+2 when trained)</span></label>
+              <label className="compact-field"><span>Other AC bonus</span><input type="number" min={-20} max={20} value={character.otherAcBonus} onChange={(event) => onChange?.({ otherAcBonus: numberOr(event.target.value, character.otherAcBonus, -20, 20) })} /></label>
+              <label className="compact-field"><span>Spellcasting ability override</span><select value={character.spellcastingAbility} onChange={(event) => onChange?.({ spellcastingAbility: event.target.value as AbilityName | "" })}><option value="">Use class default</option>{ABILITIES.map((ability) => <option key={ability}>{ability}</option>)}</select></label>
               <p className="setup-note">Class saving throw proficiencies and spell ability are applied automatically. For features that grant extras, use the save checkboxes or spell ability override. Choose Custom AC for an alternate class AC formula. Enter species speed and any armor Strength requirement here.</p>
-            </div>
+            </fieldset>
           </details>
         </aside>
       </div>

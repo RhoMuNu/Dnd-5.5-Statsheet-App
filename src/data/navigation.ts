@@ -16,6 +16,10 @@ export const navigationGroups = [
       { id: "notes", label: "Notes & journal", icon: "▤" },
     ],
   },
+  {
+    label: "PLAY TOGETHER",
+    items: [{ id: "lan", label: "LAN party", icon: "⌁" }],
+  },
 ] as const;
 
 export type SectionId = (typeof navigationGroups)[number]["items"][number]["id"];
@@ -55,6 +59,11 @@ export const sectionContent: Record<SectionId, { eyebrow: string; title: string;
     eyebrow: "ADVENTURE KIT",
     title: "Notes & journal",
     description: "Session recaps, clues, character ideas, and unfinished business.",
+  },
+  lan: {
+    eyebrow: "LOCAL NETWORK GAME",
+    title: "Gather your party.",
+    description: "Host a campaign on this PC or join one on your local network.",
   },
 };
 

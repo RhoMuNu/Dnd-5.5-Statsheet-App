@@ -3,6 +3,7 @@ import { Overview } from "./components/Overview";
 import { SectionPage } from "./components/SectionPage";
 import { Sidebar } from "./components/Sidebar";
 import { CharacterBuilder } from "./components/CharacterBuilder";
+import { LanGame } from "./components/LanGame";
 import { createCharacterBackup, parseCharacterBackup } from "./data/backup";
 import {
   loadActiveCharacterId,
@@ -172,14 +173,14 @@ function App() {
               <h1 id="page-title" tabIndex={-1}>{current.title}</h1>
               <p className="welcome-subtitle">{current.description}</p>
             </div>
-            {activeSection !== "builder" && (
+            {activeSection !== "builder" && activeSection !== "lan" && (
               <button className="create-button" onClick={() => navigate("builder")}>
                 <span aria-hidden="true">＋</span> Create a character
               </button>
             )}
           </section>
 
-          {activeSection === "overview" ? (
+          {activeSection === "lan" ? <LanGame localCharacters={characters} /> : activeSection === "overview" ? (
             <Overview
               characters={characters}
               selectedCharacterId={activeCharacter?.id ?? null}
