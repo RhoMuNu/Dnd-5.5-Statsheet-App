@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Overview } from "./components/Overview";
 import { SectionPage } from "./components/SectionPage";
 import { Sidebar } from "./components/Sidebar";
 import { CharacterBuilder } from "./components/CharacterBuilder";
+import { createCharacterBackup, parseCharacterBackup } from "./data/backup";
 import {
   loadActiveCharacterId,
   loadCharacters,
@@ -21,10 +22,11 @@ function App() {
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(loadActiveCharacterId);
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
   const [storageAvailable, setStorageAvailable] = useState(true);
+  const [backupMessage, setBackupMessage] = useState("");
   const current = sectionContent[activeSection];
   const activeCharacter = characters.find((character) => character.id === selectedCharacterId) ?? characters[0] ?? null;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setStorageAvailable(saveCharacters(characters));
   }, [characters]);
 
@@ -100,6 +102,38 @@ function App() {
       : character));
   }
 
+  function exportBackup(backupCharacters: Character[], filename: string, activeId: string | null) {
+    const blob = new Blob([createCharacterBackup(backupCharacters, activeId)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setBackupMessage(`Exported ${backupCharacters.length} ${backupCharacters.length === 1 ? "character" : "characters"}.`);
+  }
+
+  function importBackup(contents: string) {
+    try {
+      const backup = parseCharacterBackup(contents);
+      const existingIds = new Set(characters.map((character) => character.id));
+      const imported = backup.characters.filter((character) => !existingIds.has(character.id));
+      const skipped = backup.characters.length - imported.length;
+      if (imported.length === 0) {
+        setBackupMessage(skipped ? "Those character IDs are already in this library; nothing was changed." : "This backup has no characters.");
+        return;
+      }
+      setCharacters((existing) => [...imported, ...existing]);
+      const backedUpActiveId = backup.activeCharacterId;
+      if (!selectedCharacterId && backedUpActiveId && imported.some((character) => character.id === backedUpActiveId)) {
+        setSelectedCharacterId(backedUpActiveId);
+      }
+      setBackupMessage(`Imported ${imported.length} ${imported.length === 1 ? "character" : "characters"}${skipped ? `; skipped ${skipped} already in this library` : ""}.`);
+    } catch (error) {
+      setBackupMessage(error instanceof Error ? error.message : "Could not read that backup file.");
+    }
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -154,6 +188,10 @@ function App() {
               onSelect={setSelectedCharacterId}
               onEdit={editCharacter}
               onDelete={deleteCharacter}
+              onExport={(character) => exportBackup([character], `${safeFilename(character.name)}.taleforge.json`, character.id)}
+              onExportAll={() => exportBackup(characters, "taleforge-character-library.json", activeCharacter?.id ?? null)}
+              onImport={importBackup}
+              backupMessage={backupMessage}
             />
           ) : activeSection === "builder" ? (
             <CharacterBuilder
@@ -180,6 +218,10 @@ function App() {
       </div>
     </div>
   );
+}
+
+function safeFilename(name: string): string {
+  return name.trim().replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "character";
 }
 
 export default App;

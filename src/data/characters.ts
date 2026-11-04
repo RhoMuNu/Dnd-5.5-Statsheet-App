@@ -99,24 +99,31 @@ export function loadCharacters(): Character[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(CHARACTERS_KEY) ?? "[]");
     if (!Array.isArray(value)) return [];
-    return value.filter(isBaseCharacter).map((character) => ({
-      ...defaultCharacterStats(),
-      ...character,
-      subclass: character.subclass ?? "",
-      classLevels: character.classLevels && Object.keys(character.classLevels).length
-        ? character.classLevels
-        : character.characterClass ? { [character.characterClass]: character.level } : {},
-      classSubclasses: character.classSubclasses && Object.keys(character.classSubclasses).length
-        ? character.classSubclasses
-        : character.characterClass && character.subclass ? { [character.characterClass]: character.subclass } : {},
-      unarmoredDefenseChoice: character.unarmoredDefenseChoice ?? "",
-      abilityScores: { ...defaultCharacterStats().abilityScores, ...character.abilityScores },
-      savingThrowProficiencies: { ...defaultCharacterStats().savingThrowProficiencies, ...character.savingThrowProficiencies },
-      skillProficiencies: { ...defaultCharacterStats().skillProficiencies, ...character.skillProficiencies },
-    }));
+    return value.map(normalizeCharacter).filter((character): character is Character => character !== null);
   } catch {
     return [];
   }
+}
+
+export function normalizeCharacter(value: unknown): Character | null {
+  if (!isBaseCharacter(value)) return null;
+  const character = value as Character;
+  const defaults = defaultCharacterStats();
+  return {
+    ...defaults,
+    ...character,
+    subclass: character.subclass ?? "",
+    classLevels: character.classLevels && Object.keys(character.classLevels).length
+      ? character.classLevels
+      : character.characterClass ? { [character.characterClass]: character.level } : {},
+    classSubclasses: character.classSubclasses && Object.keys(character.classSubclasses).length
+      ? character.classSubclasses
+      : character.characterClass && character.subclass ? { [character.characterClass]: character.subclass } : {},
+    unarmoredDefenseChoice: character.unarmoredDefenseChoice ?? "",
+    abilityScores: { ...defaults.abilityScores, ...character.abilityScores },
+    savingThrowProficiencies: { ...defaults.savingThrowProficiencies, ...character.savingThrowProficiencies },
+    skillProficiencies: { ...defaults.skillProficiencies, ...character.skillProficiencies },
+  };
 }
 
 export function saveCharacters(characters: Character[]): boolean {

@@ -32,14 +32,14 @@ vite.config.ts         Vite configuration
 
 ## Navigation
 
-Menu sections use URL hashes (for example `/#inventory`), so they can be bookmarked and browser back/forward navigation works. Rules calculations are planned for a later step.
+Menu sections use URL hashes (for example `/#inventory`), so they can be bookmarked and browser back/forward navigation works.
 
 ## Character records
 
-The first character flow saves a character's name, concept, species, class, background, and level in this browser's local storage. The collection supports selecting, editing, and deleting a character. The remaining sheet sections are connected to the selected character and ready for their data-entry features.
+Characters autosave to this browser's local storage. The collection supports selecting, editing, and deleting characters. Use **Export library** to download a versioned JSON backup, or export one character from its roster card. **Import backup** merges characters into the current library and skips IDs already present; it never overwrites an existing local character. Keep a downloaded backup somewhere separate from the browser for recovery or transfer to another device.
 
 ## Calculated stats
 
-The Abilities & Skills page derives ability modifiers, proficiency bonus, saving throws, skill bonuses (including expertise), passive Perception, initiative, armor class, fixed-average hit point maximum, speed, carrying limits, spell save DC, spell attack bonus, and single-class spell slots. It also displays level-based resources for the selected class. Inputs are saved with the character, and the derived values recalculate from the current inputs.
+The Abilities & Skills page derives ability modifiers, proficiency bonus, saving throws, skill bonuses (including expertise), passive Perception, initiative, armor class, fixed-average hit point maximum, speed, carrying limits, spell save DC, spell attack bonus, class resources, and multiclass spell slots. Inputs are saved with the character, and derived values recalculate from the current inputs.
 
-The formulas follow the [2024 Basic Rules: Playing the Game](https://www.dndbeyond.com/sources/dnd/br-2024/playing-the-game), [Creating a Character](https://www.dndbeyond.com/sources/dnd/br-2024/creating-a-character), and [Character Classes](https://www.dndbeyond.com/sources/dnd/br-2024/character-classes). Scores begin at 10 as placeholders. Species speed and armor details are entered manually; AC features not covered by the common formulas can use Custom AC. Multiclass progression, subclass features and choices, prepared-spell counts, and full class feature descriptions still need their own data and UI.
+The formulas follow the [2024 Basic Rules: Playing the Game](https://www.dndbeyond.com/sources/dnd/br-2024/playing-the-game), [Creating a Character](https://www.dndbeyond.com/sources/dnd/br-2024/creating-a-character), and [Character Classes](https://www.dndbeyond.com/sources/dnd/br-2024/character-classes). Scores begin at 10 as placeholders. Species speed and armor details are entered manually; AC features not covered by the common formulas can use Custom AC. Local saves and versioned JSON backups are implemented. LAN hosting and reconnect conflict handling are planned for a later phase and are not part of this local-only version.

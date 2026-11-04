@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { Character } from "../data/characters";
 
 type OverviewProps = {
@@ -8,9 +9,14 @@ type OverviewProps = {
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onExport: (character: Character) => void;
+  onExportAll: () => void;
+  onImport: (contents: string) => void;
+  backupMessage: string;
 };
 
-export function Overview({ characters, selectedCharacterId, onCreate, onExplore, onSelect, onEdit, onDelete }: OverviewProps) {
+export function Overview({ characters, selectedCharacterId, onCreate, onExplore, onSelect, onEdit, onDelete, onExport, onExportAll, onImport, backupMessage }: OverviewProps) {
+  const backupInput = useRef<HTMLInputElement>(null);
   const selectedCharacter = characters.find((character) => character.id === selectedCharacterId) ?? characters[0];
 
   return (
@@ -61,8 +67,18 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
             <p className="eyebrow">YOUR COLLECTION</p>
             <h2 id="collection-title">Characters <span className="count-chip">{characters.length}</span></h2>
           </div>
-          <span className="sort-label">{characters.length ? "Saved on this device" : "Ready for your first hero"}</span>
+          <div className="backup-actions">
+            <span className="sort-label">{characters.length ? "Saved on this device" : "Ready for your first hero"}</span>
+            <button className="backup-button" onClick={() => backupInput.current?.click()}>Import backup</button>
+            <button className="backup-button" onClick={onExportAll} disabled={characters.length === 0}>Export library</button>
+            <input ref={backupInput} className="backup-file-input" type="file" accept=".json,application/json" aria-label="Choose a TaleForge backup file" onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void file.text().then(onImport).catch(() => onImport(""));
+              event.target.value = "";
+            }} />
+          </div>
         </div>
+        {backupMessage && <p className="backup-message" role="status">{backupMessage}</p>}
         {characters.length === 0 ? (
           <button className="empty-card" onClick={onCreate}>
             <span className="empty-icon" aria-hidden="true">＋</span>
@@ -81,6 +97,7 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
                 </button>
                 <div className="roster-actions">
                   <button onClick={() => onEdit(character.id)} aria-label={`Edit ${character.name}`}>Edit</button>
+                  <button onClick={() => onExport(character)} aria-label={`Export ${character.name}`}>Export</button>
                   <button onClick={() => onDelete(character.id)} aria-label={`Delete ${character.name}`}>Delete</button>
                 </div>
               </article>
