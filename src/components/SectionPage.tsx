@@ -8,6 +8,7 @@ type SectionPageProps = {
   onOpenBuilder: () => void;
   onEdit: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Character>) => void;
+  onOpenAbilities: () => void;
 };
 
 const sectionDetails: Record<Exclude<SectionId, "overview" | "builder" | "lan">, { intro: string; items: string[] }> = {
@@ -16,7 +17,7 @@ const sectionDetails: Record<Exclude<SectionId, "overview" | "builder" | "lan">,
     items: ["Ability scores", "Saving throws", "Skills & proficiencies"],
   },
   features: {
-    intro: "Keep the special parts of your hero easy to find at the table.",
+    intro: "Class uses and custom feat trackers are available on the Abilities & skills sheet. A full feature and traits editor is coming next.",
     items: ["Class features", "Species traits", "Feats & other traits"],
   },
   inventory: {
@@ -24,7 +25,7 @@ const sectionDetails: Record<Exclude<SectionId, "overview" | "builder" | "lan">,
     items: ["Weapons & armor", "Adventuring gear", "Treasure & currency"],
   },
   spells: {
-    intro: "A quick, organized reference for the magic your character can use.",
+    intro: "Spell slot tracking is available on the Abilities & skills sheet. Spell lists and prepared spells are coming next.",
     items: ["Known spells", "Prepared spells", "Spell slots & resources"],
   },
   notes: {
@@ -33,7 +34,7 @@ const sectionDetails: Record<Exclude<SectionId, "overview" | "builder" | "lan">,
   },
 };
 
-export function SectionPage({ section, character, onOpenBuilder, onEdit, onUpdate }: SectionPageProps) {
+export function SectionPage({ section, character, onOpenBuilder, onEdit, onUpdate, onOpenAbilities }: SectionPageProps) {
   const content = sectionContent[section];
   const navItem = navigationGroups[0].items.find((item) => item.id === section)
     ?? navigationGroups[1].items.find((item) => item.id === section);
@@ -69,6 +70,7 @@ export function SectionPage({ section, character, onOpenBuilder, onEdit, onUpdat
           </article>
         ))}
       </div>
+      {character && (section === "features" || section === "spells") && <div className="section-feature-link"><div><strong>{section === "features" ? "Track feature uses" : "Track spell slots"}</strong><span>{section === "features" ? "Manage class resources, feats, and custom limited-use features." : "Spend and restore spell slots from your character sheet."}</span></div><button className="primary-button" onClick={onOpenAbilities}>Open character sheet <span>→</span></button></div>}
       <div className="section-empty-footer">
         <div><strong>{character ? `${character.name}’s sheet is taking shape` : "No character selected yet"}</strong><span>{character ? "Your saved character is available from every menu section." : "Create your first hero to start filling in this section."}</span></div>
         {!character && <button className="primary-button" onClick={onOpenBuilder}>Create a character <span>→</span></button>}

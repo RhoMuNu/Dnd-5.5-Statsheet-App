@@ -24,6 +24,7 @@ function App() {
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [backupMessage, setBackupMessage] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false);
   const current = sectionContent[activeSection];
   const activeCharacter = characters.find((character) => character.id === selectedCharacterId) ?? characters[0] ?? null;
 
@@ -47,7 +48,7 @@ function App() {
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setMobileMenuOpen(false);
+      if (event.key === "Escape") { setMobileMenuOpen(false); setHelpOpen(false); }
     }
 
     window.addEventListener("keydown", closeOnEscape);
@@ -141,6 +142,7 @@ function App() {
         activeSection={activeSection}
         mobileMenuOpen={mobileMenuOpen}
         onNavigate={() => setMobileMenuOpen(false)}
+        onCampaignClick={() => navigate("lan")}
       />
       {mobileMenuOpen && <button className="mobile-scrim" aria-label="Close menu" onClick={() => setMobileMenuOpen(false)} />}
 
@@ -162,7 +164,7 @@ function App() {
           </div>
           <div className="topbar-actions">
             <span className={`rules-status ${storageAvailable ? "" : "storage-warning"}`}><span /> {storageAvailable ? "Saved in this browser" : "Local save unavailable"}</span>
-            <button className="help-button" aria-label="About this app" title="About this app">?</button>
+            <button className="help-button" aria-label="About this app" title="About this app" onClick={() => setHelpOpen(true)}>?</button>
           </div>
         </header>
 
@@ -174,7 +176,7 @@ function App() {
               <p className="welcome-subtitle">{current.description}</p>
             </div>
             {activeSection !== "builder" && activeSection !== "lan" && (
-              <button className="create-button" onClick={() => navigate("builder")}>
+              <button className="create-button" onClick={() => { setEditingCharacterId(null); navigate("builder"); }}>
                 <span aria-hidden="true">＋</span> Create a character
               </button>
             )}
@@ -208,6 +210,7 @@ function App() {
               onOpenBuilder={() => { setEditingCharacterId(null); navigate("builder"); }}
               onEdit={editCharacter}
               onUpdate={updateCharacter}
+              onOpenAbilities={() => navigate("abilities")}
             />
           )}
 
@@ -217,6 +220,7 @@ function App() {
           </footer>
         </main>
       </div>
+      {helpOpen && <div className="help-scrim" role="presentation" onClick={() => setHelpOpen(false)}><section className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-dialog-title" onClick={(event) => event.stopPropagation()}><button className="help-dialog-close" autoFocus aria-label="Close help" onClick={() => setHelpOpen(false)}>×</button><p className="eyebrow">A QUICK GUIDE</p><h2 id="help-dialog-title">Welcome to TaleForge</h2><p>Create a character, then open <strong>Abilities &amp; skills</strong> to update stats, hit points, spell slots, and limited-use features. Changes save automatically in this browser.</p><p>Use <strong>Import backup</strong> or <strong>Export library</strong> on the Overview page to move or protect your sheets. For a shared game, open <strong>LAN party</strong>; the DM starts the host and players join with the room code.</p><button className="primary-button" onClick={() => setHelpOpen(false)}>Got it</button></section></div>}
     </div>
   );
 }
