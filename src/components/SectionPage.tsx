@@ -3,14 +3,14 @@ import type { Character } from "../data/characters";
 import { AbilitiesPage } from "./AbilitiesPage";
 
 type SectionPageProps = {
-  section: Exclude<SectionId, "overview" | "builder">;
+  section: Exclude<SectionId, "overview" | "builder" | "lan">;
   character: Character | null;
   onOpenBuilder: () => void;
   onEdit: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Character>) => void;
 };
 
-const sectionDetails: Record<Exclude<SectionId, "overview" | "builder">, { intro: string; items: string[] }> = {
+const sectionDetails: Record<Exclude<SectionId, "overview" | "builder" | "lan">, { intro: string; items: string[] }> = {
   abilities: {
     intro: "Your ability scores power the rest of your sheet. Skills and saving throws will update from your character choices.",
     items: ["Ability scores", "Saving throws", "Skills & proficiencies"],
