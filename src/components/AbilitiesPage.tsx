@@ -34,7 +34,7 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
     <section className="abilities-page" aria-label={`Abilities and calculated stats for ${character.name}`}>
       <div className="sheet-context-bar">
         <div className="roster-avatar" aria-hidden="true">{character.name.charAt(0).toUpperCase()}</div>
-        <div><small>LIVE CHARACTER SHEET</small><strong>{character.name}</strong><span>{character.characterClass || "Class not chosen"} · Level {character.level}</span></div>
+        <div><small>LIVE CHARACTER SHEET</small><strong>{character.name}</strong><span>{stats.classBreakdown.map(({ name, level }) => `${name} ${level}`).join(" / ") || "Class not chosen"} · Level {stats.totalLevel}</span></div>
         <div className="proficiency-chip"><small>PROFICIENCY</small><strong>+{stats.proficiencyBonus}</strong></div>
       </div>
 
@@ -90,7 +90,7 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
         <aside className="derived-column" aria-label="Calculated stats">
           <section className="derived-panel highlight-panel">
             <p className="eyebrow">AT A GLANCE</p>
-            <div className="headline-stat"><span>Proficiency bonus</span><strong>+{stats.proficiencyBonus}</strong><small>Based on character level</small></div>
+            <div className="headline-stat"><span>Proficiency bonus</span><strong>+{stats.proficiencyBonus}</strong><small>Based on total character level {stats.totalLevel}</small></div>
             <div className="headline-stat"><span>Initiative</span><strong>{formatModifier(stats.initiative)}</strong><small>Dexterity modifier</small></div>
             <div className="headline-stat"><span>Passive Perception</span><strong>{stats.passivePerception}</strong><small>10 + Perception check modifier</small></div>
           </section>
@@ -112,11 +112,10 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
             <div className="derived-line"><span>Drag, lift, or push</span><strong>{formatWeight(stats.pushDragLift)} lb.</strong></div>
             <div className="derived-line"><span>Effective size</span><strong>{stats.effectiveSize}</strong></div>
             <div className="derived-divider" />
-            {stats.spellSaveDC === null ? <p className="no-spellcasting">Choose a spellcasting ability below to calculate spell stats.</p> : <>
-              <div className="derived-line"><span>Spell save DC</span><strong>{stats.spellSaveDC}</strong></div>
-              <div className="derived-line"><span>Spell attack</span><strong>{formatModifier(stats.spellAttackBonus ?? 0)}</strong></div>
-              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · {stats.spellSlotRecovery.toUpperCase()}</small>{stats.spellSlots.map(({ spellLevel, total }) => <div className="derived-line" key={spellLevel}><span>Level {spellLevel}</span><strong>{total}</strong></div>)}</div>}
-              {(stats.cantrips !== null || stats.preparedSpellCount !== null) && <div className="spell-slot-list"><small>SPELLCASTING PROGRESSION</small>{stats.cantrips !== null && <div className="derived-line"><span>Cantrips known</span><strong>{stats.cantrips}</strong></div>}{stats.preparedSpellCount !== null && <div className="derived-line"><span>{stats.spellCountLabel}</span><strong>{stats.preparedSpellCount}</strong></div>}</div>}
+            {stats.spellcastingProgressions.length === 0 ? <p className="no-spellcasting">Choose a spellcasting class to calculate spell stats.</p> : <>
+              {stats.spellcastingProgressions.length === 1 && <><div className="derived-line"><span>Spell save DC</span><strong>{stats.spellcastingProgressions[0].saveDC}</strong></div><div className="derived-line"><span>Spell attack</span><strong>{formatModifier(stats.spellcastingProgressions[0].attackBonus)}</strong></div></>}
+              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => <div className="derived-line" key={`${pool}-${spellLevel}`}><span>{pool} · Level {spellLevel}</span><strong>{total}</strong></div>)}</div>}
+              {stats.spellcastingProgressions.length > 0 && <div className="spell-slot-list"><small>SPELLCASTING BY CLASS</small>{stats.spellcastingProgressions.map((entry) => <div className="derived-line" key={entry.className}><span>{entry.className}: {entry.cantrips === null ? "—" : `${entry.cantrips} cantrips`}{entry.count !== null ? ` · ${entry.count} ${entry.label?.toLowerCase()}` : ""} · DC {entry.saveDC} / {entry.attackBonus >= 0 ? "+" : ""}{entry.attackBonus}</span><strong>Lvl {stats.classBreakdown.find((item) => item.name === entry.className)?.level}</strong></div>)}</div>}
             </>}
           </section>
 
@@ -130,6 +129,11 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
             <div className="feature-list">{stats.classFeatures.map(({ level, name }) => <div className="derived-line" key={`${level}-${name}`}><span>Level {level} · {name}</span>{name.includes("Choose ") && <strong>Choice</strong>}</div>)}</div>
           </section>}
 
+          {stats.multiclassWarnings.length > 0 && <section className="derived-panel class-resource-panel">
+            <p className="eyebrow">MULTICLASS RULE NOTES</p>
+            {stats.multiclassWarnings.map((warning) => <p className="setup-note" key={warning}>{warning}</p>)}
+          </section>}
+
           <details className="sheet-panel setup-panel">
             <summary>Movement, armor &amp; spell setup</summary>
             <div className="setup-fields">
@@ -138,6 +142,7 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
               <label className="compact-field"><span>Other speed bonus (feet)</span><input type="number" min={-500} max={500} value={character.otherSpeedBonus} onChange={(event) => onChange({ otherSpeedBonus: numberOr(event.target.value, character.otherSpeedBonus, -500, 500) })} /></label>
               <label className="toggle-row"><input type="checkbox" checked={character.powerfulBuild} onChange={(event) => onChange({ powerfulBuild: event.target.checked })} /><span>Counts as one size larger for carrying</span></label>
               <label className="compact-field"><span>Armor formula</span><select value={character.armorMode} onChange={(event) => onChange({ armorMode: event.target.value as Character["armorMode"] })}>{ARMOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
+              {stats.classBreakdown.some(({ name }) => name === "Barbarian") && stats.classBreakdown.some(({ name }) => name === "Monk") && <label className="compact-field"><span>Unarmored Defense choice</span><select value={character.unarmoredDefenseChoice} onChange={(event) => onChange({ unarmoredDefenseChoice: event.target.value as Character["unarmoredDefenseChoice"] })}><option value="">Use starting class</option><option value="Barbarian">Barbarian · Dex + Con</option><option value="Monk">Monk · Dex + Wis (no shield)</option></select></label>}
               {character.armorMode !== "unarmored" && <label className="compact-field"><span>Armor base AC</span><input type="number" min={1} max={40} value={character.armorBaseAC} onChange={(event) => onChange({ armorBaseAC: numberOr(event.target.value, character.armorBaseAC, 1, 40) })} /></label>}
               {character.armorMode === "heavy" && <label className="compact-field"><span>Armor Strength requirement</span><input type="number" min={0} max={30} value={character.armorStrengthRequirement} onChange={(event) => onChange({ armorStrengthRequirement: numberOr(event.target.value, character.armorStrengthRequirement, 0, 30) })} /></label>}
               <label className="toggle-row"><input type="checkbox" checked={character.hasShield} onChange={(event) => onChange({ hasShield: event.target.checked })} /><span>Shield AC bonus (+2 when trained)</span></label>

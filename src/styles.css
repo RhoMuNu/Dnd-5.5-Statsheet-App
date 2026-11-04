@@ -160,6 +160,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 .form-field input:focus, .form-field select:focus { border-color: #ab8956; box-shadow: 0 0 0 2px #d5a95b1c; }
 .form-field select option, .compact-field select option, .skill-row select option { background: #1c1b20; color: #eee9df; }
 .form-field input[type="number"] { max-width: 120px; }
+.multiclass-row { grid-column: 1 / -1; }
+.multiclass-controls { display: flex; align-items: center; gap: 9px; }
+.multiclass-controls input { max-width: 150px; }
+.multiclass-controls button { flex: 0 0 auto; }
 .form-hint { margin: 16px 0 0; color: #89858d; font-size: 9px; line-height: 1.55; }
 .form-error { margin: 10px 0 0; color: #f1a89a; font-size: 10px; }
 .form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 23px; padding-top: 17px; border-top: 1px solid #302f37; }
