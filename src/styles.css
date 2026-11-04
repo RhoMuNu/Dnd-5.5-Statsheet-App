@@ -241,8 +241,48 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 .spell-slot-list > small { display: block; margin-bottom: 4px; color: #9f8d70; font-size: 7px; letter-spacing: .7px; }
 .no-spellcasting { margin: 7px 0 0; color: #85818a; font-size: 8px; line-height: 1.5; }
 .class-resource-panel .derived-line strong { max-width: 65%; font-size: 8px; line-height: 1.4; }
+.abilities-page { font-size: 14px; }
+.sheet-context-bar small, .proficiency-chip small { font-size: 9px; }
+.sheet-context-bar > div:nth-child(2) span { font-size: 10px; }
+.panel-heading h2 { font-size: 15px; }
+.panel-hint, .panel-footnote, .no-spellcasting, .setup-note { font-size: 10px; }
+.ability-score-card > span { font-size: 10px; }
+.save-row { font-size: 11px; padding: 7px 1px; }
+.skill-name { font-size: 10px; }
+.skill-ability { font-size: 9px; }
+.skill-row b { font-size: 11px; }
+.skill-row select { font-size: 9px; height: 26px; }
+.headline-stat > span { font-size: 11px; }
+.headline-stat > small { font-size: 10px; }
+.derived-stat-grid small, .applied-features small, .spell-slot-list > small { font-size: 9px; }
+.applied-features span { font-size: 10px; }
+.derived-line span { font-size: 10px; }
+.derived-line strong { font-size: 11px; }
+.class-resource-panel .derived-line strong { max-width: 65%; font-size: 11px; }
+.setup-panel summary { font-size: 11px; }
+.compact-field > span, .toggle-row { font-size: 10px; }
+.compact-field input, .compact-field select { font-size: 10px; }
+.resource-recovery { display: block; margin-top: 3px; color: #89858d; font-size: 9px; }
+.tracked-resource { min-height: 43px; }
+.resource-controls { display: flex; align-items: center; gap: 7px; }
+.resource-controls strong { min-width: 48px; max-width: none !important; color: #e6d2ac; font-size: 11px !important; text-align: center; }
+.resource-controls button, .resource-rest-actions button { min-width: 30px; min-height: 30px; border: 1px solid #554631; border-radius: 6px; background: #24211d; color: #edc987; font-size: 17px; cursor: pointer; }
+.resource-controls button:disabled { opacity: .4; cursor: default; }
+.resource-rest-actions { display: flex; gap: 8px; margin-top: 10px; }
+.resource-rest-actions button { min-height: 32px; padding: 0 10px; font-size: 10px; }
+.nav-link { font-size: 13px; }
+.nav-heading, .campaign-copy small { font-size: 10px; }
+.breadcrumb { font-size: 10px; }
+.welcome-subtitle { font-size: 13px; line-height: 1.6; }
+.form-heading p:last-child, .form-field > span { font-size: 12px; }
+.form-field input, .form-field select { font-size: 12px; }
+.roster-copy strong { font-size: 13px; }
+.roster-copy > span { font-size: 11px; }
+.quick-copy strong { font-size: 12px; }
+.quick-copy div span { font-size: 11px; }
 .setup-panel { padding: 0; }
 .setup-panel summary { padding: 13px 15px; color: #d5c7ac; font-size: 9px; font-weight: 600; cursor: pointer; }
+.setup-panel summary { font-size: 11px; }
 .setup-fields { display: grid; min-width: 0; gap: 11px; margin: 0; padding: 0 14px 14px; border: 0; }
 .compact-field { display: flex; flex-direction: column; gap: 5px; }
 .compact-field > span { color: #a8a2a0; font-size: 8px; }
@@ -382,7 +422,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
   .page-content { padding: 34px 20px 20px; }
   .welcome-row { align-items: flex-start; }
   .welcome-row h1 { font-size: 24px; }
-  .welcome-subtitle { max-width: 360px; font-size: 11px; line-height: 1.55; }
+  .welcome-subtitle { max-width: 360px; font-size: 13px; line-height: 1.55; }
   .create-button { height: 35px; padding: 0 10px; font-size: 9px; }
   .featured-card { grid-template-columns: 1fr; }
   .featured-art { height: 158px; }
@@ -406,6 +446,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
   .lan-setup-grid { grid-template-columns: 1fr; }
   .lan-intro-card { align-items: flex-start; flex-wrap: wrap; }
   .lan-intro-card .lan-connection { margin-left: 61px; }
+  .abilities-layout { grid-template-columns: minmax(0,1fr); }
+  .resource-controls { gap: 4px; }
+  .resource-controls button { min-width: 34px; min-height: 34px; }
 }
 @media (max-width: 480px) {
   .page-content { padding: 28px 15px 18px; }
