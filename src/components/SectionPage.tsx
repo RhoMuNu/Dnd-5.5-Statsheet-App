@@ -1,6 +1,12 @@
 import { navigationGroups, sectionContent, type SectionId } from "../data/navigation";
+import type { Character } from "../data/characters";
 
-type SectionPageProps = { section: Exclude<SectionId, "overview">; onCreate: () => void };
+type SectionPageProps = {
+  section: Exclude<SectionId, "overview" | "builder">;
+  character: Character | null;
+  onOpenBuilder: () => void;
+  onEdit: (id: string) => void;
+};
 
 const sectionDetails: Record<Exclude<SectionId, "overview" | "builder">, { intro: string; items: string[] }> = {
   abilities: {
@@ -25,37 +31,10 @@ const sectionDetails: Record<Exclude<SectionId, "overview" | "builder">, { intro
   },
 };
 
-export function SectionPage({ section, onCreate }: SectionPageProps) {
+export function SectionPage({ section, character, onOpenBuilder, onEdit }: SectionPageProps) {
   const content = sectionContent[section];
   const navItem = navigationGroups[0].items.find((item) => item.id === section)
     ?? navigationGroups[1].items.find((item) => item.id === section);
-
-  if (section === "builder") {
-    return (
-      <section className="section-screen" aria-labelledby="section-page-title">
-        <div className="section-intro-card">
-          <div className="section-symbol" aria-hidden="true">✦</div>
-          <div className="section-intro-copy">
-            <p className="eyebrow">YOUR GUIDED START</p>
-            <h2 id="section-page-title">A few choices, one ready-to-play hero.</h2>
-            <p>The builder will walk you through each decision and keep the sheet up to date as you go.</p>
-          </div>
-        </div>
-        <div className="builder-steps" aria-label="Character builder steps">
-          {["The idea", "Your origins", "Your class", "Ability scores", "Review the sheet"].map((step, index) => (
-            <div className="builder-step" key={step}>
-              <span className="step-number">{String(index + 1).padStart(2, "0")}</span>
-              <span>{step}</span>
-              <span className="step-state">UP NEXT</span>
-            </div>
-          ))}
-        </div>
-        <div className="next-step-note"><span aria-hidden="true">✧</span><p><strong>The guided builder is the next feature phase.</strong><br />This menu and its destinations are ready for us to build into.</p></div>
-        <button className="primary-button" onClick={onCreate}>Back to character collection <span>→</span></button>
-      </section>
-    );
-  }
-
   const detail = sectionDetails[section];
 
   return (
@@ -68,18 +47,25 @@ export function SectionPage({ section, onCreate }: SectionPageProps) {
           <p>{detail.intro}</p>
         </div>
       </div>
+      {character && (
+        <div className="selected-character-banner">
+          <span className="roster-avatar" aria-hidden="true">{character.name.charAt(0).toUpperCase()}</span>
+          <div><small>SELECTED CHARACTER</small><strong>{character.name}</strong><span>{[character.species, character.characterClass, character.background].filter(Boolean).join(" · ") || "New adventurer"} · Level {character.level}</span></div>
+          <button className="text-button" onClick={() => onEdit(character.id)}>Edit basics <span>↗</span></button>
+        </div>
+      )}
       <div className="content-preview-grid">
         {detail.items.map((item, index) => (
           <article className="content-preview-card" key={item}>
             <span className="content-preview-icon" aria-hidden="true">{["✧", "◈", "❖"][index]}</span>
-            <div><h3>{item}</h3><p>Appears here when you create a character.</p></div>
-            <span className="locked-label">EMPTY</span>
+            <div><h3>{item}</h3><p>{character ? "This part of the sheet is ready for the next build step." : "Create a character to start filling in this section."}</p></div>
+            <span className="locked-label">{character ? "UP NEXT" : "EMPTY"}</span>
           </article>
         ))}
       </div>
       <div className="section-empty-footer">
-        <div><strong>No character selected yet</strong><span>Create your first hero to start filling in this section.</span></div>
-        <button className="primary-button" onClick={onCreate}>Go to collection <span>→</span></button>
+        <div><strong>{character ? `${character.name}’s sheet is taking shape` : "No character selected yet"}</strong><span>{character ? "Your saved character is available from every menu section." : "Create your first hero to start filling in this section."}</span></div>
+        {!character && <button className="primary-button" onClick={onOpenBuilder}>Create a character <span>→</span></button>}
       </div>
     </section>
   );

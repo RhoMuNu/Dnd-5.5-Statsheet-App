@@ -2,13 +2,35 @@ import { useEffect, useState } from "react";
 import { Overview } from "./components/Overview";
 import { SectionPage } from "./components/SectionPage";
 import { Sidebar } from "./components/Sidebar";
+import { CharacterBuilder } from "./components/CharacterBuilder";
+import {
+  loadActiveCharacterId,
+  loadCharacters,
+  makeCharacterId,
+  saveActiveCharacterId,
+  saveCharacters,
+} from "./data/characters";
+import type { Character, CharacterDraft } from "./data/characters";
 import { sectionContent, sectionFromHash } from "./data/navigation";
 import type { SectionId } from "./data/navigation";
 
 function App() {
   const [activeSection, setActiveSection] = useState<SectionId>(() => sectionFromHash(window.location.hash));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [characters, setCharacters] = useState<Character[]>(loadCharacters);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(loadActiveCharacterId);
+  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
+  const [storageAvailable, setStorageAvailable] = useState(true);
   const current = sectionContent[activeSection];
+  const activeCharacter = characters.find((character) => character.id === selectedCharacterId) ?? characters[0] ?? null;
+
+  useEffect(() => {
+    setStorageAvailable(saveCharacters(characters));
+  }, [characters]);
+
+  useEffect(() => {
+    setStorageAvailable((available) => saveActiveCharacterId(selectedCharacterId) && available);
+  }, [selectedCharacterId]);
 
   useEffect(() => {
     function syncSectionFromUrl() {
@@ -38,6 +60,40 @@ function App() {
     setMobileMenuOpen(false);
   }
 
+  function saveCharacter(draft: CharacterDraft) {
+    const now = new Date().toISOString();
+    if (editingCharacterId) {
+      setCharacters((existing) => existing.map((character) => character.id === editingCharacterId
+        ? { ...character, ...draft, updatedAt: now }
+        : character));
+      setSelectedCharacterId(editingCharacterId);
+    } else {
+      const created: Character = {
+        ...draft,
+        id: makeCharacterId(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      setCharacters((existing) => [created, ...existing]);
+      setSelectedCharacterId(created.id);
+    }
+    setEditingCharacterId(null);
+    navigate("overview");
+  }
+
+  function editCharacter(id: string) {
+    setEditingCharacterId(id);
+    setSelectedCharacterId(id);
+    navigate("builder");
+  }
+
+  function deleteCharacter(id: string) {
+    const character = characters.find((item) => item.id === id);
+    if (!character || !window.confirm(`Delete ${character.name} from this browser? This cannot be undone.`)) return;
+    setCharacters((existing) => existing.filter((item) => item.id !== id));
+    if (selectedCharacterId === id) setSelectedCharacterId(null);
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -64,7 +120,7 @@ function App() {
             <strong>{activeSection === "overview" ? "ALL CHARACTERS" : current.title.toUpperCase()}</strong>
           </div>
           <div className="topbar-actions">
-            <span className="rules-status"><span /> Local draft mode</span>
+            <span className={`rules-status ${storageAvailable ? "" : "storage-warning"}`}><span /> {storageAvailable ? "Saved in this browser" : "Local save unavailable"}</span>
             <button className="help-button" aria-label="About this app" title="About this app">?</button>
           </div>
         </header>
@@ -84,9 +140,29 @@ function App() {
           </section>
 
           {activeSection === "overview" ? (
-            <Overview onCreate={() => navigate("builder")} onExplore={() => navigate("abilities")} />
+            <Overview
+              characters={characters}
+              selectedCharacterId={activeCharacter?.id ?? null}
+              onCreate={() => { setEditingCharacterId(null); navigate("builder"); }}
+              onExplore={() => navigate("abilities")}
+              onSelect={setSelectedCharacterId}
+              onEdit={editCharacter}
+              onDelete={deleteCharacter}
+            />
+          ) : activeSection === "builder" ? (
+            <CharacterBuilder
+              key={editingCharacterId ?? "new-character"}
+              character={characters.find((character) => character.id === editingCharacterId)}
+              onSave={saveCharacter}
+              onCancel={() => { setEditingCharacterId(null); navigate("overview"); }}
+            />
           ) : (
-            <SectionPage section={activeSection} onCreate={() => navigate("overview")} />
+            <SectionPage
+              section={activeSection}
+              character={activeCharacter}
+              onOpenBuilder={() => { setEditingCharacterId(null); navigate("builder"); }}
+              onEdit={editCharacter}
+            />
           )}
 
           <footer className="page-footer">
