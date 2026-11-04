@@ -47,6 +47,8 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
         skillProficiencies: character.skillProficiencies,
         resourceUses: character.resourceUses,
         customResources: character.customResources,
+        currentHitPoints: character.currentHitPoints,
+        temporaryHitPoints: character.temporaryHitPoints,
         size: character.size,
         speedFeet: character.speedFeet,
         otherSpeedBonus: character.otherSpeedBonus,

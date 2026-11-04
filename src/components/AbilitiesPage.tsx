@@ -15,6 +15,9 @@ const ARMOR_MODES = [
 
 export function AbilitiesPage({ character, onChange, readOnly = false }: AbilitiesPageProps) {
   const stats = calculateCharacterStats(character);
+  const maximumHp = stats.maxHitPoints ?? 0;
+  const currentHp = Math.min(maximumHp, character.currentHitPoints ?? maximumHp);
+  const hpPercent = maximumHp > 0 ? (currentHp / maximumHp) * 100 : 0;
   const [resourceName, setResourceName] = useState("");
   const [resourceMax, setResourceMax] = useState("1");
   const [resourceRecovery, setResourceRecovery] = useState<Character["customResources"][number]["recovery"]>("long");
@@ -46,6 +49,22 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
 
   function changeCustomResource(id: string, amount: number) {
     onChange?.({ customResources: character.customResources.map((resource) => resource.id === id ? { ...resource, used: Math.min(resource.maxUses, Math.max(0, resource.used + amount)) } : resource) });
+  }
+
+  function changeHitPoints(amount: number) {
+    onChange?.({ currentHitPoints: Math.min(maximumHp, Math.max(0, currentHp + amount)) });
+  }
+
+  function setHitPoints(rawValue: string) {
+    if (rawValue === "") return;
+    const value = Number(rawValue);
+    if (Number.isInteger(value)) onChange?.({ currentHitPoints: Math.min(maximumHp, Math.max(0, value)) });
+  }
+
+  function setTemporaryHitPoints(rawValue: string) {
+    if (rawValue === "") return;
+    const value = Number(rawValue);
+    if (Number.isInteger(value)) onChange?.({ temporaryHitPoints: Math.max(0, Math.min(9999, value)) });
   }
 
   function addCustomResource() {
@@ -154,6 +173,11 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               <div><small>SPEED</small><strong>{stats.speed}<i> ft</i></strong></div>
               <div><small>HIT DIE</small><strong>{stats.hitDie ? `d${stats.hitDie}` : "—"}</strong></div>
             </div>
+            <div className="hp-tracker" aria-label="Hit points">
+              <div className="hp-tracker-heading"><strong>Hit points</strong><span>{stats.maxHitPoints === null ? "Choose a class to calculate maximum HP" : `${currentHp} / ${maximumHp} HP`}</span></div>
+              <div className="hp-bar" role="meter" aria-label="Hit points remaining" aria-valuemin={0} aria-valuemax={maximumHp} aria-valuenow={currentHp}><span style={{ width: `${hpPercent}%` }} /></div>
+              <div className="hp-controls"><button type="button" aria-label="Take one damage" disabled={readOnly || currentHp <= 0 || maximumHp === 0} onClick={() => changeHitPoints(-1)}>− Damage</button><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><button type="button" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label></div>
+            </div>
             {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
           </section>
 
@@ -165,23 +189,23 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <div className="derived-divider" />
             {stats.spellcastingProgressions.length === 0 ? <p className="no-spellcasting">Choose a spellcasting class to calculate spell stats.</p> : <>
               {stats.spellcastingProgressions.length === 1 && <><div className="derived-line"><span>Spell save DC</span><strong>{stats.spellcastingProgressions[0].saveDC}</strong></div><div className="derived-line"><span>Spell attack</span><strong>{formatModifier(stats.spellcastingProgressions[0].attackBonus)}</strong></div></>}
-              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · REMAINING / MAX</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => { const key = spellSlotKey(pool, spellLevel); const used = Math.min(total, character.resourceUses[key] ?? 0); return <div className="derived-line tracked-resource" key={key}><span>{pool} · Level {spellLevel}</span><div className="resource-controls"><button disabled={readOnly || used === 0} aria-label={`Use level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, 1, total)}>−</button><strong>{total - used} / {total}</strong><button disabled={readOnly || used === total} aria-label={`Restore level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, -1, total)}>+</button></div></div>; })}</div>}
+              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · REMAINING / MAX</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => { const key = spellSlotKey(pool, spellLevel); const used = Math.min(total, character.resourceUses[key] ?? 0); return <div className="derived-line tracked-resource" key={key}><span>{pool} · Level {spellLevel}</span><div className="resource-controls"><button type="button" disabled={readOnly || used === total} aria-label={`Use level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, 1, total)}>−</button><strong>{total - used} / {total}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, -1, total)}>+</button></div></div>; })}</div>}
               {stats.spellcastingProgressions.length > 0 && <div className="spell-slot-list"><small>SPELLCASTING BY CLASS</small>{stats.spellcastingProgressions.map((entry) => <div className="derived-line" key={entry.className}><span>{entry.className}: {entry.cantrips === null ? "—" : `${entry.cantrips} cantrips`}{entry.count !== null ? ` · ${entry.count} ${entry.label?.toLowerCase()}` : ""} · DC {entry.saveDC} / {entry.attackBonus >= 0 ? "+" : ""}{entry.attackBonus}</span><strong>Lvl {stats.classBreakdown.find((item) => item.name === entry.className)?.level}</strong></div>)}</div>}
             </>}
           </section>
 
           {stats.classResources.length > 0 && <section className="derived-panel class-resource-panel">
             <p className="eyebrow">CLASS FEATURES &amp; RESOURCES</p>
-            {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key ? <div className="resource-controls"><button disabled={readOnly || used === 0} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}{value ? ` ${value}` : ""}</strong><button disabled={readOnly || used === maxUses} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
+            {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key ? <div className="resource-controls"><button type="button" disabled={readOnly || used === maxUses} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}{value ? ` ${value}` : ""}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
           </section>}
 
           <section className="derived-panel class-resource-panel custom-resource-panel">
             <p className="eyebrow">FEATS &amp; CUSTOM FEATURE TRACKERS</p>
             <p className="setup-note">Add limited-use feats, subclass features, magic items, or any other resource. Choose how it recovers.</p>
-            {character.customResources.map((resource) => <div className="derived-line tracked-resource" key={resource.id}><span>{resource.name}<small className="resource-recovery">{resourceRecoveryLabel(resource.recovery)}</small></span><div className="resource-controls"><button disabled={readOnly || resource.used <= 0} aria-label={`Use one ${resource.name}`} onClick={() => changeCustomResource(resource.id, 1)}>−</button><strong>{resource.maxUses - resource.used} / {resource.maxUses}</strong><button disabled={readOnly || resource.used >= resource.maxUses} aria-label={`Restore one ${resource.name}`} onClick={() => changeCustomResource(resource.id, -1)}>+</button><button className="resource-remove" disabled={readOnly} aria-label={`Remove ${resource.name} tracker`} onClick={() => onChange?.({ customResources: character.customResources.filter((entry) => entry.id !== resource.id) })}>×</button></div></div>)}
-            {!readOnly && (stats.classResources.some(({ recovery }) => recovery === "Short Rest") || stats.spellSlots.some(({ pool }) => pool.startsWith("Pact Magic")) || character.customResources.some(({ recovery }) => recovery.startsWith("short-"))) && <button className="resource-rest-button" onClick={() => recoverResources("Short Rest")}>Take a Short Rest <span>↻</span></button>}
-            {!readOnly && (stats.classResources.some(({ maxUses }) => maxUses !== undefined) || stats.spellSlots.length > 0 || character.customResources.some(({ recovery }) => recovery !== "manual")) && <button className="resource-rest-button" onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
-            {!readOnly && <div className="custom-resource-form"><label><span>Feature / feat name</span><input value={resourceName} maxLength={50} placeholder="e.g. Lucky" onChange={(event) => setResourceName(event.target.value)} /></label><label><span>Uses</span><input type="number" min={1} max={999} value={resourceMax} onChange={(event) => setResourceMax(event.target.value)} /></label><label><span>Recovery</span><select value={resourceRecovery} onChange={(event) => setResourceRecovery(event.target.value as typeof resourceRecovery)}><option value="long">Long rest · all</option><option value="short-one">Short rest · one</option><option value="short-all">Short rest · all</option><option value="manual">Manual only</option></select></label><button className="resource-add-button" disabled={!resourceName.trim() || !Number.isInteger(Number(resourceMax)) || Number(resourceMax) < 1 || Number(resourceMax) > 999} onClick={addCustomResource}>Add tracker</button></div>}
+            {character.customResources.map((resource) => <div className="derived-line tracked-resource" key={resource.id}><span>{resource.name}<small className="resource-recovery">{resourceRecoveryLabel(resource.recovery)}</small></span><div className="resource-controls"><button type="button" disabled={readOnly || resource.used >= resource.maxUses} aria-label={`Use one ${resource.name}`} onClick={() => changeCustomResource(resource.id, 1)}>−</button><strong>{resource.maxUses - resource.used} / {resource.maxUses}</strong><button type="button" disabled={readOnly || resource.used <= 0} aria-label={`Restore one ${resource.name}`} onClick={() => changeCustomResource(resource.id, -1)}>+</button><button type="button" className="resource-remove" disabled={readOnly} aria-label={`Remove ${resource.name} tracker`} onClick={() => onChange?.({ customResources: character.customResources.filter((entry) => entry.id !== resource.id) })}>×</button></div></div>)}
+            {!readOnly && (stats.classResources.some(({ recovery }) => recovery === "Short Rest") || stats.spellSlots.some(({ pool }) => pool.startsWith("Pact Magic")) || character.customResources.some(({ recovery }) => recovery.startsWith("short-"))) && <button type="button" className="resource-rest-button" onClick={() => recoverResources("Short Rest")}>Take a Short Rest <span>↻</span></button>}
+            {!readOnly && (stats.classResources.some(({ maxUses }) => maxUses !== undefined) || stats.spellSlots.length > 0 || character.customResources.some(({ recovery }) => recovery !== "manual")) && <button type="button" className="resource-rest-button" onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
+            {!readOnly && <div className="custom-resource-form"><label><span>Feature / feat name</span><input value={resourceName} maxLength={50} placeholder="e.g. Lucky" onChange={(event) => setResourceName(event.target.value)} /></label><label><span>Uses</span><input type="number" min={1} max={999} value={resourceMax} onChange={(event) => setResourceMax(event.target.value)} /></label><label><span>Recovery</span><select value={resourceRecovery} onChange={(event) => setResourceRecovery(event.target.value as typeof resourceRecovery)}><option value="long">Long rest · all</option><option value="short-one">Short rest · one</option><option value="short-all">Short rest · all</option><option value="manual">Manual only</option></select></label><button type="button" className="resource-add-button" disabled={!resourceName.trim() || !Number.isInteger(Number(resourceMax)) || Number(resourceMax) < 1 || Number(resourceMax) > 999} onClick={addCustomResource}>Add tracker</button></div>}
           </section>
 
           {stats.classFeatures.length > 0 && <section className="derived-panel class-resource-panel">

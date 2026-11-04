@@ -9,6 +9,8 @@ export type Character = {
   classSubclasses: Record<string, string>;
   resourceUses: Record<string, number>;
   customResources: CustomResource[];
+  currentHitPoints: number | null;
+  temporaryHitPoints: number;
   unarmoredDefenseChoice: "Barbarian" | "Monk" | "";
   background: string;
   level: number;
@@ -71,6 +73,8 @@ export function defaultCharacterStats(): Pick<Character,
   "classSubclasses" |
   "resourceUses" |
   "customResources" |
+  "currentHitPoints" |
+  "temporaryHitPoints" |
   "unarmoredDefenseChoice" |
   "abilityScores" | "savingThrowProficiencies" | "skillProficiencies" | "size" | "speedFeet" |
   "otherSpeedBonus" |
@@ -83,6 +87,8 @@ export function defaultCharacterStats(): Pick<Character,
     classSubclasses: {},
     resourceUses: {},
     customResources: [],
+    currentHitPoints: null,
+    temporaryHitPoints: 0,
     unarmoredDefenseChoice: "",
     abilityScores: Object.fromEntries(ABILITIES.map((ability) => [ability, 10])) as Record<AbilityName, number>,
     savingThrowProficiencies: Object.fromEntries(ABILITIES.map((ability) => [ability, false])) as Record<AbilityName, boolean>,
@@ -122,6 +128,8 @@ export function normalizeCharacter(value: unknown): Character | null {
     ...character,
     resourceUses: character.resourceUses ?? {},
     customResources: Array.isArray(character.customResources) ? character.customResources.filter(isCustomResource).map((resource) => ({ ...resource, used: Math.min(Math.trunc(resource.maxUses), Math.max(0, Math.trunc(resource.used))) })) : [],
+    currentHitPoints: Number.isFinite(character.currentHitPoints) ? Math.max(0, Math.trunc(character.currentHitPoints!)) : null,
+    temporaryHitPoints: Number.isFinite(character.temporaryHitPoints) ? Math.max(0, Math.trunc(character.temporaryHitPoints!)) : 0,
     subclass: character.subclass ?? "",
     classLevels: character.classLevels && Object.keys(character.classLevels).length
       ? character.classLevels
