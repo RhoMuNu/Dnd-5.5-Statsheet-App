@@ -32,4 +32,8 @@ vite.config.ts         Vite configuration
 
 ## Navigation
 
-Menu sections use URL hashes (for example `/#inventory`), so they can be bookmarked and browser back/forward navigation works. Character data, saving, and rules calculations are planned for later steps.
+Menu sections use URL hashes (for example `/#inventory`), so they can be bookmarked and browser back/forward navigation works. Rules calculations are planned for a later step.
+
+## Character records
+
+The first character flow saves a character's name, concept, species, class, background, and level in this browser's local storage. The collection supports selecting, editing, and deleting a character. The remaining sheet sections are connected to the selected character and ready for their data-entry features.
