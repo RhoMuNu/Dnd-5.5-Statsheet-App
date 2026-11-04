@@ -5,6 +5,9 @@ export type Character = {
   species: string;
   characterClass: string;
   subclass: string;
+  classLevels: Record<string, number>;
+  classSubclasses: Record<string, string>;
+  unarmoredDefenseChoice: "Barbarian" | "Monk" | "";
   background: string;
   level: number;
   abilityScores: Record<AbilityName, number>;
@@ -60,6 +63,9 @@ export const SKILLS: { name: SkillName; ability: AbilityName }[] = [
 
 export function defaultCharacterStats(): Pick<Character,
   "subclass" |
+  "classLevels" |
+  "classSubclasses" |
+  "unarmoredDefenseChoice" |
   "abilityScores" | "savingThrowProficiencies" | "skillProficiencies" | "size" | "speedFeet" |
   "otherSpeedBonus" |
   "powerfulBuild" | "armorMode" | "armorBaseAC" | "hasShield" | "otherAcBonus" |
@@ -67,6 +73,9 @@ export function defaultCharacterStats(): Pick<Character,
 > {
   return {
     subclass: "",
+    classLevels: {},
+    classSubclasses: {},
+    unarmoredDefenseChoice: "",
     abilityScores: Object.fromEntries(ABILITIES.map((ability) => [ability, 10])) as Record<AbilityName, number>,
     savingThrowProficiencies: Object.fromEntries(ABILITIES.map((ability) => [ability, false])) as Record<AbilityName, boolean>,
     skillProficiencies: Object.fromEntries(SKILLS.map((skill) => [skill.name, 0])) as Record<SkillName, 0 | 1 | 2>,
@@ -94,6 +103,13 @@ export function loadCharacters(): Character[] {
       ...defaultCharacterStats(),
       ...character,
       subclass: character.subclass ?? "",
+      classLevels: character.classLevels && Object.keys(character.classLevels).length
+        ? character.classLevels
+        : character.characterClass ? { [character.characterClass]: character.level } : {},
+      classSubclasses: character.classSubclasses && Object.keys(character.classSubclasses).length
+        ? character.classSubclasses
+        : character.characterClass && character.subclass ? { [character.characterClass]: character.subclass } : {},
+      unarmoredDefenseChoice: character.unarmoredDefenseChoice ?? "",
       abilityScores: { ...defaultCharacterStats().abilityScores, ...character.abilityScores },
       savingThrowProficiencies: { ...defaultCharacterStats().savingThrowProficiencies, ...character.savingThrowProficiencies },
       skillProficiencies: { ...defaultCharacterStats().skillProficiencies, ...character.skillProficiencies },
@@ -143,6 +159,9 @@ function isBaseCharacter(value: unknown): value is Omit<Character, keyof ReturnT
     && typeof character.species === "string"
     && typeof character.characterClass === "string"
     && (character.subclass === undefined || typeof character.subclass === "string")
+    && (character.classLevels === undefined || (typeof character.classLevels === "object" && character.classLevels !== null))
+    && (character.classSubclasses === undefined || (typeof character.classSubclasses === "object" && character.classSubclasses !== null))
+    && (character.unarmoredDefenseChoice === undefined || character.unarmoredDefenseChoice === "" || character.unarmoredDefenseChoice === "Barbarian" || character.unarmoredDefenseChoice === "Monk")
     && typeof character.background === "string"
     && typeof character.level === "number"
     && typeof character.createdAt === "string"
