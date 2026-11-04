@@ -279,16 +279,22 @@ function classResourcesFor(character: Character, level: number, modifiers: Recor
         { key: "rage", label: "Rage", value: "", maxUses: level >= 17 ? 6 : level >= 12 ? 5 : level >= 6 ? 4 : level >= 3 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" },
         { label: "Rage damage", value: `+${level >= 16 ? 4 : level >= 9 ? 3 : 2}` },
         { label: "Weapon Mastery", value: String(level >= 10 ? 4 : level >= 4 ? 3 : 2) },
+        ...(level >= 15 ? [{ key: "persistent-rage-recovery", label: "Persistent Rage · Initiative Recovery", value: "", maxUses: 1, recovery: "Long Rest" as const }] : []),
       ];
     case "bard":
       return [{ key: "bardic-inspiration", label: "Bardic Inspiration", value: level >= 15 ? "d12" : level >= 10 ? "d10" : level >= 5 ? "d8" : "d6", maxUses: Math.max(1, modifiers.Charisma), recovery: level >= 5 ? "Short Rest" : "Long Rest", shortRestRecovery: "all" }];
     case "cleric":
-      return level >= 2 ? [{ key: "channel-divinity", label: "Channel Divinity", value: "", maxUses: level >= 6 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" }] : [];
+      return [
+        ...(level >= 2 ? [{ key: "channel-divinity", label: "Channel Divinity", value: "", maxUses: level >= 6 ? 3 : 2, recovery: "Short Rest" as const, shortRestRecovery: "one" as const }] : []),
+        ...(level >= 10 ? [{ key: "divine-intervention", label: "Divine Intervention", value: "", maxUses: 1, recovery: "Long Rest" as const }] : []),
+      ];
     case "druid":
       return level >= 2 ? [{ key: "wild-shape", label: "Wild Shape", value: "", maxUses: level >= 17 ? 4 : level >= 6 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" }] : [];
     case "fighter":
       return [
         { key: "second-wind", label: "Second Wind", value: "", maxUses: level >= 10 ? 4 : level >= 4 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" },
+        { key: "action-surge", label: "Action Surge", value: "", maxUses: level >= 17 ? 2 : 1, recovery: "Short Rest", shortRestRecovery: "all" },
+        ...(level >= 9 ? [{ key: "indomitable", label: "Indomitable", value: "", maxUses: level >= 17 ? 3 : level >= 13 ? 2 : 1, recovery: "Long Rest" as const }] : []),
         { label: "Weapon Mastery", value: `${level >= 16 ? 6 : level >= 10 ? 5 : level >= 4 ? 4 : 3} weapons` },
       ];
     case "monk":
@@ -298,24 +304,38 @@ function classResourcesFor(character: Character, level: number, modifiers: Recor
       ] : [{ label: "Martial Arts die", value: "d6" }];
     case "paladin":
       return [
-        { label: "Lay On Hands pool", value: `${5 * level} HP` },
+        { key: "lay-on-hands", label: "Lay On Hands pool", value: "HP", maxUses: 5 * level, recovery: "Long Rest" },
+        ...(level >= 5 ? [{ key: "faithful-steed", label: "Faithful Steed · Free Find Steed", value: "", maxUses: 1, recovery: "Long Rest" as const }] : []),
         ...(level >= 3 ? [{ key: "channel-divinity", label: "Channel Divinity", value: "", maxUses: level >= 11 ? 3 : 2, recovery: "Short Rest" as const, shortRestRecovery: "one" as const }] : []),
       ];
     case "ranger":
-      return [{ label: "Favored Enemy", value: `${level >= 17 ? 6 : level >= 13 ? 5 : level >= 9 ? 4 : level >= 5 ? 3 : 2} free Hunter’s Mark casts` }];
+      return [
+        { key: "favored-enemy", label: "Favored Enemy", value: "free Hunter’s Mark casts", maxUses: level >= 17 ? 6 : level >= 13 ? 5 : level >= 9 ? 4 : level >= 5 ? 3 : 2, recovery: "Long Rest" },
+        ...(level >= 10 ? [{ key: "tireless", label: "Tireless · Temporary HP", value: "uses", maxUses: Math.max(1, modifiers.Wisdom), recovery: "Long Rest" as const }] : []),
+        ...(level >= 14 ? [{ key: "natures-veil", label: "Nature’s Veil", value: "", maxUses: Math.max(1, modifiers.Wisdom), recovery: "Long Rest" as const }] : []),
+      ];
     case "rogue":
-      return [{ label: "Sneak Attack", value: `${Math.ceil(level / 2)}d6` }];
+      return [
+        { label: "Sneak Attack", value: `${Math.ceil(level / 2)}d6` },
+        ...(level >= 20 ? [{ key: "stroke-of-luck", label: "Stroke of Luck", value: "", maxUses: 1, recovery: "Short Rest" as const, shortRestRecovery: "all" as const }] : []),
+      ];
     case "sorcerer":
       return [
         { key: "innate-sorcery", label: "Innate Sorcery", value: "", maxUses: 2, recovery: "Long Rest" },
         ...(level >= 2 ? [{ key: "sorcery-points", label: "Sorcery Points", value: "", maxUses: level, recovery: "Long Rest" as const }] : []),
+        ...(level >= 5 ? [{ key: "sorcerous-restoration", label: "Sorcerous Restoration", value: "", maxUses: 1, recovery: "Long Rest" as const }] : []),
       ];
     case "warlock": {
       const invocations = [1, 3, 3, 3, 5, 5, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10][level - 1];
-      return [{ label: "Eldritch Invocations", value: String(invocations) }];
+      return [
+        { label: "Eldritch Invocations", value: String(invocations) },
+        ...(level >= 2 ? [{ key: "magical-cunning", label: "Magical Cunning", value: "", maxUses: 1, recovery: "Long Rest" as const }] : []),
+        ...(level >= 9 ? [{ key: "contact-patron", label: "Contact Patron · Free Contact Other Plane", value: "", maxUses: 1, recovery: "Long Rest" as const }] : []),
+        ...[11, 13, 15, 17].filter((threshold) => level >= threshold).map((threshold) => ({ key: `mystic-arcanum-${Math.floor((threshold + 1) / 2)}`, label: `Mystic Arcanum · Level ${Math.floor((threshold + 1) / 2)}`, value: "", maxUses: 1, recovery: "Long Rest" as const })),
+      ];
     }
     case "wizard":
-      return [{ label: "Arcane Recovery", value: `Recover spell slots totaling up to ${Math.ceil(level / 2)} spell levels once per Long Rest` }];
+      return [{ key: "arcane-recovery", label: "Arcane Recovery", value: `spell levels · up to ${Math.ceil(level / 2)}`, maxUses: 1, recovery: "Long Rest" }];
     default:
       return [];
   }

@@ -8,6 +8,7 @@ export type Character = {
   classLevels: Record<string, number>;
   classSubclasses: Record<string, string>;
   resourceUses: Record<string, number>;
+  customResources: CustomResource[];
   unarmoredDefenseChoice: "Barbarian" | "Monk" | "";
   background: string;
   level: number;
@@ -27,6 +28,8 @@ export type Character = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type CustomResource = { id: string; name: string; maxUses: number; used: number; recovery: "short-one" | "short-all" | "long" | "manual" };
 
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
 export type AbilityName = "Strength" | "Dexterity" | "Constitution" | "Intelligence" | "Wisdom" | "Charisma";
@@ -67,6 +70,7 @@ export function defaultCharacterStats(): Pick<Character,
   "classLevels" |
   "classSubclasses" |
   "resourceUses" |
+  "customResources" |
   "unarmoredDefenseChoice" |
   "abilityScores" | "savingThrowProficiencies" | "skillProficiencies" | "size" | "speedFeet" |
   "otherSpeedBonus" |
@@ -78,6 +82,7 @@ export function defaultCharacterStats(): Pick<Character,
     classLevels: {},
     classSubclasses: {},
     resourceUses: {},
+    customResources: [],
     unarmoredDefenseChoice: "",
     abilityScores: Object.fromEntries(ABILITIES.map((ability) => [ability, 10])) as Record<AbilityName, number>,
     savingThrowProficiencies: Object.fromEntries(ABILITIES.map((ability) => [ability, false])) as Record<AbilityName, boolean>,
@@ -116,6 +121,7 @@ export function normalizeCharacter(value: unknown): Character | null {
     ...defaults,
     ...character,
     resourceUses: character.resourceUses ?? {},
+    customResources: Array.isArray(character.customResources) ? character.customResources.filter(isCustomResource).map((resource) => ({ ...resource, used: Math.min(Math.trunc(resource.maxUses), Math.max(0, Math.trunc(resource.used))) })) : [],
     subclass: character.subclass ?? "",
     classLevels: character.classLevels && Object.keys(character.classLevels).length
       ? character.classLevels
@@ -128,6 +134,15 @@ export function normalizeCharacter(value: unknown): Character | null {
     savingThrowProficiencies: { ...defaults.savingThrowProficiencies, ...character.savingThrowProficiencies },
     skillProficiencies: { ...defaults.skillProficiencies, ...character.skillProficiencies },
   };
+}
+
+function isCustomResource(value: unknown): value is CustomResource {
+  if (!value || typeof value !== "object") return false;
+  const resource = value as Partial<CustomResource>;
+  return typeof resource.id === "string" && typeof resource.name === "string"
+    && typeof resource.maxUses === "number" && Number.isFinite(resource.maxUses) && resource.maxUses > 0
+    && typeof resource.used === "number" && Number.isFinite(resource.used)
+    && ["short-one", "short-all", "long", "manual"].includes(resource.recovery ?? "");
 }
 
 export function saveCharacters(characters: Character[]): boolean {
