@@ -109,6 +109,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 .section-title-row h2 { margin: 0; color: #eee8df; font-size: 17px; font-weight: 600; }
 .count-chip { display: inline-grid; min-width: 19px; height: 19px; place-items: center; margin-left: 5px; padding: 0 5px; border: 1px solid #3e3b40; border-radius: 20px; color: #aaa5a8; font-size: 9px; font-weight: 500; vertical-align: 3px; }
 .sort-label { color: #827f88; font-size: 9px; }
+.backup-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+.backup-button { min-height: 29px; padding: 0 9px; border: 1px solid #494239; border-radius: 5px; background: #201e1b; color: #d2bd98; font-size: 9px; cursor: pointer; }
+.backup-button:hover:not(:disabled) { border-color: #a0804e; color: #f2d9a8; }
+.backup-button:disabled { opacity: .45; cursor: not-allowed; }
+.backup-file-input { display: none; }
+.backup-message { margin: -5px 0 11px; color: #bca77f; font-size: 9px; }
 .empty-card { display: flex; width: 100%; height: 150px; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed #3a3840; border-radius: 9px; background: #17171d; cursor: pointer; transition: border-color .2s, background .2s; }
 .empty-card:hover { border-color: #88704c; background: #1b1a20; }
 .empty-icon { display: grid; width: 28px; height: 28px; place-items: center; margin-bottom: 8px; border: 1px solid #5b4a35; border-radius: 50%; color: #deb875; font-size: 17px; }
@@ -305,6 +311,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
   .feature-heading { margin-top: 16px; }
   .feature-heading h2 { font-size: 19px; }
   .collection-section { margin-top: 31px; }
+  .section-title-row { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .backup-actions { justify-content: flex-start; }
   .quick-links { align-items: flex-start; }
   .quick-links > button { padding-top: 5px; }
   .page-footer { margin-top: 24px; }
