@@ -61,7 +61,7 @@ export type CalculatedStats = {
   spellSlots: { spellLevel: number; total: number; pool: string }[];
   spellSlotRecovery: "Long Rest" | "Short or Long Rest";
   appliedClassFeatures: string[];
-  classResources: { label: string; value: string }[];
+  classResources: { key?: string; label: string; value: string; maxUses?: number; used?: number; recovery?: "Short Rest" | "Long Rest"; shortRestRecovery?: "one" | "all" }[];
   classFeatures: { level: number; name: string }[];
   cantrips: number | null;
   preparedSpellCount: number | null;
@@ -144,7 +144,10 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const spellcastingAbility = character.spellcastingAbility || CLASS_SPELLCASTING_ABILITIES[character.characterClass.trim().toLowerCase()] || "";
   const spellModifier = spellcastingAbility ? abilityModifiers[spellcastingAbility] : null;
   const spellSlots = spellSlotsForClasses(classes, character.classSubclasses ?? { [capitalize(className)]: character.subclass });
-  const classResources = classes.flatMap(({ name, level: classLevel }) => classResourcesFor({ ...character, characterClass: capitalize(name) }, classLevel, abilityModifiers).map((resource) => ({ ...resource, label: classes.length > 1 ? `${capitalize(name)} · ${resource.label}` : resource.label })));
+  const classResources = classes.flatMap(({ name, level: classLevel }) => classResourcesFor({ ...character, characterClass: capitalize(name) }, classLevel, abilityModifiers).map((resource) => {
+    const key = resource.key ? `${name}.${resource.key}` : undefined;
+    return { ...resource, key, used: key && resource.maxUses !== undefined ? Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[key] ?? 0)) : undefined, label: classes.length > 1 ? `${capitalize(name)} · ${resource.label}` : resource.label };
+  }));
   const preparedSpellCount = spellCountFor(className, classes.find((entry) => entry.name === className)?.level ?? level, abilityModifiers);
   const spellcastingProgressions = classes.flatMap(({ name, level: classLevel }) => {
     const classProgression = classProgressionAtLevel(name, classLevel);
@@ -268,35 +271,35 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function classResourcesFor(character: Character, level: number, modifiers: Record<AbilityName, number>): { label: string; value: string }[] {
+function classResourcesFor(character: Character, level: number, modifiers: Record<AbilityName, number>): { key?: string; label: string; value: string; maxUses?: number; recovery?: "Short Rest" | "Long Rest"; shortRestRecovery?: "one" | "all" }[] {
   const className = character.characterClass.trim().toLowerCase();
   switch (className) {
     case "barbarian":
       return [
-        { label: "Rage uses", value: String(level >= 17 ? 6 : level >= 12 ? 5 : level >= 6 ? 4 : level >= 3 ? 3 : 2) },
+        { key: "rage", label: "Rage", value: "", maxUses: level >= 17 ? 6 : level >= 12 ? 5 : level >= 6 ? 4 : level >= 3 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" },
         { label: "Rage damage", value: `+${level >= 16 ? 4 : level >= 9 ? 3 : 2}` },
         { label: "Weapon Mastery", value: String(level >= 10 ? 4 : level >= 4 ? 3 : 2) },
       ];
     case "bard":
-      return [{ label: "Bardic Inspiration", value: `${level >= 15 ? "d12" : level >= 10 ? "d10" : level >= 5 ? "d8" : "d6"} · ${Math.max(1, modifiers.Charisma)} uses` }];
+      return [{ key: "bardic-inspiration", label: "Bardic Inspiration", value: level >= 15 ? "d12" : level >= 10 ? "d10" : level >= 5 ? "d8" : "d6", maxUses: Math.max(1, modifiers.Charisma), recovery: level >= 5 ? "Short Rest" : "Long Rest", shortRestRecovery: "all" }];
     case "cleric":
-      return level >= 2 ? [{ label: "Channel Divinity", value: `${level >= 6 ? 3 : 2} uses` }] : [];
+      return level >= 2 ? [{ key: "channel-divinity", label: "Channel Divinity", value: "", maxUses: level >= 6 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" }] : [];
     case "druid":
-      return level >= 2 ? [{ label: "Wild Shape", value: `${level >= 17 ? 4 : level >= 6 ? 3 : 2} uses` }] : [];
+      return level >= 2 ? [{ key: "wild-shape", label: "Wild Shape", value: "", maxUses: level >= 17 ? 4 : level >= 6 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" }] : [];
     case "fighter":
       return [
-        { label: "Second Wind", value: `${level >= 10 ? 4 : level >= 4 ? 3 : 2} uses` },
+        { key: "second-wind", label: "Second Wind", value: "", maxUses: level >= 10 ? 4 : level >= 4 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" },
         { label: "Weapon Mastery", value: `${level >= 16 ? 6 : level >= 10 ? 5 : level >= 4 ? 4 : 3} weapons` },
       ];
     case "monk":
       return level >= 2 ? [
-        { label: "Focus Points", value: String(level) },
+        { key: "focus-points", label: "Focus Points", value: "", maxUses: level, recovery: "Short Rest", shortRestRecovery: "all" },
         { label: "Martial Arts die", value: level >= 17 ? "d12" : level >= 11 ? "d10" : level >= 5 ? "d8" : "d6" },
       ] : [{ label: "Martial Arts die", value: "d6" }];
     case "paladin":
       return [
         { label: "Lay On Hands pool", value: `${5 * level} HP` },
-        ...(level >= 3 ? [{ label: "Channel Divinity", value: `${level >= 11 ? 3 : 2} uses` }] : []),
+        ...(level >= 3 ? [{ key: "channel-divinity", label: "Channel Divinity", value: "", maxUses: level >= 11 ? 3 : 2, recovery: "Short Rest" as const, shortRestRecovery: "one" as const }] : []),
       ];
     case "ranger":
       return [{ label: "Favored Enemy", value: `${level >= 17 ? 6 : level >= 13 ? 5 : level >= 9 ? 4 : level >= 5 ? 3 : 2} free Hunter’s Mark casts` }];
@@ -304,8 +307,8 @@ function classResourcesFor(character: Character, level: number, modifiers: Recor
       return [{ label: "Sneak Attack", value: `${Math.ceil(level / 2)}d6` }];
     case "sorcerer":
       return [
-        { label: "Innate Sorcery", value: "2 uses" },
-        ...(level >= 2 ? [{ label: "Sorcery Points", value: String(level) }] : []),
+        { key: "innate-sorcery", label: "Innate Sorcery", value: "", maxUses: 2, recovery: "Long Rest" },
+        ...(level >= 2 ? [{ key: "sorcery-points", label: "Sorcery Points", value: "", maxUses: level, recovery: "Long Rest" as const }] : []),
       ];
     case "warlock": {
       const invocations = [1, 3, 3, 3, 5, 5, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10][level - 1];

@@ -7,6 +7,7 @@ export type Character = {
   subclass: string;
   classLevels: Record<string, number>;
   classSubclasses: Record<string, string>;
+  resourceUses: Record<string, number>;
   unarmoredDefenseChoice: "Barbarian" | "Monk" | "";
   background: string;
   level: number;
@@ -65,6 +66,7 @@ export function defaultCharacterStats(): Pick<Character,
   "subclass" |
   "classLevels" |
   "classSubclasses" |
+  "resourceUses" |
   "unarmoredDefenseChoice" |
   "abilityScores" | "savingThrowProficiencies" | "skillProficiencies" | "size" | "speedFeet" |
   "otherSpeedBonus" |
@@ -75,6 +77,7 @@ export function defaultCharacterStats(): Pick<Character,
     subclass: "",
     classLevels: {},
     classSubclasses: {},
+    resourceUses: {},
     unarmoredDefenseChoice: "",
     abilityScores: Object.fromEntries(ABILITIES.map((ability) => [ability, 10])) as Record<AbilityName, number>,
     savingThrowProficiencies: Object.fromEntries(ABILITIES.map((ability) => [ability, false])) as Record<AbilityName, boolean>,
@@ -112,6 +115,7 @@ export function normalizeCharacter(value: unknown): Character | null {
   return {
     ...defaults,
     ...character,
+    resourceUses: character.resourceUses ?? {},
     subclass: character.subclass ?? "",
     classLevels: character.classLevels && Object.keys(character.classLevels).length
       ? character.classLevels

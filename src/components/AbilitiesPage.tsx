@@ -30,6 +30,25 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
     onChange?.({ skillProficiencies: { ...character.skillProficiencies, [skill]: rank } });
   }
 
+  function changeResource(key: string, amount: number, maxUses: number) {
+    const used = Math.min(maxUses, Math.max(0, (character.resourceUses[key] ?? 0) + amount));
+    onChange?.({ resourceUses: { ...character.resourceUses, [key]: used } });
+  }
+
+  function recoverResources(recovery: "Short Rest" | "Long Rest") {
+    const updates = { ...character.resourceUses };
+    for (const resource of stats.classResources) {
+      if (!resource.key || resource.maxUses === undefined) continue;
+      if (recovery === "Long Rest") updates[resource.key] = 0;
+      else if (resource.recovery === "Short Rest") {
+        updates[resource.key] = resource.shortRestRecovery === "all"
+          ? 0
+          : Math.max(0, (updates[resource.key] ?? 0) - 1);
+      }
+    }
+    onChange?.({ resourceUses: updates });
+  }
+
   return (
     <section className="abilities-page" aria-label={`Abilities and calculated stats for ${character.name}`}>
       <div className="sheet-context-bar">
@@ -121,7 +140,8 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
 
           {stats.classResources.length > 0 && <section className="derived-panel class-resource-panel">
             <p className="eyebrow">CLASS FEATURES &amp; RESOURCES</p>
-            {stats.classResources.map(({ label, value }) => <div className="derived-line" key={label}><span>{label}</span><strong>{value}</strong></div>)}
+            {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key ? <div className="resource-controls"><button disabled={readOnly || used === 0} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}</strong><button disabled={readOnly || used === maxUses} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
+            {!readOnly && stats.classResources.some(({ maxUses }) => maxUses !== undefined) && <div className="resource-rest-actions">{stats.classResources.some(({ recovery }) => recovery === "Short Rest") && <button onClick={() => recoverResources("Short Rest")}>Short rest</button>}<button onClick={() => recoverResources("Long Rest")}>Long rest</button></div>}
           </section>}
 
           {stats.classFeatures.length > 0 && <section className="derived-panel class-resource-panel">
