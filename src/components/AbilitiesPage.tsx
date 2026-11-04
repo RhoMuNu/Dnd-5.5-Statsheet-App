@@ -116,12 +116,18 @@ export function AbilitiesPage({ character, onChange }: AbilitiesPageProps) {
               <div className="derived-line"><span>Spell save DC</span><strong>{stats.spellSaveDC}</strong></div>
               <div className="derived-line"><span>Spell attack</span><strong>{formatModifier(stats.spellAttackBonus ?? 0)}</strong></div>
               {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · {stats.spellSlotRecovery.toUpperCase()}</small>{stats.spellSlots.map(({ spellLevel, total }) => <div className="derived-line" key={spellLevel}><span>Level {spellLevel}</span><strong>{total}</strong></div>)}</div>}
+              {(stats.cantrips !== null || stats.preparedSpellCount !== null) && <div className="spell-slot-list"><small>SPELLCASTING PROGRESSION</small>{stats.cantrips !== null && <div className="derived-line"><span>Cantrips known</span><strong>{stats.cantrips}</strong></div>}{stats.preparedSpellCount !== null && <div className="derived-line"><span>{stats.spellCountLabel}</span><strong>{stats.preparedSpellCount}</strong></div>}</div>}
             </>}
           </section>
 
           {stats.classResources.length > 0 && <section className="derived-panel class-resource-panel">
             <p className="eyebrow">CLASS FEATURES &amp; RESOURCES</p>
             {stats.classResources.map(({ label, value }) => <div className="derived-line" key={label}><span>{label}</span><strong>{value}</strong></div>)}
+          </section>}
+
+          {stats.classFeatures.length > 0 && <section className="derived-panel class-resource-panel">
+            <p className="eyebrow">UNLOCKED CLASS FEATURES</p>
+            <div className="feature-list">{stats.classFeatures.map(({ level, name }) => <div className="derived-line" key={`${level}-${name}`}><span>Level {level} · {name}</span>{name.includes("Choose ") && <strong>Choice</strong>}</div>)}</div>
           </section>}
 
           <details className="sheet-panel setup-panel">
