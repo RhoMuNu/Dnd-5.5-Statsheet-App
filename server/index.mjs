@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
@@ -9,7 +10,7 @@ const isProduction = process.env.NODE_ENV === "production" || process.argv.inclu
 const port = Number(process.env.TALEFORGE_PORT ?? (isProduction ? 4173 : 4174));
 const appRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distRoot = join(appRoot, "dist");
-const dataRoot = join(process.env.APPDATA ?? join(homedir(), ".local", "share"), "TaleForge");
+const dataRoot = resolve(process.env.TALEFORGE_DATA_DIR ?? join(process.env.APPDATA ?? join(homedir(), ".local", "share"), "TaleForge"));
 const dataFile = join(dataRoot, "lan-campaigns.json");
 const clients = new Map();
 
@@ -237,4 +238,8 @@ apiServer.listen(port, "0.0.0.0", () => {
   console.log(`TaleForge LAN server listening on 0.0.0.0:${port}`);
   console.log(`Campaign data: ${dataFile}`);
   if (isProduction) console.log("Open this PC's LAN address from the other devices on the same Wi-Fi.");
+  if (isProduction && process.env.TALEFORGE_OPEN_BROWSER === "1") {
+    const openBrowser = spawn(process.env.ComSpec ?? "cmd.exe", ["/c", "start", "", `http://localhost:${port}`], { detached: true, stdio: "ignore", windowsHide: true });
+    openBrowser.unref();
+  }
 });
