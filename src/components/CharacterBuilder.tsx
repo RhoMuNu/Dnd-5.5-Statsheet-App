@@ -46,6 +46,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
         savingThrowProficiencies: character.savingThrowProficiencies,
         skillProficiencies: character.skillProficiencies,
         resourceUses: character.resourceUses,
+        customResources: character.customResources,
         size: character.size,
         speedFeet: character.speedFeet,
         otherSpeedBonus: character.otherSpeedBonus,

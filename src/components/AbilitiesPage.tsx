@@ -1,5 +1,6 @@
 import { ABILITIES, SKILLS, type AbilityName, type Character, type SkillName } from "../data/characters";
 import { calculateCharacterStats, isClassSavingThrowProficient } from "../data/calculations";
+import { useState } from "react";
 
 type AbilitiesPageProps = { character: Character; onChange?: (updates: Partial<Character>) => void; readOnly?: boolean };
 
@@ -14,6 +15,9 @@ const ARMOR_MODES = [
 
 export function AbilitiesPage({ character, onChange, readOnly = false }: AbilitiesPageProps) {
   const stats = calculateCharacterStats(character);
+  const [resourceName, setResourceName] = useState("");
+  const [resourceMax, setResourceMax] = useState("1");
+  const [resourceRecovery, setResourceRecovery] = useState<Character["customResources"][number]["recovery"]>("long");
 
   function setAbilityScore(ability: AbilityName, rawValue: string) {
     const value = Number(rawValue);
@@ -35,6 +39,24 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
     onChange?.({ resourceUses: { ...character.resourceUses, [key]: used } });
   }
 
+  function changeSpellSlot(key: string, amount: number, maxUses: number) {
+    const used = Math.min(maxUses, Math.max(0, (character.resourceUses[key] ?? 0) + amount));
+    onChange?.({ resourceUses: { ...character.resourceUses, [key]: used } });
+  }
+
+  function changeCustomResource(id: string, amount: number) {
+    onChange?.({ customResources: character.customResources.map((resource) => resource.id === id ? { ...resource, used: Math.min(resource.maxUses, Math.max(0, resource.used + amount)) } : resource) });
+  }
+
+  function addCustomResource() {
+    const name = resourceName.trim();
+    const maxUses = Number(resourceMax);
+    if (!name || !Number.isInteger(maxUses) || maxUses < 1 || maxUses > 999) return;
+    onChange?.({ customResources: [...character.customResources, { id: globalThis.crypto?.randomUUID?.() ?? `custom-${Date.now()}`, name, maxUses, used: 0, recovery: resourceRecovery }] });
+    setResourceName("");
+    setResourceMax("1");
+  }
+
   function recoverResources(recovery: "Short Rest" | "Long Rest") {
     const updates = { ...character.resourceUses };
     for (const resource of stats.classResources) {
@@ -46,7 +68,17 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
           : Math.max(0, (updates[resource.key] ?? 0) - 1);
       }
     }
-    onChange?.({ resourceUses: updates });
+    for (const slot of stats.spellSlots) {
+      const key = spellSlotKey(slot.pool, slot.spellLevel);
+      if (recovery === "Long Rest" || slot.pool.startsWith("Pact Magic")) updates[key] = 0;
+    }
+    const customResources = character.customResources.map((resource) => {
+      if (recovery === "Long Rest" && resource.recovery !== "manual") return { ...resource, used: 0 };
+      if (recovery === "Short Rest" && resource.recovery === "short-all") return { ...resource, used: 0 };
+      if (recovery === "Short Rest" && resource.recovery === "short-one") return { ...resource, used: Math.max(0, resource.used - 1) };
+      return resource;
+    });
+    onChange?.({ resourceUses: updates, customResources });
   }
 
   return (
@@ -133,16 +165,24 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <div className="derived-divider" />
             {stats.spellcastingProgressions.length === 0 ? <p className="no-spellcasting">Choose a spellcasting class to calculate spell stats.</p> : <>
               {stats.spellcastingProgressions.length === 1 && <><div className="derived-line"><span>Spell save DC</span><strong>{stats.spellcastingProgressions[0].saveDC}</strong></div><div className="derived-line"><span>Spell attack</span><strong>{formatModifier(stats.spellcastingProgressions[0].attackBonus)}</strong></div></>}
-              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => <div className="derived-line" key={`${pool}-${spellLevel}`}><span>{pool} · Level {spellLevel}</span><strong>{total}</strong></div>)}</div>}
+              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · REMAINING / MAX</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => { const key = spellSlotKey(pool, spellLevel); const used = Math.min(total, character.resourceUses[key] ?? 0); return <div className="derived-line tracked-resource" key={key}><span>{pool} · Level {spellLevel}</span><div className="resource-controls"><button disabled={readOnly || used === 0} aria-label={`Use level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, 1, total)}>−</button><strong>{total - used} / {total}</strong><button disabled={readOnly || used === total} aria-label={`Restore level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, -1, total)}>+</button></div></div>; })}</div>}
               {stats.spellcastingProgressions.length > 0 && <div className="spell-slot-list"><small>SPELLCASTING BY CLASS</small>{stats.spellcastingProgressions.map((entry) => <div className="derived-line" key={entry.className}><span>{entry.className}: {entry.cantrips === null ? "—" : `${entry.cantrips} cantrips`}{entry.count !== null ? ` · ${entry.count} ${entry.label?.toLowerCase()}` : ""} · DC {entry.saveDC} / {entry.attackBonus >= 0 ? "+" : ""}{entry.attackBonus}</span><strong>Lvl {stats.classBreakdown.find((item) => item.name === entry.className)?.level}</strong></div>)}</div>}
             </>}
           </section>
 
           {stats.classResources.length > 0 && <section className="derived-panel class-resource-panel">
             <p className="eyebrow">CLASS FEATURES &amp; RESOURCES</p>
-            {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key ? <div className="resource-controls"><button disabled={readOnly || used === 0} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}</strong><button disabled={readOnly || used === maxUses} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
-            {!readOnly && stats.classResources.some(({ maxUses }) => maxUses !== undefined) && <div className="resource-rest-actions">{stats.classResources.some(({ recovery }) => recovery === "Short Rest") && <button onClick={() => recoverResources("Short Rest")}>Short rest</button>}<button onClick={() => recoverResources("Long Rest")}>Long rest</button></div>}
+            {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key ? <div className="resource-controls"><button disabled={readOnly || used === 0} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}{value ? ` ${value}` : ""}</strong><button disabled={readOnly || used === maxUses} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
           </section>}
+
+          <section className="derived-panel class-resource-panel custom-resource-panel">
+            <p className="eyebrow">FEATS &amp; CUSTOM FEATURE TRACKERS</p>
+            <p className="setup-note">Add limited-use feats, subclass features, magic items, or any other resource. Choose how it recovers.</p>
+            {character.customResources.map((resource) => <div className="derived-line tracked-resource" key={resource.id}><span>{resource.name}<small className="resource-recovery">{resourceRecoveryLabel(resource.recovery)}</small></span><div className="resource-controls"><button disabled={readOnly || resource.used <= 0} aria-label={`Use one ${resource.name}`} onClick={() => changeCustomResource(resource.id, 1)}>−</button><strong>{resource.maxUses - resource.used} / {resource.maxUses}</strong><button disabled={readOnly || resource.used >= resource.maxUses} aria-label={`Restore one ${resource.name}`} onClick={() => changeCustomResource(resource.id, -1)}>+</button><button className="resource-remove" disabled={readOnly} aria-label={`Remove ${resource.name} tracker`} onClick={() => onChange?.({ customResources: character.customResources.filter((entry) => entry.id !== resource.id) })}>×</button></div></div>)}
+            {!readOnly && (stats.classResources.some(({ recovery }) => recovery === "Short Rest") || stats.spellSlots.some(({ pool }) => pool.startsWith("Pact Magic")) || character.customResources.some(({ recovery }) => recovery.startsWith("short-"))) && <button className="resource-rest-button" onClick={() => recoverResources("Short Rest")}>Take a Short Rest <span>↻</span></button>}
+            {!readOnly && (stats.classResources.some(({ maxUses }) => maxUses !== undefined) || stats.spellSlots.length > 0 || character.customResources.some(({ recovery }) => recovery !== "manual")) && <button className="resource-rest-button" onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
+            {!readOnly && <div className="custom-resource-form"><label><span>Feature / feat name</span><input value={resourceName} maxLength={50} placeholder="e.g. Lucky" onChange={(event) => setResourceName(event.target.value)} /></label><label><span>Uses</span><input type="number" min={1} max={999} value={resourceMax} onChange={(event) => setResourceMax(event.target.value)} /></label><label><span>Recovery</span><select value={resourceRecovery} onChange={(event) => setResourceRecovery(event.target.value as typeof resourceRecovery)}><option value="long">Long rest · all</option><option value="short-one">Short rest · one</option><option value="short-all">Short rest · all</option><option value="manual">Manual only</option></select></label><button className="resource-add-button" disabled={!resourceName.trim() || !Number.isInteger(Number(resourceMax)) || Number(resourceMax) < 1 || Number(resourceMax) > 999} onClick={addCustomResource}>Add tracker</button></div>}
+          </section>
 
           {stats.classFeatures.length > 0 && <section className="derived-panel class-resource-panel">
             <p className="eyebrow">UNLOCKED CLASS FEATURES</p>
@@ -179,6 +219,17 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
 
 function formatModifier(value: number): string {
   return value >= 0 ? `+${value}` : String(value);
+}
+
+function spellSlotKey(pool: string, spellLevel: number): string {
+  return `spell-slot:${pool}:${spellLevel}`;
+}
+
+function resourceRecoveryLabel(recovery: Character["customResources"][number]["recovery"]): string {
+  if (recovery === "short-one") return "Short Rest · regain one";
+  if (recovery === "short-all") return "Short Rest · regain all";
+  if (recovery === "long") return "Long Rest · regain all";
+  return "Manual recovery";
 }
 
 function formatWeight(value: number): string {
