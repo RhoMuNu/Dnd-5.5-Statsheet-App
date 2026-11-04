@@ -12,6 +12,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   const [concept, setConcept] = useState(character?.concept ?? "");
   const [species, setSpecies] = useState(character?.species ?? "");
   const [characterClass, setCharacterClass] = useState(character?.characterClass ?? "");
+  const [subclass, setSubclass] = useState(character?.subclass ?? "");
   const [background, setBackground] = useState(character?.background ?? "");
   const [level, setLevel] = useState(String(character?.level ?? 1));
   const [error, setError] = useState("");
@@ -52,6 +53,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       concept: concept.trim(),
       species: species.trim(),
       characterClass: characterClass.trim(),
+      subclass: subclass.trim(),
       background: background.trim(),
       level: numericLevel,
     });
@@ -94,6 +96,10 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
               <option value="">Choose a class</option>
               {CLASSES.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
+          </label>
+          <label className="form-field">
+            <span>Subclass <small>OPTIONAL</small></span>
+            <input name="subclass" maxLength={50} value={subclass} onChange={(event) => setSubclass(event.target.value)} placeholder="Choose at level 3" />
           </label>
           <label className="form-field">
             <span>Background <small>OPTIONAL</small></span>

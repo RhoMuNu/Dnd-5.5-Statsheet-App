@@ -4,6 +4,7 @@ export type Character = {
   concept: string;
   species: string;
   characterClass: string;
+  subclass: string;
   background: string;
   level: number;
   abilityScores: Record<AbilityName, number>;
@@ -58,12 +59,14 @@ export const SKILLS: { name: SkillName; ability: AbilityName }[] = [
 ];
 
 export function defaultCharacterStats(): Pick<Character,
+  "subclass" |
   "abilityScores" | "savingThrowProficiencies" | "skillProficiencies" | "size" | "speedFeet" |
   "otherSpeedBonus" |
   "powerfulBuild" | "armorMode" | "armorBaseAC" | "hasShield" | "otherAcBonus" |
   "armorStrengthRequirement" | "spellcastingAbility"
 > {
   return {
+    subclass: "",
     abilityScores: Object.fromEntries(ABILITIES.map((ability) => [ability, 10])) as Record<AbilityName, number>,
     savingThrowProficiencies: Object.fromEntries(ABILITIES.map((ability) => [ability, false])) as Record<AbilityName, boolean>,
     skillProficiencies: Object.fromEntries(SKILLS.map((skill) => [skill.name, 0])) as Record<SkillName, 0 | 1 | 2>,
@@ -90,6 +93,7 @@ export function loadCharacters(): Character[] {
     return value.filter(isBaseCharacter).map((character) => ({
       ...defaultCharacterStats(),
       ...character,
+      subclass: character.subclass ?? "",
       abilityScores: { ...defaultCharacterStats().abilityScores, ...character.abilityScores },
       savingThrowProficiencies: { ...defaultCharacterStats().savingThrowProficiencies, ...character.savingThrowProficiencies },
       skillProficiencies: { ...defaultCharacterStats().skillProficiencies, ...character.skillProficiencies },
@@ -138,6 +142,7 @@ function isBaseCharacter(value: unknown): value is Omit<Character, keyof ReturnT
     && typeof character.concept === "string"
     && typeof character.species === "string"
     && typeof character.characterClass === "string"
+    && (character.subclass === undefined || typeof character.subclass === "string")
     && typeof character.background === "string"
     && typeof character.level === "number"
     && typeof character.createdAt === "string"

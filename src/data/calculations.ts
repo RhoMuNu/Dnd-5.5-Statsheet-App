@@ -1,5 +1,6 @@
 import type { AbilityName, Character, CreatureSize, SkillName } from "./characters";
 import { SKILLS } from "./characters";
+import { classProgressionAtLevel } from "./classProgression";
 
 const HIT_DICE: Record<string, number> = {
   barbarian: 12,
@@ -59,6 +60,10 @@ export type CalculatedStats = {
   spellSlotRecovery: "Long Rest" | "Short or Long Rest";
   appliedClassFeatures: string[];
   classResources: { label: string; value: string }[];
+  classFeatures: { level: number; name: string }[];
+  cantrips: number | null;
+  preparedSpellCount: number | null;
+  spellCountLabel: string | null;
 };
 
 const FULL_CASTER_SLOTS: number[][] = [
@@ -93,6 +98,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   })) as Record<SkillName, number>;
 
   const className = character.characterClass.trim().toLowerCase();
+  const progression = classProgressionAtLevel(className, level, character.subclass);
   const dexterityModifier = abilityModifiers.Dexterity;
   let armorBase = character.armorMode === "unarmored" ? 10 + dexterityModifier : character.armorBaseAC + armorDexterity(character, dexterityModifier);
   const appliedClassFeatures: string[] = [];
@@ -130,6 +136,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const spellModifier = spellcastingAbility ? abilityModifiers[spellcastingAbility] : null;
   const spellSlots = spellSlotsForClass(character.characterClass, level);
   const classResources = classResourcesFor(character, level, abilityModifiers);
+  const preparedSpellCount = spellCountFor(className, level, abilityModifiers);
 
   return {
     proficiencyBonus,
@@ -151,7 +158,24 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     spellSlotRecovery: character.characterClass.trim().toLowerCase() === "warlock" ? "Short or Long Rest" : "Long Rest",
     appliedClassFeatures,
     classResources,
+    classFeatures: progression.gainedFeatures,
+    cantrips: progression.cantrips,
+    preparedSpellCount: preparedSpellCount.value,
+    spellCountLabel: preparedSpellCount.label,
   };
+}
+
+function spellCountFor(className: string, level: number, modifiers: Record<AbilityName, number>) {
+  if (["cleric", "druid", "wizard"].includes(className)) {
+    const actualModifier = className === "cleric" || className === "druid" ? modifiers.Wisdom : modifiers.Intelligence;
+    return { value: Math.max(1, level + actualModifier), label: "Prepared spells" };
+  }
+  if (["paladin", "ranger"].includes(className)) {
+    const actualModifier = className === "paladin" ? modifiers.Charisma : modifiers.Wisdom;
+    return { value: Math.max(1, Math.floor(level / 2) + actualModifier), label: "Prepared spells" };
+  }
+  const known = classProgressionAtLevel(className, level).preparedSpells;
+  return known === null ? { value: null, label: null } : { value: known, label: "Spells known" };
 }
 
 export function isClassSavingThrowProficient(character: Character, ability: AbilityName): boolean {
