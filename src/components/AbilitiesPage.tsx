@@ -97,7 +97,11 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
       if (recovery === "Short Rest" && resource.recovery === "short-one") return { ...resource, used: Math.max(0, resource.used - 1) };
       return resource;
     });
-    onChange?.({ resourceUses: updates, customResources });
+    onChange?.({
+      resourceUses: updates,
+      customResources,
+      ...(recovery === "Long Rest" && stats.maxHitPoints !== null ? { currentHitPoints: stats.maxHitPoints, temporaryHitPoints: 0 } : {}),
+    });
   }
 
   return (
@@ -204,7 +208,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <p className="setup-note">Add limited-use feats, subclass features, magic items, or any other resource. Choose how it recovers.</p>
             {character.customResources.map((resource) => <div className="derived-line tracked-resource" key={resource.id}><span>{resource.name}<small className="resource-recovery">{resourceRecoveryLabel(resource.recovery)}</small></span><div className="resource-controls"><button type="button" disabled={readOnly || resource.used >= resource.maxUses} aria-label={`Use one ${resource.name}`} onClick={() => changeCustomResource(resource.id, 1)}>−</button><strong>{resource.maxUses - resource.used} / {resource.maxUses}</strong><button type="button" disabled={readOnly || resource.used <= 0} aria-label={`Restore one ${resource.name}`} onClick={() => changeCustomResource(resource.id, -1)}>+</button><button type="button" className="resource-remove" disabled={readOnly} aria-label={`Remove ${resource.name} tracker`} onClick={() => onChange?.({ customResources: character.customResources.filter((entry) => entry.id !== resource.id) })}>×</button></div></div>)}
             {!readOnly && (stats.classResources.some(({ recovery }) => recovery === "Short Rest") || stats.spellSlots.some(({ pool }) => pool.startsWith("Pact Magic")) || character.customResources.some(({ recovery }) => recovery.startsWith("short-"))) && <button type="button" className="resource-rest-button" onClick={() => recoverResources("Short Rest")}>Take a Short Rest <span>↻</span></button>}
-            {!readOnly && (stats.classResources.some(({ maxUses }) => maxUses !== undefined) || stats.spellSlots.length > 0 || character.customResources.some(({ recovery }) => recovery !== "manual")) && <button type="button" className="resource-rest-button" onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
+            {!readOnly && stats.maxHitPoints !== null && <button type="button" className="resource-rest-button" onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
             {!readOnly && <div className="custom-resource-form"><label><span>Feature / feat name</span><input value={resourceName} maxLength={50} placeholder="e.g. Lucky" onChange={(event) => setResourceName(event.target.value)} /></label><label><span>Uses</span><input type="number" min={1} max={999} value={resourceMax} onChange={(event) => setResourceMax(event.target.value)} /></label><label><span>Recovery</span><select value={resourceRecovery} onChange={(event) => setResourceRecovery(event.target.value as typeof resourceRecovery)}><option value="long">Long rest · all</option><option value="short-one">Short rest · one</option><option value="short-all">Short rest · all</option><option value="manual">Manual only</option></select></label><button type="button" className="resource-add-button" disabled={!resourceName.trim() || !Number.isInteger(Number(resourceMax)) || Number(resourceMax) < 1 || Number(resourceMax) > 999} onClick={addCustomResource}>Add tracker</button></div>}
           </section>
 

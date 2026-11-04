@@ -4,9 +4,10 @@ type SidebarProps = {
   activeSection: SectionId;
   mobileMenuOpen: boolean;
   onNavigate: () => void;
+  onCampaignClick: () => void;
 };
 
-export function Sidebar({ activeSection, mobileMenuOpen, onNavigate }: SidebarProps) {
+export function Sidebar({ activeSection, mobileMenuOpen, onNavigate, onCampaignClick }: SidebarProps) {
   return (
     <aside className={`sidebar ${mobileMenuOpen ? "sidebar-open" : ""}`}>
       <a className="brand" href="#overview" onClick={onNavigate} aria-label="Taleforge home">
@@ -17,14 +18,14 @@ export function Sidebar({ activeSection, mobileMenuOpen, onNavigate }: SidebarPr
         </span>
       </a>
 
-      <div className="campaign-switcher" aria-label="Current collection: Personal collection">
+      <button className="campaign-switcher" type="button" aria-label="Open LAN campaign menu" title="Open LAN campaign menu" onClick={() => { onNavigate(); onCampaignClick(); }}>
         <span className="campaign-avatar" aria-hidden="true">✧</span>
         <span className="campaign-copy">
           <small>YOUR CAMPAIGN</small>
           <strong>Personal collection</strong>
         </span>
         <span className="chevron" aria-hidden="true">⌄</span>
-      </div>
+      </button>
 
       <nav className="side-nav" id="main-navigation" aria-label="Main navigation">
         {navigationGroups.map((group) => (
@@ -40,7 +41,6 @@ export function Sidebar({ activeSection, mobileMenuOpen, onNavigate }: SidebarPr
               >
                 <span className="nav-icon" aria-hidden="true">{item.icon}</span>
                 <span>{item.label}</span>
-                {item.id === "spells" && <span className="nav-count" aria-label="0 spells">0</span>}
               </a>
             ))}
           </div>
@@ -51,8 +51,7 @@ export function Sidebar({ activeSection, mobileMenuOpen, onNavigate }: SidebarPr
         <div className="rules-badge"><span className="rules-dot" /> 2024 RULESET <span className="rules-check">✓</span></div>
         <div className="profile-row">
           <div className="profile-avatar" aria-hidden="true">P</div>
-          <div><strong>Player One</strong><small>Adventurer</small></div>
-          <span className="more-button" aria-hidden="true">···</span>
+          <div><strong>Local player</strong><small>Personal collection</small></div>
         </div>
       </div>
     </aside>

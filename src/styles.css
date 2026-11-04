@@ -28,7 +28,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 .brand-copy, .campaign-copy { display: flex; flex-direction: column; gap: 3px; }
 .brand-copy strong { font-size: 14px; font-weight: 800; letter-spacing: 2px; }
 .brand-copy small { color: #8e8b91; font-size: 8px; letter-spacing: 1.65px; }
-.campaign-switcher { display: flex; align-items: center; gap: 10px; margin: 34px 0 29px; padding: 11px 10px; border: 1px solid #2e2e37; border-radius: 10px; background: #1d1d24; }
+.campaign-switcher { display: flex; width: 100%; align-items: center; gap: 10px; margin: 34px 0 29px; padding: 11px 10px; border: 1px solid #2e2e37; border-radius: 10px; background: #1d1d24; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.campaign-switcher:hover { border-color: #665338; background: #23211d; }
 .campaign-avatar { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 8px; background: #322b22; color: var(--gold); font-size: 20px; }
 .campaign-copy { flex: 1; }
 .campaign-copy small, .nav-heading { color: #777680; font-size: 9px; letter-spacing: 1.45px; }
@@ -279,6 +280,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 .resource-remove { min-width: 28px !important; border-color: #563c37 !important; color: #e79d8c !important; }
 .resource-rest-button { display: inline-flex; align-items: center; gap: 9px; margin: 8px 7px 0 0; }
 .resource-rest-button span { font-size: 15px; }
+.help-scrim { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 20px; background: #08080bcc; }
+.help-dialog { position: relative; width: min(100%, 480px); padding: 27px; border: 1px solid #625039; border-radius: 12px; background: #1c1b20; box-shadow: 0 20px 70px #000a; }
+.help-dialog h2 { margin: 0 0 12px; color: #f1e7d4; font-size: 22px; }
+.help-dialog p:not(.eyebrow) { color: #b4adb0; font-size: 13px; line-height: 1.65; }
+.help-dialog p strong { color: #e9d4ad; }
+.help-dialog-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 1px solid #413c36; border-radius: 6px; background: #222127; color: #e5c17f; font-size: 21px; cursor: pointer; }
+.help-dialog .primary-button { margin-top: 8px; }
 .hp-tracker { margin-top: 12px; padding: 11px; border: 1px solid #34323a; border-radius: 7px; background: #15151a; }
 .hp-tracker-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: #e8dfd0; }
 .hp-tracker-heading strong { font-size: 13px; }
@@ -328,6 +336,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 .section-empty-footer strong { color: #d8d1c7; font-size: 10px; }
 .section-empty-footer div span { color: #8d8992; font-size: 9px; }
 .section-empty-footer .primary-button { white-space: nowrap; }
+.section-feature-link { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid #4a3e2c; border-radius: 8px; background: #211e19; }
+.section-feature-link > div { display: flex; flex-direction: column; gap: 5px; }
+.section-feature-link strong { color: #e1bd7f; font-size: 12px; }
+.section-feature-link span { color: #a49da0; font-size: 11px; }
 .builder-steps { overflow: hidden; border: 1px solid #302f37; border-radius: 8px; background: #1a1a20; }
 .builder-step { display: flex; min-height: 43px; align-items: center; gap: 12px; padding: 0 13px; border-bottom: 1px solid #2b2a32; color: #d8d2c8; font-size: 10px; }
 .builder-step:last-child { border-bottom: 0; }
@@ -496,6 +508,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
   .section-symbol { width: 37px; height: 37px; flex-basis: 37px; font-size: 18px; }
   .section-intro-copy h2 { font-size: 16px; }
   .section-empty-footer { align-items: flex-start; flex-direction: column; }
+  .section-feature-link { align-items: flex-start; flex-direction: column; }
   .form-grid { grid-template-columns: 1fr; }
   .form-field-wide { grid-column: auto; }
   .character-roster-card { flex-wrap: wrap; }
