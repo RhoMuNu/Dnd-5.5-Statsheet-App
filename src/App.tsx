@@ -94,6 +94,12 @@ function App() {
     if (selectedCharacterId === id) setSelectedCharacterId(null);
   }
 
+  function updateCharacter(id: string, updates: Partial<Character>) {
+    setCharacters((existing) => existing.map((character) => character.id === id
+      ? { ...character, ...updates, updatedAt: new Date().toISOString() }
+      : character));
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -162,6 +168,7 @@ function App() {
               character={activeCharacter}
               onOpenBuilder={() => { setEditingCharacterId(null); navigate("builder"); }}
               onEdit={editCharacter}
+              onUpdate={updateCharacter}
             />
           )}
 
