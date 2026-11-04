@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import type { Character, CharacterDraft } from "../data/characters";
+import { CLASSES, defaultCharacterStats, type Character, type CharacterDraft } from "../data/characters";
 
 type CharacterBuilderProps = {
   character?: Character;
@@ -32,6 +32,22 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
 
     setError("");
     onSave({
+      ...defaultCharacterStats(),
+      ...(character ? {
+        abilityScores: character.abilityScores,
+        savingThrowProficiencies: character.savingThrowProficiencies,
+        skillProficiencies: character.skillProficiencies,
+        size: character.size,
+        speedFeet: character.speedFeet,
+        otherSpeedBonus: character.otherSpeedBonus,
+        powerfulBuild: character.powerfulBuild,
+        armorMode: character.armorMode,
+        armorBaseAC: character.armorBaseAC,
+        hasShield: character.hasShield,
+        otherAcBonus: character.otherAcBonus,
+        armorStrengthRequirement: character.armorStrengthRequirement,
+        spellcastingAbility: character.spellcastingAbility,
+      } : {}),
       name: trimmedName,
       concept: concept.trim(),
       species: species.trim(),
@@ -74,7 +90,10 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
           </label>
           <label className="form-field">
             <span>Class <small>OPTIONAL</small></span>
-            <input name="class" maxLength={40} value={characterClass} onChange={(event) => setCharacterClass(event.target.value)} placeholder="Choose or type a class" />
+            <select name="class" value={characterClass} onChange={(event) => setCharacterClass(event.target.value)}>
+              <option value="">Choose a class</option>
+              {CLASSES.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
           </label>
           <label className="form-field">
             <span>Background <small>OPTIONAL</small></span>
@@ -86,7 +105,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
           </label>
         </div>
 
-        <p className="form-hint">Free text for now. We’ll add searchable 2024 character options and guided ability choices in the next pass.</p>
+        <p className="form-hint">Your ability scores start as temporary placeholders. Set them on the Abilities &amp; skills page; derived stats update as you go.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
           <button className="form-cancel" type="button" onClick={onCancel}>Cancel</button>

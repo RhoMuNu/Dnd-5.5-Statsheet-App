@@ -1,11 +1,13 @@
 import { navigationGroups, sectionContent, type SectionId } from "../data/navigation";
 import type { Character } from "../data/characters";
+import { AbilitiesPage } from "./AbilitiesPage";
 
 type SectionPageProps = {
   section: Exclude<SectionId, "overview" | "builder">;
   character: Character | null;
   onOpenBuilder: () => void;
   onEdit: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<Character>) => void;
 };
 
 const sectionDetails: Record<Exclude<SectionId, "overview" | "builder">, { intro: string; items: string[] }> = {
@@ -31,11 +33,15 @@ const sectionDetails: Record<Exclude<SectionId, "overview" | "builder">, { intro
   },
 };
 
-export function SectionPage({ section, character, onOpenBuilder, onEdit }: SectionPageProps) {
+export function SectionPage({ section, character, onOpenBuilder, onEdit, onUpdate }: SectionPageProps) {
   const content = sectionContent[section];
   const navItem = navigationGroups[0].items.find((item) => item.id === section)
     ?? navigationGroups[1].items.find((item) => item.id === section);
   const detail = sectionDetails[section];
+
+  if (section === "abilities" && character) {
+    return <AbilitiesPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
+  }
 
   return (
     <section className="section-screen" aria-labelledby="section-page-title">
