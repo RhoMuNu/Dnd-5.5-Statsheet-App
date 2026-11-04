@@ -29,7 +29,9 @@ The LAN host and party dashboard are available from the **LAN party** menu.
 
 ### Production host
 
-Run `npm run host` on the DM's PC. This builds the app and starts the combined web and campaign server at port `4173`. Open `http://localhost:4173` on the host PC, then give players the LAN address displayed in the DM dashboard.
+**Easy Windows launch:** double-click `Start TaleForge Host.bat`. It checks for Node.js, installs app dependencies the first time, builds TaleForge, and opens it on the host PC. Keep the terminal window open while playing; press Ctrl+C there to stop the host. Node.js LTS is a one-time install on the DM's PC only. Players need no install; they open the invite address in a browser.
+
+You can also run `npm run host` from a terminal. This builds the app and starts the combined web and campaign server at port `4173`; open `http://localhost:4173` on the host PC, then give players a LAN address displayed in the DM dashboard.
 
 On Windows, allow Node.js through Windows Defender Firewall for **Private networks** if prompted. The host and players need to be on the same network, and the host PC must stay awake with the server running. The DM can stop a development host with Ctrl+C; for a production host, stop its PowerShell process with Ctrl+C.
 
@@ -49,12 +51,13 @@ src/
   data/
     navigation.ts      Menu labels, sections, and URL helpers
     lan.ts             LAN API types and request helper
-server/
-  index.mjs            Persistent campaign API and production web host
-  dev.mjs              Starts Vite and the API together for LAN development
   App.tsx              App shell and section navigation
   main.tsx             Browser entry point
   styles.css           Global styles and responsive layout
+server/
+  index.mjs            Persistent campaign API and production web host
+  dev.mjs              Starts Vite and the API together for LAN development
+Start TaleForge Host.bat  Windows one-click host launcher
 index.html             HTML shell
 vite.config.ts         Vite configuration
 ```
