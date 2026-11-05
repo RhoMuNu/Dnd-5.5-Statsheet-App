@@ -1,6 +1,7 @@
 import { navigationGroups, sectionContent, type SectionId } from "../data/navigation";
 import type { Character } from "../data/characters";
 import { AbilitiesPage } from "./AbilitiesPage";
+import { FeaturesPage, InventoryPage, NotesPage, SpellbookPage } from "./CharacterSections";
 
 type SectionPageProps = {
   section: Exclude<SectionId, "overview" | "builder" | "lan">;
@@ -17,19 +18,19 @@ const sectionDetails: Record<Exclude<SectionId, "overview" | "builder" | "lan">,
     items: ["Ability scores", "Saving throws", "Skills & proficiencies"],
   },
   features: {
-    intro: "Class uses and custom feat trackers are available on the Abilities & skills sheet. A full feature and traits editor is coming next.",
+    intro: "Review class features as your character levels up, and record the feats and traits that make them yours.",
     items: ["Class features", "Species traits", "Feats & other traits"],
   },
   inventory: {
-    intro: "Keep your equipment and treasures close at hand while you adventure.",
+    intro: "Track carried gear, equipped items, coins, and how much your character can carry.",
     items: ["Weapons & armor", "Adventuring gear", "Treasure & currency"],
   },
   spells: {
-    intro: "Spell slot tracking is available on the Abilities & skills sheet. Spell lists and prepared spells are coming next.",
+    intro: "Build a spellbook, mark spells ready, and spend spell slots as you cast.",
     items: ["Known spells", "Prepared spells", "Spell slots & resources"],
   },
   notes: {
-    intro: "Hold on to the little details that make a campaign feel like your story.",
+    intro: "Keep a character backstory and session journal with this sheet.",
     items: ["Session journal", "Character backstory", "Party clues & reminders"],
   },
 };
@@ -43,6 +44,10 @@ export function SectionPage({ section, character, onOpenBuilder, onEdit, onUpdat
   if (section === "abilities" && character) {
     return <AbilitiesPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
   }
+  if (character && section === "features") return <FeaturesPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
+  if (character && section === "inventory") return <InventoryPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
+  if (character && section === "spells") return <><SpellbookPage character={character} onChange={(updates) => onUpdate(character.id, updates)} /><button className="backup-button spell-slot-navigation" onClick={onOpenAbilities}>Open spell slot &amp; resource trackers ↗</button></>;
+  if (character && section === "notes") return <NotesPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
 
   return (
     <section className="section-screen" aria-labelledby="section-page-title">
@@ -70,7 +75,6 @@ export function SectionPage({ section, character, onOpenBuilder, onEdit, onUpdat
           </article>
         ))}
       </div>
-      {character && (section === "features" || section === "spells") && <div className="section-feature-link"><div><strong>{section === "features" ? "Track feature uses" : "Track spell slots"}</strong><span>{section === "features" ? "Manage class resources, feats, and custom limited-use features." : "Spend and restore spell slots from your character sheet."}</span></div><button className="primary-button" onClick={onOpenAbilities}>Open character sheet <span>→</span></button></div>}
       <div className="section-empty-footer">
         <div><strong>{character ? `${character.name}’s sheet is taking shape` : "No character selected yet"}</strong><span>{character ? "Your saved character is available from every menu section." : "Create your first hero to start filling in this section."}</span></div>
         {!character && <button className="primary-button" onClick={onOpenBuilder}>Create a character <span>→</span></button>}

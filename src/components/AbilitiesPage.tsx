@@ -25,7 +25,10 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
   function setAbilityScore(ability: AbilityName, rawValue: string) {
     const value = Number(rawValue);
     if (!Number.isInteger(value) || value < 1 || value > 30) return;
-    onChange?.({ abilityScores: { ...character.abilityScores, [ability]: value } });
+    onChange?.({
+      abilityScores: { ...character.abilityScores, [ability]: value },
+      abilityScoreOverrides: { ...character.abilityScoreOverrides, [ability]: value },
+    });
   }
 
   function setSaveProficiency(ability: AbilityName, proficient: boolean) {

@@ -101,6 +101,20 @@ export const CLASS_ARMOR: Record<string, Record<string, { mode: ArmorMode; baseA
 
 export const LANGUAGES = ["Common", "Common Sign Language", "Abyssal", "Celestial", "Deep Speech", "Draconic", "Dwarvish", "Elvish", "Giant", "Gnomish", "Goblin", "Halfling", "Infernal", "Orc", "Primordial", "Sylvan", "Undercommon"];
 export const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
+export const STANDARD_ARRAY_BY_CLASS: Record<string, Record<AbilityName, number>> = {
+  Barbarian: { Strength: 15, Dexterity: 13, Constitution: 14, Intelligence: 10, Wisdom: 12, Charisma: 8 },
+  Bard: { Strength: 8, Dexterity: 14, Constitution: 12, Intelligence: 13, Wisdom: 10, Charisma: 15 },
+  Cleric: { Strength: 14, Dexterity: 8, Constitution: 13, Intelligence: 10, Wisdom: 15, Charisma: 12 },
+  Druid: { Strength: 8, Dexterity: 12, Constitution: 14, Intelligence: 13, Wisdom: 15, Charisma: 10 },
+  Fighter: { Strength: 15, Dexterity: 14, Constitution: 13, Intelligence: 8, Wisdom: 10, Charisma: 12 },
+  Monk: { Strength: 12, Dexterity: 15, Constitution: 13, Intelligence: 10, Wisdom: 14, Charisma: 8 },
+  Paladin: { Strength: 15, Dexterity: 10, Constitution: 13, Intelligence: 8, Wisdom: 12, Charisma: 14 },
+  Ranger: { Strength: 12, Dexterity: 15, Constitution: 13, Intelligence: 8, Wisdom: 14, Charisma: 10 },
+  Rogue: { Strength: 12, Dexterity: 15, Constitution: 13, Intelligence: 14, Wisdom: 10, Charisma: 8 },
+  Sorcerer: { Strength: 10, Dexterity: 13, Constitution: 14, Intelligence: 8, Wisdom: 12, Charisma: 15 },
+  Warlock: { Strength: 8, Dexterity: 14, Constitution: 13, Intelligence: 12, Wisdom: 10, Charisma: 15 },
+  Wizard: { Strength: 8, Dexterity: 12, Constitution: 13, Intelligence: 15, Wisdom: 14, Charisma: 10 },
+};
 
 export function pointBuyCost(score: number): number {
   if (score <= 8) return 0;

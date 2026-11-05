@@ -109,10 +109,11 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
       <section className="quick-links">
         <div className="quick-copy">
           <span className="quick-spark" aria-hidden="true">✧</span>
-          <div><strong>Your sheets stay on this device</strong><span>Local saves are automatic in this browser. LAN campaign sharing can come later.</span></div>
+          <div><strong>Your sheets stay on this device</strong><span>Local saves are automatic in this browser. Use LAN party to share selected sheets with your group.</span></div>
         </div>
         <button onClick={onCreate}>Create another <span>→</span></button>
       </section>
     </>
   );
 }
+
