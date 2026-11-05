@@ -46,11 +46,16 @@ src/
   components/
     Overview.tsx       Character collection landing screen
     LanGame.tsx        Host, player, and DM LAN workflows
-    SectionPage.tsx    Starter screens for menu destinations
+    SectionPage.tsx    Character-section routing and empty states
+    CharacterSections.tsx Feature, inventory, spellbook, and journal editors
+    CharacterBuilder.tsx Guided 2024 character creator
     Sidebar.tsx        Main navigation
   data/
     navigation.ts      Menu labels, sections, and URL helpers
     lan.ts             LAN API types and request helper
+    characters.ts      Character records, defaults, local saves, migrations
+    creationOptions.ts  Character-creation choices and equipment
+    calculations.ts    Derived stats and limited-use class/species resources
   App.tsx              App shell and section navigation
   main.tsx             Browser entry point
   styles.css           Global styles and responsive layout
@@ -70,8 +75,10 @@ Menu sections use URL hashes (for example `/#inventory`), so they can be bookmar
 
 Characters autosave to this browser's local storage. The collection supports selecting, editing, and deleting characters. Use **Export library** to download a versioned JSON backup, or export one character from its roster card. **Import backup** merges characters into the current library and skips IDs already present; it never overwrites an existing local character. Keep a downloaded backup somewhere separate from the browser for recovery or transfer to another device.
 
+Character sections include class features and custom traits, a quantity and weight inventory with coin tracking, a spellbook with ready-state and spell-slot spending, and a backstory with a dated journal. These fields are included in character backups.
+
 ## Calculated stats
 
 The Abilities & Skills page derives ability modifiers, proficiency bonus, saving throws, skill bonuses (including expertise), passive Perception, initiative, armor class, fixed-average hit point maximum, speed, carrying limits, spell save DC, spell attack bonus, class resources, and multiclass spell slots. Inputs are saved with the character, and derived values recalculate from the current inputs.
 
-The formulas follow the [2024 Basic Rules: Playing the Game](https://www.dndbeyond.com/sources/dnd/br-2024/playing-the-game), [Creating a Character](https://www.dndbeyond.com/sources/dnd/br-2024/creating-a-character), and [Character Classes](https://www.dndbeyond.com/sources/dnd/br-2024/character-classes). Scores begin at 10 as placeholders. Species speed and armor details are entered manually; AC features not covered by the common formulas can use Custom AC. Local saves, versioned JSON backups, and LAN campaign sharing are implemented.
+The formulas follow the [2024 Basic Rules: Playing the Game](https://www.dndbeyond.com/sources/dnd/br-2024/playing-the-game), [Creating a Character](https://www.dndbeyond.com/sources/dnd/br-2024/creating-a-character), and [Character Classes](https://www.dndbeyond.com/sources/dnd/br-2024/character-classes). The creator offers Standard Array, Point Buy, manual scores, and 4d6 rolls, with class-based Standard Array suggestions and background boosts. Species size and speed, class equipment armor, and AC features are editable. Class and species resources update with level; specific spell, feat, and subclass choices can be recorded in the character sections. Local saves, versioned JSON backups, and LAN campaign sharing are implemented.

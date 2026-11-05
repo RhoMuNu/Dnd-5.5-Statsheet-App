@@ -27,7 +27,12 @@ export type Character = {
   otherAcBonus: number;
   armorStrengthRequirement: number;
   spellcastingAbility: AbilityName | "";
+  abilityScoreOverrides?: Partial<Record<AbilityName, number>>;
   creationDetails?: CharacterCreationDetails;
+  features: CharacterFeature[];
+  inventory: CharacterInventory;
+  spells: CharacterSpell[];
+  notes: CharacterNotes;
   createdAt: string;
   updatedAt: string;
 };
@@ -35,6 +40,12 @@ export type Character = {
 export type CustomResource = { id: string; name: string; maxUses: number; used: number; recovery: "short-one" | "short-all" | "long" | "manual" };
 
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
+export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string };
+export type InventoryCurrency = { cp: number; sp: number; ep: number; gp: number; pp: number };
+export type InventoryItem = { id: string; name: string; quantity: number; weight: number; category: string; equipped: boolean; notes: string };
+export type CharacterInventory = { items: InventoryItem[]; currency: InventoryCurrency; startingKitsAdded: boolean };
+export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean };
+export type CharacterNotes = { backstory: string; entries: { id: string; title: string; body: string; createdAt: string; updatedAt: string }[] };
 export type CharacterCreationDetails = {
   abilityMethod: "standard" | "point-buy" | "manual" | "rolled";
   baseAbilityScores: Record<AbilityName, number>;
@@ -48,6 +59,7 @@ export type CharacterCreationDetails = {
   classEquipmentOption: "A" | "B" | "C" | "custom";
   classChoices: string;
   appearance: string;
+  abilityScoreOverrides?: Partial<Record<AbilityName, number>>;
 };
 export type AbilityName = "Strength" | "Dexterity" | "Constitution" | "Intelligence" | "Wisdom" | "Charisma";
 export type SkillName =
@@ -94,7 +106,7 @@ export function defaultCharacterStats(): Pick<Character,
   "abilityScores" | "savingThrowProficiencies" | "skillProficiencies" | "size" | "speedFeet" |
   "otherSpeedBonus" |
   "powerfulBuild" | "armorMode" | "armorBaseAC" | "hasShield" | "otherAcBonus" |
-  "armorStrengthRequirement" | "spellcastingAbility"
+  "armorStrengthRequirement" | "spellcastingAbility" | "features" | "inventory" | "spells" | "notes"
 > {
   return {
     subclass: "",
@@ -118,6 +130,10 @@ export function defaultCharacterStats(): Pick<Character,
     otherAcBonus: 0,
     armorStrengthRequirement: 0,
     spellcastingAbility: "",
+    features: [],
+    inventory: { items: [], currency: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 }, startingKitsAdded: false },
+    spells: [],
+    notes: { backstory: "", entries: [] },
   };
 }
 
@@ -154,8 +170,100 @@ export function normalizeCharacter(value: unknown): Character | null {
       : character.characterClass && character.subclass ? { [character.characterClass]: character.subclass } : {},
     unarmoredDefenseChoice: character.unarmoredDefenseChoice ?? "",
     abilityScores: { ...defaults.abilityScores, ...character.abilityScores },
+    abilityScoreOverrides: normalizeAbilityScoreOverrides(character.abilityScoreOverrides),
     savingThrowProficiencies: { ...defaults.savingThrowProficiencies, ...character.savingThrowProficiencies },
     skillProficiencies: { ...defaults.skillProficiencies, ...character.skillProficiencies },
+    creationDetails: normalizeCreationDetails(character.creationDetails),
+    features: Array.isArray(character.features) ? character.features.filter(isCharacterFeature) : [],
+    inventory: normalizeInventory(character.inventory),
+    spells: Array.isArray(character.spells) ? character.spells.filter(isCharacterSpell) : [],
+    notes: normalizeNotes(character.notes),
+  };
+}
+
+function isCharacterFeature(value: unknown): value is CharacterFeature {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<CharacterFeature>;
+  return typeof item.id === "string" && typeof item.name === "string"
+    && ["class", "species", "feat", "other"].includes(item.category ?? "")
+    && typeof item.description === "string";
+}
+
+function isInventoryItem(value: unknown): value is InventoryItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<InventoryItem>;
+  return typeof item.id === "string" && typeof item.name === "string"
+    && Number.isInteger(item.quantity) && (item.quantity ?? 0) >= 0
+    && Number.isFinite(item.weight) && (item.weight ?? -1) >= 0
+    && typeof item.category === "string" && typeof item.equipped === "boolean"
+    && typeof item.notes === "string";
+}
+
+function isCharacterSpell(value: unknown): value is CharacterSpell {
+  if (!value || typeof value !== "object") return false;
+  const spell = value as Partial<CharacterSpell>;
+  return typeof spell.id === "string" && typeof spell.name === "string"
+    && Number.isInteger(spell.level) && (spell.level ?? -1) >= 0 && (spell.level ?? 10) <= 9
+    && typeof spell.school === "string" && typeof spell.castingTime === "string"
+    && typeof spell.range === "string" && typeof spell.components === "string"
+    && typeof spell.concentration === "boolean" && typeof spell.description === "string"
+    && typeof spell.prepared === "boolean";
+}
+
+function normalizeInventory(value: unknown): CharacterInventory {
+  const defaults: CharacterInventory = { items: [], currency: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 }, startingKitsAdded: false };
+  if (!value || typeof value !== "object") return defaults;
+  const inventory = value as Partial<CharacterInventory>;
+  const currency = inventory.currency && typeof inventory.currency === "object" ? inventory.currency as Partial<InventoryCurrency> : {};
+  return {
+    items: Array.isArray(inventory.items) ? inventory.items.filter(isInventoryItem) : [],
+    currency: Object.fromEntries((Object.keys(defaults.currency) as (keyof InventoryCurrency)[]).map((key) => [key, Math.max(0, Math.trunc(Number(currency[key]) || 0))])) as InventoryCurrency,
+    startingKitsAdded: inventory.startingKitsAdded === true,
+  };
+}
+
+function normalizeNotes(value: unknown): CharacterNotes {
+  if (!value || typeof value !== "object") return { backstory: "", entries: [] };
+  const notes = value as Partial<CharacterNotes>;
+  return {
+    backstory: typeof notes.backstory === "string" ? notes.backstory : "",
+    entries: Array.isArray(notes.entries) ? notes.entries.filter((entry) => entry && typeof entry.id === "string" && typeof entry.title === "string" && typeof entry.body === "string" && typeof entry.createdAt === "string" && typeof entry.updatedAt === "string") : [],
+  };
+}
+
+function normalizeAbilityScoreOverrides(value: unknown): Partial<Record<AbilityName, number>> {
+  if (!value || typeof value !== "object") return {};
+  const entries = Object.entries(value as Record<string, unknown>).filter(([key, score]) => ABILITIES.includes(key as AbilityName) && Number.isInteger(score) && Number(score) >= 1 && Number(score) <= 30);
+  return Object.fromEntries(entries) as Partial<Record<AbilityName, number>>;
+}
+
+function normalizeCreationDetails(value: unknown): CharacterCreationDetails | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const details = value as Partial<CharacterCreationDetails>;
+  const abilityMethod = ["standard", "point-buy", "manual", "rolled"].includes(details.abilityMethod ?? "") ? details.abilityMethod! : "manual";
+  const baseAbilityScores = Object.fromEntries(ABILITIES.map((ability) => {
+    const score = Number(details.baseAbilityScores?.[ability]);
+    return [ability, Number.isInteger(score) ? Math.min(30, Math.max(1, score)) : 10];
+  })) as Record<AbilityName, number>;
+  const boosts = normalizeAbilityScoreOverrides(details.backgroundAbilityBoosts);
+  const backgroundAbilityBoosts = Object.fromEntries(Object.entries(boosts).map(([ability, score]) => [ability, Math.min(2, score) as 0 | 1 | 2])) as Partial<Record<AbilityName, 0 | 1 | 2>>;
+  const classSkills = Array.isArray(details.classSkills) ? details.classSkills.filter((skill): skill is SkillName => SKILLS.some((entry) => entry.name === skill)).slice(0, 18) : [];
+  const languages = Array.isArray(details.languages) ? details.languages.filter((language): language is string => typeof language === "string").slice(0, 12) : ["Common"];
+  const equipmentChoice = ["A", "B", "gold"].includes(details.equipmentChoice ?? "") ? details.equipmentChoice! : "A";
+  const classEquipmentOption = ["A", "B", "C", "custom"].includes(details.classEquipmentOption ?? "") ? details.classEquipmentOption! : "A";
+  return {
+    abilityMethod,
+    baseAbilityScores,
+    backgroundAbilityBoosts,
+    classSkills,
+    languages,
+    toolProficiency: typeof details.toolProficiency === "string" ? details.toolProficiency.slice(0, 120) : "",
+    classToolProficiency: typeof details.classToolProficiency === "string" ? details.classToolProficiency.slice(0, 120) : "",
+    equipmentChoice,
+    classEquipment: typeof details.classEquipment === "string" ? details.classEquipment.slice(0, 300) : "",
+    classEquipmentOption,
+    classChoices: typeof details.classChoices === "string" ? details.classChoices.slice(0, 300) : "",
+    appearance: typeof details.appearance === "string" ? details.appearance.slice(0, 200) : "",
   };
 }
 

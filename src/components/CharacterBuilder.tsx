@@ -1,11 +1,12 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { ABILITIES, CLASSES, defaultCharacterStats, type AbilityName, type Character, type CharacterCreationDetails, type CharacterDraft, type SkillName } from "../data/characters";
-import { BACKGROUNDS, CLASS_ARMOR, CLASS_EQUIPMENT, CLASS_SKILLS, CLASS_TOOLS, LANGUAGES, SPECIES, STANDARD_ARRAY, pointBuyCost } from "../data/creationOptions";
+import { BACKGROUNDS, CLASS_ARMOR, CLASS_EQUIPMENT, CLASS_SKILLS, CLASS_TOOLS, LANGUAGES, SPECIES, STANDARD_ARRAY, STANDARD_ARRAY_BY_CLASS, pointBuyCost } from "../data/creationOptions";
 import { calculateCharacterStats } from "../data/calculations";
 
 type CharacterBuilderProps = { character?: Character; onSave: (draft: CharacterDraft) => void; onCancel: () => void };
 type AbilityScores = Record<AbilityName, number>;
 const emptyScores = (value = 10): AbilityScores => Object.fromEntries(ABILITIES.map((ability) => [ability, value])) as AbilityScores;
+const standardScoresFor = (characterClass: string): AbilityScores => STANDARD_ARRAY_BY_CLASS[characterClass] ?? Object.fromEntries(ABILITIES.map((ability, index) => [ability, STANDARD_ARRAY[index]])) as AbilityScores;
 const rollScores = (): number[] => Array.from({ length: 6 }, () => {
   const dice = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => b - a);
   return dice.slice(0, 3).reduce((sum, die) => sum + die, 0);
@@ -31,6 +32,8 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   const [level, setLevel] = useState(String(character?.level ?? 1));
   const [abilityMethod, setAbilityMethod] = useState<CharacterCreationDetails["abilityMethod"]>(saved?.abilityMethod ?? "standard");
   const [baseScores, setBaseScores] = useState<AbilityScores>(() => saved?.baseAbilityScores ?? character?.abilityScores ?? { ...emptyScores(), Strength: 15, Dexterity: 14, Constitution: 13, Intelligence: 12, Wisdom: 10, Charisma: 8 });
+  const [scoreDistributionTouched, setScoreDistributionTouched] = useState(Boolean(character || saved));
+  const [abilityScoreOverrides, setAbilityScoreOverrides] = useState(character?.abilityScoreOverrides ?? {});
   const [rolledScores, setRolledScores] = useState<number[]>(() => rollScores());
   const [boosts, setBoosts] = useState<Partial<Record<AbilityName, 0 | 1 | 2>>>(saved?.backgroundAbilityBoosts ?? {});
   const [classSkills, setClassSkills] = useState<SkillName[]>(saved?.classSkills ?? []);
@@ -53,12 +56,12 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   const selectedClassArmor = CLASS_ARMOR[characterClass]?.[classEquipmentOption];
   const gearSelectionChanged = !character || gearChanged;
   const scoreTotal = Object.values(baseScores).reduce((sum, value) => sum + pointBuyCost(value), 0);
-  const abilityScores = useMemo(() => Object.fromEntries(ABILITIES.map((ability) => [ability, Math.min(20, baseScores[ability] + (boosts[ability] ?? 0))])) as AbilityScores, [baseScores, boosts]);
+  const abilityScores = useMemo(() => Object.fromEntries(ABILITIES.map((ability) => [ability, abilityScoreOverrides[ability] ?? Math.min(20, baseScores[ability] + (boosts[ability] ?? 0))])) as AbilityScores, [baseScores, boosts, abilityScoreOverrides]);
   const previewCharacter = useMemo(() => ({
     ...(character ?? defaultCharacterStats()), name, concept, species, characterClass, subclass, classLevels,
     classSubclasses, background, level: Object.values(classLevels).reduce((sum, value) => sum + value, 0) || Number(level) || 1,
     abilityScores, skillProficiencies: { ...defaultCharacterStats().skillProficiencies, ...(character?.skillProficiencies ?? {}), ...Object.fromEntries([...(backgroundData?.skills ?? []), ...classSkills].map((skill) => [skill, 1])) },
-    size: speciesData?.size ?? customSize, speedFeet: speciesData?.speed ?? customSpeed,
+    size: customSize, speedFeet: customSpeed,
     armorMode: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.mode : character?.armorMode ?? "unarmored",
     armorBaseAC: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.baseAC : character?.armorBaseAC ?? 10,
     armorStrengthRequirement: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.strengthRequirement ?? 0 : character?.armorStrengthRequirement ?? 0,
@@ -66,7 +69,11 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   }) as Character, [character, name, concept, species, characterClass, subclass, classLevels, classSubclasses, background, level, abilityScores, backgroundData, classSkills, speciesData, customSize, customSpeed, gearSelectionChanged, selectedClassArmor]);
   const calculated = calculateCharacterStats(previewCharacter);
 
-  function setBaseScore(ability: AbilityName, value: number) { setBaseScores((current) => ({ ...current, [ability]: value })); }
+  function setBaseScore(ability: AbilityName, value: number) {
+    setBaseScores((current) => ({ ...current, [ability]: value }));
+    setScoreDistributionTouched(true);
+    setAbilityScoreOverrides((current) => { const next = { ...current }; delete next[ability]; return next; });
+  }
 
   function validateStep(): boolean {
     if (step === 1) {
@@ -118,12 +125,15 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
         armorBaseAC: character.armorBaseAC, hasShield: character.hasShield, otherAcBonus: character.otherAcBonus,
         armorStrengthRequirement: character.armorStrengthRequirement, unarmoredDefenseChoice: character.unarmoredDefenseChoice,
         spellcastingAbility: character.spellcastingAbility,
+        features: character.features ?? [], inventory: character.inventory ?? defaultCharacterStats().inventory,
+        spells: character.spells ?? [], notes: character.notes ?? { backstory: "", entries: [] },
       } : {}),
       name: name.trim(), concept: concept.trim(), species: species === "Custom" ? speciesChoice.trim() : speciesChoice ? `${species} (${speciesChoice})` : species,
       characterClass, subclass: subclass.trim(), classLevels: normalizedLevels,
       classSubclasses: { ...classSubclasses, ...(characterClass ? { [characterClass]: subclass.trim() } : {}) },
       background: background === "Custom" ? customBackground.trim() : background, level: totalLevel, abilityScores, skillProficiencies,
-      size: speciesData?.size ?? customSize, speedFeet: speciesData?.speed ?? customSpeed,
+      size: customSize, speedFeet: customSpeed,
+      abilityScoreOverrides,
       armorMode: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.mode : character?.armorMode ?? "unarmored",
       armorBaseAC: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.baseAC : character?.armorBaseAC ?? 10,
       armorStrengthRequirement: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.strengthRequirement ?? 0 : character?.armorStrengthRequirement ?? 0,
@@ -135,9 +145,11 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   function changeClass(next: string) {
     setClassLevels((previous) => { const updated = { ...previous }; delete updated[characterClass]; if (next) updated[next] = Number(level) || 1; return updated; });
     setCharacterClass(next); setSubclass(classSubclasses[next] ?? ""); setClassSkills([]); setClassEquipmentOption("A"); setClassEquipment(""); setGearChanged(true);
+    if (next && abilityMethod === "standard" && !scoreDistributionTouched && STANDARD_ARRAY_BY_CLASS[next]) setBaseScores(STANDARD_ARRAY_BY_CLASS[next]);
   }
   function chooseBoost(ability: AbilityName, value: number) {
     setBoosts((previous) => { const next = { ...previous }; if (value === 0) delete next[ability]; else next[ability] = value as 1 | 2; return next; });
+    setAbilityScoreOverrides((current) => { const next = { ...current }; delete next[ability]; return next; });
   }
 
   return <section className="builder-screen" aria-labelledby="builder-title">
@@ -150,12 +162,12 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       {step === 1 && <div className="form-grid">
         <label className="form-field form-field-wide"><span>Character name <b>REQUIRED</b></span><input autoFocus maxLength={60} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Bramble Underbough" /></label>
         <label className="form-field form-field-wide"><span>Character idea <small>OPTIONAL</small></span><input maxLength={100} value={concept} onChange={(event) => setConcept(event.target.value)} placeholder="A cheerful treasure hunter with a mysterious map" /></label>
-        <label className="form-field"><span>Species <b>REQUIRED</b></span><select value={species} onChange={(event) => { setSpecies(event.target.value); setSpeciesChoice(""); }}><option value="">Choose a species</option>{Object.keys(SPECIES).map((item) => <option key={item}>{item}</option>)}<option value="Custom">Custom / other</option></select></label>
+        <label className="form-field"><span>Species <b>REQUIRED</b></span><select value={species} onChange={(event) => { const next = event.target.value; setSpecies(next); setSpeciesChoice(""); setCustomSize(SPECIES[next]?.size ?? "Medium"); setCustomSpeed(SPECIES[next]?.speed ?? 30); }}><option value="">Choose a species</option>{Object.keys(SPECIES).map((item) => <option key={item}>{item}</option>)}<option value="Custom">Custom / other</option></select></label>
         {species === "Custom" && <label className="form-field"><span>Species name</span><input maxLength={40} value={speciesChoice} onChange={(event) => setSpeciesChoice(event.target.value)} placeholder="Your species" /></label>}
-        {species === "Custom" && <><label className="form-field"><span>Size</span><select value={customSize} onChange={(event) => setCustomSize(event.target.value as Character["size"])}>{["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"].map((size) => <option key={size}>{size}</option>)}</select></label><label className="form-field"><span>Walking speed (ft.)</span><input type="number" min={0} max={120} value={customSpeed} onChange={(event) => setCustomSpeed(Number(event.target.value))} /></label></>}
+        {species && <><label className="form-field"><span>Size</span><select value={customSize} onChange={(event) => setCustomSize(event.target.value as Character["size"])}>{["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"].map((size) => <option key={size}>{size}</option>)}</select></label><label className="form-field"><span>Walking speed (ft.)</span><input type="number" min={0} max={120} value={customSpeed} onChange={(event) => setCustomSpeed(Number(event.target.value))} /></label></>}
         {species && species !== "Custom" && ["Elf", "Gnome", "Tiefling", "Dragonborn", "Goliath"].includes(species) && <label className="form-field"><span>{species} lineage / ancestry <small>OPTIONAL</small></span><input maxLength={35} value={speciesChoice} onChange={(event) => setSpeciesChoice(event.target.value)} placeholder={species === "Elf" ? "Drow, High Elf, or Wood Elf" : species === "Tiefling" ? "Abyssal, Chthonic, or Infernal" : species === "Dragonborn" ? "Choose a dragon ancestry" : species === "Goliath" ? "Choose a giant ancestry" : "Forest or Rock"} /></label>}
         <label className="form-field"><span>Class <b>REQUIRED</b></span><select value={characterClass} onChange={(event) => changeClass(event.target.value)}><option value="">Choose a class</option>{CLASSES.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label className="form-field"><span>Background <b>REQUIRED</b></span><select value={background} onChange={(event) => { setBackground(event.target.value); setBoosts({}); setToolProficiency(BACKGROUNDS[event.target.value]?.tool ?? ""); setClassSkills((current) => current.filter((skill) => !BACKGROUNDS[event.target.value]?.skills.includes(skill))); }}><option value="">Choose a background</option>{Object.keys(BACKGROUNDS).map((item) => <option key={item}>{item}</option>)}<option value="Custom">Custom / other</option></select></label>
+        <label className="form-field"><span>Background <b>REQUIRED</b></span><select value={background} onChange={(event) => { setBackground(event.target.value); setBoosts({}); setAbilityScoreOverrides({}); setToolProficiency(BACKGROUNDS[event.target.value]?.tool ?? ""); setClassSkills((current) => current.filter((skill) => !BACKGROUNDS[event.target.value]?.skills.includes(skill))); }}><option value="">Choose a background</option>{Object.keys(BACKGROUNDS).map((item) => <option key={item}>{item}</option>)}<option value="Custom">Custom / other</option></select></label>
         {background === "Custom" && <label className="form-field"><span>Background name</span><input maxLength={50} value={customBackground} onChange={(event) => setCustomBackground(event.target.value)} placeholder="Your background" /></label>}
         <label className="form-field"><span>{characterClass || "Class"} level <small>1–20</small></span><input type="number" min={1} max={20} value={classLevels[characterClass] ?? level} onChange={(event) => { setLevel(event.target.value); if (characterClass) setClassLevels((current) => ({ ...current, [characterClass]: Number(event.target.value) || 1 })); }} /></label>
         <label className="form-field"><span>Subclass <small>LEVEL 3+</small></span><input maxLength={50} value={subclass} onChange={(event) => { setSubclass(event.target.value); if (characterClass) setClassSubclasses((current) => ({ ...current, [characterClass]: event.target.value })); }} placeholder="Choose when your class grants it" /></label>
@@ -166,7 +178,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       </div>}
 
       {step === 2 && <>
-        <div className="creator-section"><h3>Ability scores</h3><p>Choose a method, then place your scores. Your background adds the final boosts.</p><div className="ability-methods">{([["standard", "Standard Array"], ["point-buy", "Point Buy"], ["manual", "Manual"], ["rolled", "Roll 4d6"]] as const).map(([method, label]) => <button type="button" key={method} className={abilityMethod === method ? "method-selected" : ""} onClick={() => { setAbilityMethod(method); if (method === "standard") setBaseScores(Object.fromEntries(ABILITIES.map((ability, index) => [ability, STANDARD_ARRAY[index]])) as AbilityScores); if (method === "point-buy") setBaseScores(emptyScores(8)); if (method === "rolled") { const rolls = rollScores(); setRolledScores(rolls); setBaseScores(Object.fromEntries(ABILITIES.map((ability, index) => [ability, rolls[index]])) as AbilityScores); } }}>{label}</button>)}</div>
+        <div className="creator-section"><h3>Ability scores</h3><p>Choose a method, then place your scores. Your background adds the final boosts.</p><div className="ability-methods">{([["standard", "Standard Array"], ["point-buy", "Point Buy"], ["manual", "Manual"], ["rolled", "Roll 4d6"]] as const).map(([method, label]) => <button type="button" key={method} className={abilityMethod === method ? "method-selected" : ""} onClick={() => { setAbilityMethod(method); setAbilityScoreOverrides({}); setScoreDistributionTouched(method !== "standard"); if (method === "standard") setBaseScores(standardScoresFor(characterClass)); if (method === "point-buy") setBaseScores(emptyScores(8)); if (method === "rolled") { const rolls = rollScores(); setRolledScores(rolls); setBaseScores(Object.fromEntries(ABILITIES.map((ability, index) => [ability, rolls[index]])) as AbilityScores); } }}>{label}</button>)}</div>
           {abilityMethod === "rolled" && <button className="text-button" type="button" onClick={() => { const rolls = rollScores(); setRolledScores(rolls); setBaseScores(Object.fromEntries(ABILITIES.map((ability, index) => [ability, rolls[index]])) as AbilityScores); }}>Roll again: {rolledScores.join(" · ")}</button>}
           {abilityMethod === "point-buy" && <p className={scoreTotal === 27 ? "point-buy-total" : "form-hint"}>Points spent: {scoreTotal} / 27</p>}
           <div className="creator-ability-grid">{ABILITIES.map((ability) => <label className="creator-ability" key={ability}><span>{ability}</span>{abilityMethod === "manual" || abilityMethod === "point-buy" ? <input type="number" min={abilityMethod === "point-buy" ? 8 : 3} max={abilityMethod === "point-buy" ? 15 : 20} value={baseScores[ability]} onChange={(event) => setBaseScore(ability, Number(event.target.value))} /> : <select value={baseScores[ability]} onChange={(event) => setBaseScore(ability, Number(event.target.value))}>{Array.from(new Set(abilityMethod === "standard" ? STANDARD_ARRAY : rolledScores)).filter((score) => { const allScores = abilityMethod === "standard" ? STANDARD_ARRAY : rolledScores; const allowed = allScores.filter((entry) => entry === score).length; const usedElsewhere = ABILITIES.filter((other) => other !== ability && baseScores[other] === score).length; return score === baseScores[ability] || usedElsewhere < allowed; }).map((score) => <option key={score} value={score}>{score}</option>)}</select>}<small>Final {abilityScores[ability]} ({abilityScores[ability] >= 10 ? "+" : ""}{Math.floor((abilityScores[ability] - 10) / 2)})</small></label>)}</div>
@@ -183,6 +195,9 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
     </form>
   </section>;
 }
+
+
+
 
 
 

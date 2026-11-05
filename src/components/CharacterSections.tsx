@@ -1,0 +1,165 @@
+import { useMemo, useState, type FormEvent } from "react";
+import { calculateCharacterStats } from "../data/calculations";
+import type { Character, CharacterFeature, CharacterInventory, CharacterNotes, CharacterSpell, InventoryCurrency, InventoryItem } from "../data/characters";
+import { BACKGROUNDS } from "../data/creationOptions";
+
+type SectionProps = { character: Character; onChange: (updates: Partial<Character>) => void };
+const itemCategories = ["Weapon", "Armor", "Gear", "Treasure", "Other"];
+const spellSchools = ["Abjuration", "Conjuration", "Divination", "Enchantment", "Evocation", "Illusion", "Necromancy", "Transmutation", "Other"];
+
+function newId() { return globalThis.crypto?.randomUUID?.() ?? `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
+
+export function FeaturesPage({ character, onChange }: SectionProps) {
+  const stats = calculateCharacterStats(character);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<CharacterFeature["category"]>("feat");
+  const [description, setDescription] = useState("");
+  const features = character.features ?? [];
+
+  function addFeature(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim()) return;
+    onChange({ features: [...features, { id: newId(), name: name.trim(), category, description: description.trim() }] });
+    setName(""); setDescription("");
+  }
+  function updateFeature(id: string, updates: Partial<CharacterFeature>) {
+    onChange({ features: features.map((feature) => feature.id === id ? { ...feature, ...updates } : feature) });
+  }
+
+  return <section className="collection-page" aria-label={`Features and traits for ${character.name}`}>
+    <div className="collection-page-heading"><div><p className="eyebrow">WHAT MAKES THEM UNIQUE</p><h2>Features &amp; traits</h2><p>Class features are calculated from your levels. Add details for feats, species traits, and other abilities.</p></div></div>
+    <section className="collection-panel"><h3>Class features by level</h3>{stats.classFeatures.length ? <div className="feature-collection-list">{stats.classFeatures.map((feature) => <div className="feature-collection-row" key={`${feature.level}-${feature.name}`}><span>Level {feature.level}</span><strong>{feature.name}</strong></div>)}</div> : <p className="collection-empty-copy">Choose a class and level to see class features here.</p>}</section>
+    <section className="collection-panel"><h3>Your features</h3>{features.length ? <div className="editable-feature-list">{features.map((feature) => <article className="editable-feature-card" key={feature.id}><div className="editable-feature-heading"><input aria-label="Feature name" maxLength={80} value={feature.name} onChange={(event) => updateFeature(feature.id, { name: event.target.value })} /><select aria-label="Feature category" value={feature.category} onChange={(event) => updateFeature(feature.id, { category: event.target.value as CharacterFeature["category"] })}><option value="class">Class</option><option value="species">Species</option><option value="feat">Feat</option><option value="other">Other</option></select><button type="button" className="text-button" onClick={() => onChange({ features: features.filter((entry) => entry.id !== feature.id) })}>Remove</button></div><textarea aria-label={`${feature.name || "Feature"} description`} rows={3} maxLength={2000} value={feature.description} onChange={(event) => updateFeature(feature.id, { description: event.target.value })} placeholder="What does this feature do?" /></article>)}</div> : <p className="collection-empty-copy">Your added traits and feats will appear here.</p>}</section>
+    <form className="collection-panel collection-entry-form" onSubmit={addFeature}><h3>Add a feature, trait, or feat</h3><div className="collection-form-grid"><label><span>Name</span><input maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Alert" required /></label><label><span>Category</span><select value={category} onChange={(event) => setCategory(event.target.value as CharacterFeature["category"])}><option value="class">Class</option><option value="species">Species</option><option value="feat">Feat</option><option value="other">Other</option></select></label><label className="collection-field-wide"><span>Description</span><textarea rows={3} maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Add a reminder of how it works." /></label></div><button className="primary-button" type="submit">Add feature <span>＋</span></button></form>
+    <p className="collection-helper">Limited-use abilities can also have a counter on the Abilities &amp; Skills page.</p>
+  </section>;
+}
+
+export function InventoryPage({ character, onChange }: SectionProps) {
+  const stats = calculateCharacterStats(character);
+  const inventory = character.inventory ?? { items: [], currency: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 }, startingKitsAdded: false };
+  const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [weight, setWeight] = useState("0");
+  const [category, setCategory] = useState("Gear");
+  const [equipped, setEquipped] = useState(false);
+  const carriedWeight = useMemo(() => inventory.items.reduce((total, item) => total + item.quantity * item.weight, 0) + Object.values(inventory.currency).reduce((total, coins) => total + coins, 0) / 50, [inventory]);
+
+  function saveInventory(updates: Partial<CharacterInventory>) { onChange({ inventory: { ...inventory, ...updates } }); }
+  function addItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const parsedQuantity = Number(quantity); const parsedWeight = Number(weight);
+    if (!name.trim() || !Number.isInteger(parsedQuantity) || parsedQuantity < 1 || !Number.isFinite(parsedWeight) || parsedWeight < 0) return;
+    const item: InventoryItem = { id: newId(), name: name.trim(), quantity: parsedQuantity, weight: parsedWeight, category, equipped, notes: "" };
+    saveInventory({ items: [...inventory.items, item] });
+    setName(""); setQuantity("1"); setWeight("0"); setEquipped(false);
+  }
+  function updateItem(id: string, updates: Partial<InventoryItem>) {
+    saveInventory({ items: inventory.items.map((item) => item.id === id ? { ...item, ...updates } : item) });
+  }
+  function updateCurrency(key: keyof InventoryCurrency, rawValue: string) {
+    const value = Math.max(0, Math.trunc(Number(rawValue) || 0));
+    saveInventory({ currency: { ...inventory.currency, [key]: value } });
+  }
+  const backgroundData = BACKGROUNDS[character.background];
+  const backgroundPackage = backgroundData ? (character.creationDetails?.equipmentChoice === "B" ? backgroundData.equipmentB : backgroundData.equipmentA) : "";
+  const startingPackages = [{ source: "Class", text: character.creationDetails?.classEquipment ?? "" }, { source: "Background", text: backgroundPackage }].filter((entry) => entry.text);
+  function addStartingKit() {
+    const items: InventoryItem[] = [];
+    const currency = { ...inventory.currency };
+    for (const { text: equipmentPackage } of startingPackages) {
+      for (const rawPart of equipmentPackage.replace(/^[A-C]:\s*/, "").split(/,\s*/)) {
+        const part = rawPart.replace(/^and\s+/i, "").trim();
+        const coins = part.match(/^(\d+)\s*(cp|sp|ep|gp|pp)$/i);
+        if (coins) { currency[coins[2].toLowerCase() as keyof InventoryCurrency] += Number(coins[1]); continue; }
+        if (!part) continue;
+        const quantityMatch = part.match(/^(\d+)\s+(.+)$/);
+        const itemName = quantityMatch?.[2] ?? part;
+        const category = /armor|mail|shirt/i.test(itemName) ? "Armor" : /sword|axe|bow|spear|mace|flail|dagger|staff|javelin|sickle/i.test(itemName) ? "Weapon" : "Gear";
+        items.push({ id: newId(), name: itemName, quantity: quantityMatch ? Number(quantityMatch[1]) : 1, weight: 0, category, equipped: false, notes: "Starting equipment · enter the weight when known." });
+      }
+    }
+    saveInventory({ items: [...inventory.items, ...items], currency, startingKitsAdded: true });
+  }
+
+  return <section className="collection-page" aria-label={`Inventory for ${character.name}`}>
+    <div className="collection-page-heading"><div><p className="eyebrow">WHAT THEY CARRY</p><h2>Inventory</h2><p>Track equipment, quantities, weight, and coins. Equipped armor still uses the armor controls on Abilities &amp; Skills.</p></div></div>
+    {startingPackages.length > 0 && <section className="collection-panel starting-kit-panel"><div className="collection-panel-heading"><h3>Starting equipment</h3>{!inventory.startingKitsAdded && <button className="backup-button" type="button" onClick={addStartingKit}>Add to inventory</button>}</div>{startingPackages.map(({ source, text }) => <p className="starting-kit-line" key={`${source}-${text}`}>{source}: {text}</p>)}<p className="collection-helper">The creator saves packages as rule text. Adding them creates item rows and coins; item weights start at 0 until you fill them in.</p></section>}
+    <section className="collection-panel"><div className="collection-panel-heading"><h3>Carrying load</h3><strong>{carriedWeight.toFixed(1)} / {stats.carryingCapacity} lb.</strong></div><div className="carry-meter" role="meter" aria-label="Carrying load" aria-valuemin={0} aria-valuemax={stats.carryingCapacity} aria-valuenow={Math.min(carriedWeight, stats.carryingCapacity)}><span style={{ width: `${Math.min(100, stats.carryingCapacity > 0 ? carriedWeight / stats.carryingCapacity * 100 : 0)}%` }} /></div>{carriedWeight > stats.carryingCapacity && <p className="collection-warning">This load exceeds the character’s calculated carrying capacity.</p>}</section>
+    <section className="collection-panel"><div className="collection-panel-heading"><h3>Coins</h3><span>Coin weight included in carrying load</span></div><div className="coin-grid">{(["cp", "sp", "ep", "gp", "pp"] as const).map((coin) => <label key={coin}><span>{coin.toUpperCase()}</span><input type="number" min={0} max={999999} value={inventory.currency[coin]} onChange={(event) => updateCurrency(coin, event.target.value)} /></label>)}</div></section>
+    <section className="collection-panel"><h3>Items</h3>{inventory.items.length ? <div className="inventory-list">{inventory.items.map((item) => <article className="inventory-item" key={item.id}><div className="inventory-item-main"><label><span>Item</span><input maxLength={100} value={item.name} onChange={(event) => updateItem(item.id, { name: event.target.value })} /></label><label><span>Type</span><select value={item.category} onChange={(event) => updateItem(item.id, { category: event.target.value })}>{itemCategories.map((entry) => <option key={entry}>{entry}</option>)}</select></label><label><span>Qty</span><input type="number" min={0} max={9999} value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} /></label><label><span>Each (lb.)</span><input type="number" min={0} max={99999} step="0.1" value={item.weight} onChange={(event) => updateItem(item.id, { weight: Math.max(0, Number(event.target.value) || 0) })} /></label><label className="inventory-equipped"><input type="checkbox" checked={item.equipped} onChange={(event) => updateItem(item.id, { equipped: event.target.checked })} /><span>Equipped</span></label><button type="button" className="text-button" onClick={() => saveInventory({ items: inventory.items.filter((entry) => entry.id !== item.id) })}>Remove</button></div><label className="inventory-item-notes"><span>Notes</span><input maxLength={300} value={item.notes} onChange={(event) => updateItem(item.id, { notes: event.target.value })} placeholder="Optional details" /></label></article>)}</div> : <p className="collection-empty-copy">No items yet. Add starting gear, weapons, or treasure below.</p>}</section>
+    <form className="collection-panel collection-entry-form" onSubmit={addItem}><h3>Add item</h3><div className="collection-form-grid"><label><span>Name</span><input maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Longsword" required /></label><label><span>Type</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{itemCategories.map((entry) => <option key={entry}>{entry}</option>)}</select></label><label><span>Quantity</span><input type="number" min={1} max={9999} value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><label><span>Weight each (lb.)</span><input type="number" min={0} max={99999} step="0.1" value={weight} onChange={(event) => setWeight(event.target.value)} /></label><label className="inventory-equipped"><input type="checkbox" checked={equipped} onChange={(event) => setEquipped(event.target.checked)} /><span>Equipped</span></label></div><button className="primary-button" type="submit">Add item <span>＋</span></button></form>
+  </section>;
+}
+
+export function SpellbookPage({ character, onChange }: SectionProps) {
+  const stats = calculateCharacterStats(character);
+  const spells = character.spells ?? [];
+  const [name, setName] = useState("");
+  const [level, setLevel] = useState("0");
+  const [school, setSchool] = useState("Other");
+  const [castingTime, setCastingTime] = useState("1 action");
+  const [range, setRange] = useState("");
+  const [components, setComponents] = useState("V, S");
+  const [concentration, setConcentration] = useState(false);
+  const [description, setDescription] = useState("");
+  const [ready, setReady] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const visibleSpells = spells.filter((spell) => filter === "all" || (filter === "ready" ? spell.prepared : !spell.prepared));
+
+  function updateSpell(id: string, updates: Partial<CharacterSpell>) {
+    onChange({ spells: spells.map((spell) => spell.id === id ? { ...spell, ...updates } : spell) });
+  }
+  function addSpell(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim()) return;
+    const spell: CharacterSpell = { id: newId(), name: name.trim(), level: Number(level), school, castingTime: castingTime.trim(), range: range.trim(), components: components.trim(), concentration, description: description.trim(), prepared: ready };
+    onChange({ spells: [...spells, spell] });
+    setName(""); setRange(""); setDescription(""); setConcentration(false); setReady(true);
+  }
+  function castSpell(spell: CharacterSpell) {
+    if (!spell.prepared || spell.level === 0) return;
+    const options = stats.spellSlots.filter((slot) => slot.spellLevel >= spell.level).map((slot) => ({ ...slot, key: `spell-slot:${slot.pool}:${slot.spellLevel}` }))
+      .filter((slot) => (character.resourceUses[slot.key] ?? 0) < slot.total)
+      .sort((a, b) => a.spellLevel - b.spellLevel);
+    const slot = options[0];
+    if (!slot) return;
+    onChange({ resourceUses: { ...character.resourceUses, [slot.key]: (character.resourceUses[slot.key] ?? 0) + 1 } });
+  }
+  function availableSlot(spell: CharacterSpell) {
+    if (spell.level === 0) return true;
+    return stats.spellSlots.some((slot) => slot.spellLevel >= spell.level && (character.resourceUses[`spell-slot:${slot.pool}:${slot.spellLevel}`] ?? 0) < slot.total);
+  }
+
+  return <section className="collection-page" aria-label={`Spellbook for ${character.name}`}>
+    <div className="collection-page-heading"><div><p className="eyebrow">A SPELL FOR EVERY MOMENT</p><h2>Spellbook</h2><p>Add the spells your character knows. Mark ready spells; casting one spends the lowest available slot that can cast it.</p></div></div>
+    <div className="spellbook-summary"><span>{spells.length} spell{spells.length === 1 ? "" : "s"}</span><span>{spells.filter((spell) => spell.prepared).length} ready</span><span>{stats.spellSlots.reduce((sum, slot) => sum + slot.total - Math.min(slot.total, character.resourceUses[`spell-slot:${slot.pool}:${slot.spellLevel}`] ?? 0), 0)} spell slots left</span></div>
+    <div className="spell-filter-row"><label><span>Show</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All spells</option><option value="ready">Ready to cast</option><option value="unready">Not ready</option></select></label></div>
+    <section className="spellbook-list">{visibleSpells.length ? visibleSpells.map((spell) => <article className="spell-card" key={spell.id}><div className="spell-card-heading"><div><small>{spell.level === 0 ? "CANTRIP" : `LEVEL ${spell.level}`} · {spell.school}</small><h3>{spell.name}</h3></div><label className="spell-ready-toggle"><input type="checkbox" checked={spell.prepared} onChange={(event) => updateSpell(spell.id, { prepared: event.target.checked })} /><span>Ready</span></label></div><div className="spell-meta"><span>{spell.castingTime || "Casting time not set"}</span><span>{spell.range || "Range not set"}</span><span>{spell.components || "Components not set"}</span>{spell.concentration && <span>Concentration</span>}</div>{spell.description && <details><summary>Description</summary><p>{spell.description}</p></details>}<div className="spell-card-actions">{spell.level > 0 ? <button type="button" className="backup-button" disabled={!spell.prepared || !availableSlot(spell)} onClick={() => castSpell(spell)}>{availableSlot(spell) ? "Cast · spend lowest slot" : "No suitable spell slot"}</button> : <span className="cantrip-note">Cantrips don’t spend spell slots</span>}<button type="button" className="text-button" onClick={() => onChange({ spells: spells.filter((entry) => entry.id !== spell.id) })}>Remove</button></div></article>) : <p className="collection-empty-copy">{spells.length ? "No spells match that filter." : "Your spellbook is empty. Add a spell below."}</p>}</section>
+    <form className="collection-panel collection-entry-form" onSubmit={addSpell}><h3>Add a spell</h3><div className="collection-form-grid"><label><span>Name</span><input maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Cure Wounds" required /></label><label><span>Level</span><select value={level} onChange={(event) => setLevel(event.target.value)}>{Array.from({ length: 10 }, (_, index) => <option key={index} value={index}>{index === 0 ? "Cantrip" : `Level ${index}`}</option>)}</select></label><label><span>School</span><select value={school} onChange={(event) => setSchool(event.target.value)}>{spellSchools.map((entry) => <option key={entry}>{entry}</option>)}</select></label><label><span>Casting time</span><input maxLength={50} value={castingTime} onChange={(event) => setCastingTime(event.target.value)} placeholder="1 action" /></label><label><span>Range</span><input maxLength={50} value={range} onChange={(event) => setRange(event.target.value)} placeholder="60 feet" /></label><label><span>Components</span><input maxLength={50} value={components} onChange={(event) => setComponents(event.target.value)} placeholder="V, S, M" /></label><label className="inventory-equipped"><input type="checkbox" checked={concentration} onChange={(event) => setConcentration(event.target.checked)} /><span>Requires concentration</span></label><label className="inventory-equipped"><input type="checkbox" checked={ready} onChange={(event) => setReady(event.target.checked)} /><span>Ready to cast</span></label><label className="collection-field-wide"><span>Description / reminder</span><textarea rows={3} maxLength={3000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Add a quick rules reminder." /></label></div><button className="primary-button" type="submit">Add spell <span>＋</span></button></form>
+  </section>;
+}
+
+export function NotesPage({ character, onChange }: SectionProps) {
+  const notes = character.notes ?? { backstory: "", entries: [] };
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  function updateNotes(updates: Partial<CharacterNotes>) { onChange({ notes: { ...notes, ...updates } }); }
+  function addEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!title.trim() && !body.trim()) return;
+    const now = new Date().toISOString();
+    updateNotes({ entries: [{ id: newId(), title: title.trim() || "Session note", body: body.trim(), createdAt: now, updatedAt: now }, ...notes.entries] });
+    setTitle(""); setBody("");
+  }
+  function updateEntry(id: string, updates: { title?: string; body?: string }) {
+    updateNotes({ entries: notes.entries.map((entry) => entry.id === id ? { ...entry, ...updates, updatedAt: new Date().toISOString() } : entry) });
+  }
+
+  return <section className="collection-page" aria-label={`Notes for ${character.name}`}>
+    <div className="collection-page-heading"><div><p className="eyebrow">KEEP THE STORY CLOSE</p><h2>Notes &amp; journal</h2><p>Backstory and session notes save with this character.</p></div></div>
+    <section className="collection-panel"><label className="collection-block-field"><span>Backstory</span><textarea rows={7} maxLength={10000} value={notes.backstory} onChange={(event) => updateNotes({ backstory: event.target.value })} placeholder="Where did your character come from? What keeps them adventuring?" /></label></section>
+    <form className="collection-panel collection-entry-form" onSubmit={addEntry}><h3>Add a journal entry</h3><div className="collection-form-grid"><label className="collection-field-wide"><span>Title</span><input maxLength={100} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Session 1 · The road to Redbrook" /></label><label className="collection-field-wide"><span>Note</span><textarea rows={4} maxLength={5000} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Clues, NPCs, promises, or anything to remember…" /></label></div><button className="primary-button" type="submit">Save journal entry <span>＋</span></button></form>
+    <section className="collection-panel"><h3>Journal</h3>{notes.entries.length ? <div className="journal-list">{notes.entries.map((entry) => <article className="journal-entry" key={entry.id}><div className="journal-entry-heading"><input aria-label="Journal title" maxLength={100} value={entry.title} onChange={(event) => updateEntry(entry.id, { title: event.target.value })} /><small>{new Date(entry.updatedAt).toLocaleDateString()}</small><button type="button" className="text-button" onClick={() => updateNotes({ entries: notes.entries.filter((note) => note.id !== entry.id) })}>Remove</button></div><textarea aria-label={`${entry.title} note`} rows={4} maxLength={5000} value={entry.body} onChange={(event) => updateEntry(entry.id, { body: event.target.value })} placeholder="Write a note…" /></article>)}</div> : <p className="collection-empty-copy">Your adventure log is waiting for its first entry.</p>}</section>
+  </section>;
+}
