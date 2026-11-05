@@ -27,27 +27,22 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
           <div className="mountain mountain-back" />
           <div className="mountain mountain-front" />
           <div className="art-rune">✧</div>
-          <div className="art-caption">A NEW TALE AWAITS</div>
         </div>
         <div className="featured-info">
-          <div className="featured-topline">
-            <span className="status-pill"><i /> {selectedCharacter ? "CHARACTER READY" : "FIRST ADVENTURE"}</span>
-            <span className="last-played">{selectedCharacter ? "Saved in this browser" : "Your next session is waiting"}</span>
-          </div>
           <div className="feature-heading">
             <div>
-              <p className="character-kicker">{selectedCharacter ? "YOUR ACTIVE CHARACTER" : "YOUR FIRST CHARACTER"}</p>
-              <h2 id="first-hero-title">{selectedCharacter?.name ?? "Make your first hero"}</h2>
+              {selectedCharacter && <p className="character-kicker">ACTIVE CHARACTER</p>}
+              <h2 id="first-hero-title">{selectedCharacter?.name ?? "Create a character"}</h2>
             </div>
             <span className="level-seal" aria-label={selectedCharacter ? `Level ${selectedCharacter.level}` : "A new adventure"}>{selectedCharacter ? selectedCharacter.level : "✦"}</span>
           </div>
           <p className="feature-description">
             {selectedCharacter
-              ? [selectedCharacter.concept, [selectedCharacter.species, selectedCharacter.characterClass, selectedCharacter.background].filter(Boolean).join(" · ")].filter(Boolean).join(" — ") || "Your hero is ready for the next step in their story."
-              : "Every great adventure begins with a character. Build yours and we’ll help keep all the numbers in order."}
+              ? [selectedCharacter.concept, [selectedCharacter.species, selectedCharacter.characterClass, selectedCharacter.background].filter(Boolean).join(" · ")].filter(Boolean).join(" — ") || "No character details yet."
+              : "Choose a class, species, and background in the character builder."}
           </p>
           <div className="feature-meta">
-            {selectedCharacter ? <><span><i className="meta-icon">⚔</i> {selectedCharacter.characterClass || "Class not chosen"}</span><span><i className="meta-icon">◷</i> Level {selectedCharacter.level}</span></> : <><span><i className="meta-icon">⚔</i> 2024 rules</span><span><i className="meta-icon">◷</i> A few minutes to begin</span></>}
+            {selectedCharacter ? <><span><i className="meta-icon">⚔</i> {selectedCharacter.characterClass || "Class not chosen"}</span><span><i className="meta-icon">◷</i> Level {selectedCharacter.level}</span></> : <span><i className="meta-icon">⚔</i> 2024 rules</span>}
           </div>
           <div className="feature-actions">
             {selectedCharacter ? <>
@@ -64,11 +59,10 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
       <section className="collection-section" aria-labelledby="collection-title">
         <div className="section-title-row">
           <div>
-            <p className="eyebrow">YOUR COLLECTION</p>
             <h2 id="collection-title">Characters <span className="count-chip">{characters.length}</span></h2>
           </div>
           <div className="backup-actions">
-            <span className="sort-label">{characters.length ? "Saved on this device" : "Ready for your first hero"}</span>
+            {characters.length > 0 && <span className="sort-label">Saved on this device</span>}
             <button className="backup-button" onClick={() => backupInput.current?.click()}>Import backup</button>
             <button className="backup-button" onClick={onExportAll} disabled={characters.length === 0}>Export library</button>
             <input ref={backupInput} className="backup-file-input" type="file" accept=".json,application/json" aria-label="Choose a TaleForge backup file" onChange={(event) => {

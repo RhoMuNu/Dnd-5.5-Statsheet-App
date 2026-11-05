@@ -20,42 +20,42 @@ export type SectionId = (typeof navigationGroups)[number]["items"][number]["id"]
 export const sectionContent: Record<SectionId, { eyebrow: string; title: string; description: string }> = {
   overview: {
     eyebrow: "YOUR ADVENTURE",
-    title: "Your next chapter.",
-    description: "Your heroes, your stories, your next great adventure.",
+    title: "My characters",
+    description: "",
   },
   builder: {
     eyebrow: "CHARACTER BUILDER",
-    title: "Bring a hero to life.",
-    description: "A guided path from your first idea to a ready-to-play character.",
+    title: "Character builder",
+    description: "",
   },
   abilities: {
     eyebrow: "CHARACTER DETAILS",
     title: "Character sheet",
-    description: "Everything you need at the table, right where you need it.",
+    description: "",
   },
   features: {
     eyebrow: "CHARACTER DETAILS",
     title: "Features & traits",
-    description: "Class features, species traits, feats, and the things that make your hero unique.",
+    description: "",
   },
   inventory: {
     eyebrow: "ADVENTURE KIT",
     title: "Inventory",
-    description: "Gear, treasure, and the curious things you pick up along the way.",
+    description: "",
   },
   spells: {
     eyebrow: "ADVENTURE KIT",
     title: "Spellbook",
-    description: "Spells and magical resources, gathered in one easy-to-use place.",
+    description: "",
   },
   notes: {
     eyebrow: "ADVENTURE KIT",
     title: "Notes & journal",
-    description: "Session recaps, clues, character ideas, and unfinished business.",
+    description: "",
   },
   lan: {
     eyebrow: "LOCAL NETWORK GAME",
-    title: "Gather your party.",
+    title: "LAN campaign",
     description: "Host a campaign on this PC or join one on your local network.",
   },
 };

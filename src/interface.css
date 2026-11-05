@@ -411,6 +411,8 @@ summary { padding-block: 8px; line-height: 1.5; }
 [data-text-size="large"] .sheet-view-tabs small { font-size: 13px; }
 [data-text-size="large"] :is(.level-up-dialog, .physical-dice-dialog) :is(button, input, select, label, p) { font-size: 16px; }
 .help-dialog h2 { padding-right: 44px; }
+.featured-info .feature-heading { margin-top: 0; }
+.page-footer { justify-content: flex-end; }
 @container sheet (max-width: 600px) {
   .skill-row { grid-template-columns: 18px minmax(0,1fr) 34px 38px; gap: 8px; padding-block: 12px; }
   .app-shell .skill-row select { grid-column: 2 / -1; width: 100%; font-size: 14px; }

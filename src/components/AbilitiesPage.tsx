@@ -118,7 +118,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
       {levelingUp && onChange && <LevelUpWizard character={character} onApply={onChange} onClose={() => setLevelingUp(false)} />}
       <header className="sheet-hero">
         <div className="sheet-hero-emblem"><Icon name="dice" /></div>
-        <div className="sheet-hero-copy"><p className="eyebrow">{readOnly ? "SHARED CHARACTER" : "READY FOR ADVENTURE"}</p><h2>{character.name}</h2><p>{[character.species, character.background].filter(Boolean).join(" · ")}</p><div className="hero-class-chips">{stats.classBreakdown.map(({ name, level }) => <span key={name}>{name} <b>{level}</b></span>)}{readOnly && <span>View only</span>}</div></div>
+        <div className="sheet-hero-copy">{readOnly && <p className="eyebrow">SHARED CHARACTER</p>}<h2>{character.name}</h2><p>{[character.species, character.background].filter(Boolean).join(" · ")}</p><div className="hero-class-chips">{stats.classBreakdown.map(({ name, level }) => <span key={name}>{name} <b>{level}</b></span>)}{readOnly && <span>View only</span>}</div></div>
         <div className="hero-level"><span>LEVEL</span><strong>{stats.totalLevel.toString().padStart(2, "0")}</strong><small>2024 rules</small>{!readOnly && onChange && <button type="button" className="level-up-button" disabled={stats.totalLevel >= 20} onClick={() => setLevelingUp(true)}>{stats.totalLevel >= 20 ? "Maximum level" : "Level up ✦"}</button>}</div>
       </header>
       <div className="vitals-strip" aria-label="Character vital statistics">
@@ -194,7 +194,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             </div>
           </section>
 </div>
-      <div className="sheet-tab-panel resource-view" role="tabpanel" id={`${tabId}-panel-resources`} aria-labelledby={`${tabId}-tab-resources`} hidden={view !== "resources"}><div className="view-intro"><h3>Ready for the next encounter.</h3><p>Manage spell slots and feature uses here. Rest when your party is ready.</p></div><div className="resource-view-grid">          <section className="derived-panel">
+      <div className="sheet-tab-panel resource-view" role="tabpanel" id={`${tabId}-panel-resources`} aria-labelledby={`${tabId}-tab-resources`} hidden={view !== "resources"}><div className="view-intro"><h3>Resources &amp; rest</h3><p>Manage spell slots and feature uses here. Rest when your party is ready.</p></div><div className="resource-view-grid">          <section className="derived-panel">
             <p className="eyebrow">STRENGTH &amp; MAGIC</p>
             <div className="derived-line"><span>Carry</span><strong>{formatWeight(stats.carryingCapacity)} lb.</strong></div>
             <div className="derived-line"><span>Drag, lift, or push</span><strong>{formatWeight(stats.pushDragLift)} lb.</strong></div>
