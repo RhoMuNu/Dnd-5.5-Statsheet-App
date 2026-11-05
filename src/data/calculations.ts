@@ -1,3 +1,4 @@
+import { customModifierTotal } from "./customModifiers";
 import { hasFeat } from "./advancement";
 import { classLevel, subclassIs } from "./rulesCatalog";
 import { inventoryArmor } from "./equipment";
@@ -103,14 +104,14 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const savingThrows = Object.fromEntries(
     Object.entries(abilityModifiers).map(([ability, modifier]) => [
       ability,
-      modifier + (isSavingThrowProficient(character, ability as AbilityName) ? proficiencyBonus : 0) + effectTotal(character, "save") + auraBonus - 2 * exhaustion,
+      modifier + (isSavingThrowProficient(character, ability as AbilityName) ? proficiencyBonus : 0) + effectTotal(character, "save") + auraBonus + customModifierTotal(character, `save:${ability}`) - 2 * exhaustion,
     ]),
   ) as Record<AbilityName, number>;
 
   const skillBonuses = Object.fromEntries(SKILLS.map(({ name, ability }) => {
     const rank = character.skillProficiencies[name] ?? 0;
     const jack = rank === 0 && classLevelOf(classes, "bard") >= 2 ? Math.floor(proficiencyBonus / 2) : 0;
-    return [name, abilityModifiers[ability] + proficiencyBonus * rank + jack + effectTotal(character, "check") - 2 * exhaustion];
+    return [name, abilityModifiers[ability] + proficiencyBonus * rank + jack + effectTotal(character, "check") + customModifierTotal(character, `skill:${name}`) - 2 * exhaustion];
   })) as Record<SkillName, number>;
 
   const className = primaryClass;
@@ -138,7 +139,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     return total + levels * Math.max(1, average + constitutionModifier);
   }, Math.max(1, (HIT_DICE[className] ?? 0) + constitutionModifier));
   // Dwarven Toughness grants 1 additional HP per character level in the 2024 rules.
-  const maxHitPoints = calculatedHitPoints === null ? null : calculatedHitPoints + (character.species.toLowerCase().startsWith("dwarf") ? level : 0) + effectTotal(character, "hpPerLevel") * level + (character.hitPointAdjustment ?? 0) + (subclassIs(character, "Sorcerer", "Draconic") ? classLevel(character, "Sorcerer") : 0);
+  const maxHitPoints = calculatedHitPoints === null ? null : Math.max(1, calculatedHitPoints + (character.species.toLowerCase().startsWith("dwarf") ? level : 0) + effectTotal(character, "hpPerLevel") * level + (character.hitPointAdjustment ?? 0) + customModifierTotal(character, "maxHP") + (subclassIs(character, "Sorcerer", "Draconic") ? classLevel(character, "Sorcerer") : 0));
 
   const effectiveSize = character.powerfulBuild ? increaseSize(character.size) : character.size;
   const carryingCapacity = character.abilityScores.Strength * SIZE_MULTIPLIER[effectiveSize];
@@ -168,7 +169,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     const ability = spellAbilityFor(name, character.classSubclasses?.[capitalize(name)] ?? (name === className ? character.subclass : ""), name === className ? character.spellcastingAbility : "");
     if (!ability) return [];
     const count = spellCountFor(name, classLevel);
-    return [{ className: capitalize(name), cantrips: classProgression.cantrips, count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus, attackBonus: abilityModifiers[ability] + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack") }];
+    return [{ className: capitalize(name), cantrips: classProgression.cantrips, count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus + customModifierTotal(character, "spellDC"), attackBonus: abilityModifiers[ability] + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack") + customModifierTotal(character, "spellAttack") }];
   });
   const multiclassWarnings = multiclassPrerequisiteWarnings(classes, character.abilityScores);
   const extraAttackClasses = classes.filter(({ name, level: classLevel }) => classProgressionAtLevel(name, classLevel).gainedFeatures.some(({ name: feature }) => feature === "Extra Attack"));
@@ -190,8 +191,8 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     carryingCapacity,
     pushDragLift: carryingCapacity * 2,
     effectiveSize,
-    spellSaveDC: spellModifier === null ? null : 8 + spellModifier + proficiencyBonus,
-    spellAttackBonus: spellModifier === null ? null : spellModifier + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack"),
+    spellSaveDC: spellModifier === null ? null : 8 + spellModifier + proficiencyBonus + customModifierTotal(character, "spellDC"),
+    spellAttackBonus: spellModifier === null ? null : spellModifier + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack") + customModifierTotal(character, "spellAttack"),
     spellSlots,
     spellSlotRecovery: classes.length === 1 && className === "warlock" ? "Short or Long Rest" : "Long Rest",
     appliedClassFeatures,

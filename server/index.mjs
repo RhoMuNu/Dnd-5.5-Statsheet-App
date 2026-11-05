@@ -140,6 +140,11 @@ function validCharacter(character) {
 
 function validCombatData(character) {
   const integer = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
+  if (character.customModifiers !== undefined) {
+    const targets = new Set(rules.modifierTargets().map((entry) => entry.key));
+    if (!Array.isArray(character.customModifiers) || character.customModifiers.length > 100 || new Set(character.customModifiers.map((entry) => entry?.id)).size !== character.customModifiers.length
+      || !character.customModifiers.every((entry) => entry && typeof entry.id === "string" && entry.id.length > 0 && entry.id.length <= 100 && typeof entry.name === "string" && entry.name.length <= 80 && targets.has(entry.target) && integer(entry.amount, -100, 100) && typeof entry.enabled === "boolean")) return false;
+  }
   if (character.attacks !== undefined && (!Array.isArray(character.attacks) || character.attacks.length > 100 || !character.attacks.every((entry) => entry && typeof entry.id === "string" && typeof entry.name === "string"
     && ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"].includes(entry.ability)
     && integer(entry.diceCount, 0, 30) && [4, 6, 8, 10, 12, 20].includes(entry.dieSize)

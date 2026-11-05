@@ -9,7 +9,7 @@ import { CLASS_CATALOG, SPELL_CATALOG, classLevel, gainedRuleFeatures, subclassO
 import { calculateCharacterStats } from "../data/calculations";
 
 const steps = ["Your next level", "Features & choices", "Spells", "Review"];
-const fingerprint = (character: Character) => JSON.stringify([character.classLevels, character.level, character.abilityScores, character.spells, character.features, character.rulesChoices]);
+const fingerprint = (character: Character) => JSON.stringify([character.classLevels, character.level, character.abilityScores, character.spells, character.features, character.rulesChoices, character.customModifiers]);
 
 export function LevelUpWizard({ character, onApply, onClose }: { character: Character; onApply: (updates: Partial<Character>) => void; onClose: () => void }) {
   const diceSource = useDiceRoll(character.updatedAt);

@@ -34,9 +34,12 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
     const character = { ...defaultCharacterStats(), id: "lan-hero", name: "LAN hero", concept: "", species: "Human", characterClass: "Fighter", background: "", classLevels: { Fighter: 1 }, level: 1, createdAt: "2026-11-05T00:00:00Z", updatedAt: "2026-11-05T00:00:00Z" };
     character.combat = { ...defaultCombatState(), effects: [makeEffect("Bless", "bless")] };
     character.attacks = [makeWeaponAttack(character, "Dagger", "dagger")];
+    character.customModifiers = [{ id: "ring", name: "Guardian ring", target: "ac", amount: 2, enabled: true }];
     assert.equal((await request(`${route}/characters`, "POST", { character, shared: false }, player.token)).status, 200);
     assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, combat: { conditions: "Poisoned" } } }, player.token)).status, 400);
     assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, attacks: [{ diceCount: 1000000 }] } }, player.token)).status, 400);
+    assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, customModifiers: "invalid" } }, player.token)).status, 400);
+    assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, customModifiers: [{ ...character.customModifiers[0], target: "unknown" }] } }, player.token)).status, 400);
     assert.equal((await request(route, "GET", undefined, dm.token)).data.characters.length, 0);
     assert.equal((await request(route, "GET", undefined, other.token)).data.characters.length, 0);
     assert.equal((await request(`${route}/encounter`, "POST", { revision: 0, action: { type: "add", characterId: character.id, initiative: 10 } }, dm.token)).status, 400);
@@ -93,6 +96,7 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
       assert.equal(saved.campaigns[0].activity[1].summary, "Longsword attack = 21");
       assert.equal(saved.campaigns[0].characters[0].character.combat.effects[0].name, "Bless");
       assert.equal(saved.campaigns[0].characters[0].character.attacks[0].name, "Dagger");
+      assert.deepEqual(saved.campaigns[0].characters[0].character.customModifiers, character.customModifiers);
     } finally { controller.abort(); await reader.cancel().catch(() => {}); }
   } finally {
     const stopped = once(child, "exit");

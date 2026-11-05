@@ -1,5 +1,6 @@
 import { subclassIs } from "./rulesCatalog";
 import { inventoryArmor } from "./equipment";
+import { customModifierTotal } from "./customModifiers";
 import { effectDice, effectTotal } from "./effects";
 import type { Character } from "./characters";
 import { calculateCharacterStats } from "./calculations";
@@ -34,7 +35,7 @@ export function resolveSpellCast(character: Character, id: string, slotKey: stri
   const caster = stats.spellcastingProgressions.find((entry) => entry.className === className);
   if (!caster) throw new Error("Choose the class whose spellcasting ability applies.");
   if (formula.kind === "effect") return { updates, amount: 0, attack: null, summary: `${spell.name}: effect prepared for recipients.` };
-  const ability = caster.attackBonus + 2 * exhaustionLevel(character) - stats.proficiencyBonus - effectTotal(character, "attack");
+  const ability = caster.attackBonus + 2 * exhaustionLevel(character) - stats.proficiencyBonus - effectTotal(character, "attack") - customModifierTotal(character, "spellAttack");
   const scaling = formula.cantripScaling ? 1 + [5, 11, 17].filter((level) => stats.totalLevel >= level).length : 1;
   const count = formula.count * scaling + formula.perSlot * Math.max(0, (slot?.spellLevel ?? spell.level) - formula.level);
   const attack = formula.attack ? rollD20(character, "attack", mode, "", false, false, die) : null;
