@@ -4,6 +4,7 @@ import { Icon } from "./components/Icon";
 import { Overview } from "./components/Overview";
 import { SectionPage } from "./components/SectionPage";
 import { Sidebar } from "./components/Sidebar";
+import { creationProgression } from "./data/creationProgression";
 import { CharacterBuilder } from "./components/CharacterBuilder";
 import { LanGame } from "./components/LanGame";
 import { createCharacterBackup, parseCharacterBackup } from "./data/backup";
@@ -76,12 +77,13 @@ function App() {
     const now = new Date().toISOString();
     if (editingCharacterId) {
       setCharacters((existing) => existing.map((character) => character.id === editingCharacterId
-        ? { ...character, ...draft, updatedAt: now }
+        ? { ...character, ...draft, ...creationProgression(character.characterClass, character), updatedAt: now }
         : character));
       setSelectedCharacterId(editingCharacterId);
     } else {
       const created: Character = {
         ...draft,
+        ...creationProgression(draft.characterClass),
         id: makeCharacterId(),
         createdAt: now,
         updatedAt: now,

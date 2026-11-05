@@ -116,7 +116,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
     onChange?.(restCharacter(character, recovery));
   }
 
-  if (dice.classic) return <ClassicSheet character={character} onChange={onChange} readOnly={readOnly} />;
+  if (dice.classic) return <>{levelingUp && onChange && <LevelUpWizard character={character} onApply={onChange} onClose={() => setLevelingUp(false)} />}<ClassicSheet character={character} onChange={onChange} readOnly={readOnly} onLevelUp={onChange ? () => setLevelingUp(true) : undefined} /></>;
 
   return (
     <section className="abilities-page" aria-label={`Character sheet for ${character.name}`}>

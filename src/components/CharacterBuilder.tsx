@@ -5,6 +5,7 @@ import { ABILITIES, CLASSES, defaultCharacterStats, type AbilityName, type Chara
 import { BACKGROUNDS, CLASS_ARMOR, CLASS_EQUIPMENT, CLASS_SKILLS, CLASS_TOOLS, LANGUAGES, SPECIES, SPECIES_SKILL_CHOICES, STANDARD_ARRAY, STANDARD_ARRAY_BY_CLASS, pointBuyCost } from "../data/creationOptions";
 import { StartingSpellPicker } from "./StartingSpellPicker";
 import { createStartingSpells, startingSpellErrors, startingSpellLimits } from "../data/startingSpells";
+import { creationProgression } from "../data/creationProgression";
 import { calculateCharacterStats } from "../data/calculations";
 
 type CharacterBuilderProps = { character?: Character; onSave: (draft: CharacterDraft) => void; onCancel: () => void };
@@ -29,12 +30,11 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   const [customSize, setCustomSize] = useState<Character["size"]>(character?.size ?? "Medium");
   const [customSpeed, setCustomSpeed] = useState(character?.speedFeet ?? 30);
   const [characterClass, setCharacterClass] = useState(character?.characterClass ?? "");
-  const [subclass, setSubclass] = useState(character?.subclass ?? "");
-  const [classLevels, setClassLevels] = useState<Record<string, number>>(() => character?.classLevels && Object.keys(character.classLevels).length ? { ...character.classLevels } : character?.characterClass ? { [character.characterClass]: character.level } : {});
-  const [classSubclasses, setClassSubclasses] = useState<Record<string, string>>(() => character?.classSubclasses ?? (character?.characterClass && character.subclass ? { [character.characterClass]: character.subclass } : {}));
+  const progression = creationProgression(characterClass, character);
+  const { subclass, classLevels, classSubclasses } = progression;
   const [background, setBackground] = useState(character?.background && !(character.background in BACKGROUNDS) ? "Custom" : character?.background ?? "");
   const [customBackground, setCustomBackground] = useState(character?.background && !(character.background in BACKGROUNDS) ? character.background : "");
-  const [level, setLevel] = useState(String(character?.level ?? 1));
+  const level = String(progression.level);
   const [abilityMethod, setAbilityMethod] = useState<CharacterCreationDetails["abilityMethod"]>(saved?.abilityMethod ?? "standard");
   const [baseScores, setBaseScores] = useState<AbilityScores>(() => saved?.baseAbilityScores ?? character?.abilityScores ?? { ...emptyScores(), Strength: 15, Dexterity: 14, Constitution: 13, Intelligence: 12, Wisdom: 10, Charisma: 8 });
   const [scoreDistributionTouched, setScoreDistributionTouched] = useState(Boolean(character || saved));
@@ -83,7 +83,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   const spellSelections = Object.fromEntries(casterClasses.map((name) => [name, startingSelections[name] ?? []]));
   const stepLabels = hasSpellStep ? ["CHARACTER", "ORIGIN & ABILITIES", "STARTING SPELLS", "REVIEW"] : ["CHARACTER", "ORIGIN & ABILITIES", "REVIEW"];
   const stepTitles = hasSpellStep ? ["Character details", "Origin & abilities", "Starting spells", "Review character"] : ["Character details", "Origin & abilities", "Review character"];
-  const stepDescriptions = hasSpellStep ? ["Choose your class, background, and species.", "Set ability scores and proficiencies.", "Choose spells to add to your Spellbook.", "Check your character before saving."] : ["Choose your class, background, and species.", "Set ability scores and proficiencies.", "Check your character before saving."];
+  const stepDescriptions = hasSpellStep ? [character ? "Edit character basics. Progression changes use Level up." : "Choose your class, background, and species.", "Set ability scores and proficiencies.", "Choose spells to add to your Spellbook.", "Check your character before saving."] : [character ? "Edit character basics. Progression changes use Level up." : "Choose your class, background, and species.", "Set ability scores and proficiencies.", "Check your character before saving."];
 
   async function rollAbilities() {
     try {
@@ -106,10 +106,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       if (species === "Custom" && !speciesChoice.trim()) { setError("Enter your custom species name."); return false; }
       if (speciesSkillOptions.length && !speciesSkillProficiency) { setError(`Choose the ${species === "Elf" ? "Keen Senses" : "Skillful"} skill proficiency.`); return false; }
       if (background === "Custom" && !customBackground.trim()) { setError("Enter your custom background name."); return false; }
-      const normalized = Object.entries(classLevels).filter(([key, value]) => key.trim() && value > 0);
-      const total = normalized.reduce((sum, [, value]) => sum + value, 0) || Number(level);
-      if (!Number.isInteger(total) || total < 1 || total > 20 || normalized.some(([, value]) => !Number.isInteger(value) || value < 1 || value > 20)) { setError("Combined class levels must total 1–20, and each class level must be 1–20."); return false; }
-      if (Object.entries(classSubclasses).some(([className, subclassName]) => subclassName.trim() && (classLevels[className] ?? (className === characterClass ? Number(level) : 0)) < 3)) { setError("A subclass can only be added once that class reaches level 3."); return false; }
+
     }
     if (step === 2) {
       if (abilityMethod === "point-buy" && scoreTotal !== 27) { setError(`Point Buy uses exactly 27 points. You have spent ${scoreTotal}.`); return false; }
@@ -135,9 +132,6 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
     event.preventDefault();
     if (step < reviewStep) { moveNext(); return; }
     if (!validateStep()) { if (hasSpellStep) setStep(3); return; }
-    const normalizedLevels = Object.fromEntries(Object.entries(classLevels).filter(([key, value]) => key.trim() && value > 0));
-    if (characterClass && !normalizedLevels[characterClass]) normalizedLevels[characterClass] = Number(level) || 1;
-    const totalLevel = Object.values(normalizedLevels).reduce((sum, value) => sum + value, 0) || Number(level);
     const skillProficiencies = { ...defaultCharacterStats().skillProficiencies, ...(character?.skillProficiencies ?? {}) };
     const previouslyGranted = [...(saved?.classSkills ?? []), ...(BACKGROUNDS[character?.background ?? ""]?.skills ?? []), ...(saved?.speciesSkillProficiency ? [saved.speciesSkillProficiency] : [])];
     for (const skill of previouslyGranted) if (skillProficiencies[skill] === 1) skillProficiencies[skill] = 0;
@@ -160,9 +154,8 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
         spells: character.spells ?? [], notes: character.notes ?? { backstory: "", entries: [] },
       } : {}),
       name: name.trim(), concept: concept.trim(), species: species === "Custom" ? speciesChoice.trim() : speciesChoice ? `${species} (${speciesChoice})` : species,
-      characterClass, subclass: subclass.trim(), classLevels: normalizedLevels,
-      classSubclasses: { ...classSubclasses, ...(characterClass ? { [characterClass]: subclass.trim() } : {}) },
-      background: background === "Custom" ? customBackground.trim() : background, level: totalLevel, abilityScores, skillProficiencies,
+      ...progression,
+      background: background === "Custom" ? customBackground.trim() : background, abilityScores, skillProficiencies,
       size: customSize, speedFeet: customSpeed,
       abilityScoreOverrides,
       armorMode: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.mode : character?.armorMode ?? "unarmored",
@@ -178,8 +171,8 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
     setSpecies(next); setSpeciesChoice(""); setCustomSize(SPECIES[next]?.size ?? "Medium"); setCustomSpeed(SPECIES[next]?.speed ?? 30); setSpeciesSkillProficiency("");
   }
   function changeClass(next: string) {
-    setClassLevels((previous) => { const updated = { ...previous }; delete updated[characterClass]; if (next) updated[next] = Number(level) || 1; return updated; });
-    setCharacterClass(next); setSubclass(classSubclasses[next] ?? ""); setClassSkills([]); setClassEquipmentOption("A"); setClassEquipment(""); setGearChanged(true);
+    if (character) return;
+    setCharacterClass(next); setClassSkills([]); setClassEquipmentOption("A"); setClassEquipment(""); setGearChanged(true);
     if (next && abilityMethod === "standard" && !scoreDistributionTouched && STANDARD_ARRAY_BY_CLASS[next]) setBaseScores(STANDARD_ARRAY_BY_CLASS[next]);
   }
   function chooseBoost(ability: AbilityName, value: number) {
@@ -202,14 +195,10 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
         {species && <><label className="form-field"><span>Size</span><select value={customSize} onChange={(event) => setCustomSize(event.target.value as Character["size"])}>{["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"].map((size) => <option key={size}>{size}</option>)}</select></label><label className="form-field"><span>Walking speed (ft.)</span><input type="number" min={0} max={120} value={customSpeed} onChange={(event) => setCustomSpeed(Number(event.target.value))} /></label></>}
         {speciesSkillOptions.length > 0 && <label className="form-field"><span>{species === "Elf" ? "Keen Senses skill" : "Human Skillful skill"} <b>REQUIRED</b></span><select value={speciesSkillProficiency} onChange={(event) => setSpeciesSkillProficiency(event.target.value as SkillName)}><option value="">Choose a skill</option>{speciesSkillOptions.map((skill) => <option key={skill}>{skill}</option>)}</select></label>}
         {species && species !== "Custom" && ["Elf", "Gnome", "Tiefling", "Dragonborn", "Goliath"].includes(species) && <label className="form-field"><span>{species} lineage / ancestry <small>OPTIONAL</small></span><input maxLength={35} value={speciesChoice} onChange={(event) => setSpeciesChoice(event.target.value)} placeholder={species === "Elf" ? "Drow, High Elf, or Wood Elf" : species === "Tiefling" ? "Abyssal, Chthonic, or Infernal" : species === "Dragonborn" ? "Choose a dragon ancestry" : species === "Goliath" ? "Choose a giant ancestry" : "Forest or Rock"} /></label>}
-        <label className="form-field"><span>Class <b>REQUIRED</b></span><select value={characterClass} onChange={(event) => changeClass(event.target.value)}><option value="">Choose a class</option>{CLASSES.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="form-field"><span>Class <b>REQUIRED</b></span><select disabled={Boolean(character)} value={characterClass} onChange={(event) => changeClass(event.target.value)}><option value="">Choose a class</option>{CLASSES.map((item) => <option key={item}>{item}</option>)}</select></label>
         <label className="form-field"><span>Background <b>REQUIRED</b></span><select value={background} onChange={(event) => { const next = event.target.value; setBackground(next); setBoosts({}); setAbilityScoreOverrides({}); setToolProficiency(BACKGROUNDS[next]?.tool.startsWith("Choose") ? "" : BACKGROUNDS[next]?.tool ?? ""); setClassSkills((current) => current.filter((skill) => !BACKGROUNDS[next]?.skills.includes(skill))); }}><option value="">Choose a background</option>{Object.keys(BACKGROUNDS).map((item) => <option key={item}>{item}</option>)}<option value="Custom">Custom / other</option></select></label>
         {background === "Custom" && <label className="form-field"><span>Background name</span><input maxLength={50} value={customBackground} onChange={(event) => setCustomBackground(event.target.value)} placeholder="Your background" /></label>}
-        <label className="form-field"><span>{characterClass || "Class"} level <small>1–20</small></span><input type="number" min={1} max={20} value={classLevels[characterClass] ?? level} onChange={(event) => { setLevel(event.target.value); if (characterClass) setClassLevels((current) => ({ ...current, [characterClass]: Number(event.target.value) || 1 })); }} /></label>
-        <label className="form-field"><span>Subclass <small>LEVEL 3+</small></span><input maxLength={50} value={subclass} onChange={(event) => { setSubclass(event.target.value); if (characterClass) setClassSubclasses((current) => ({ ...current, [characterClass]: event.target.value })); }} placeholder="Choose when your class grants it" /></label>
-        {Object.entries(classLevels).filter(([key]) => key !== characterClass).map(([key, value]) => <div className="form-field multiclass-row" key={key}><span>{key} class level</span><div className="multiclass-controls"><input aria-label={`${key} class level`} type="number" min={1} max={20} value={value} onChange={(event) => setClassLevels((current) => ({ ...current, [key]: Number(event.target.value) || 1 }))} /><input aria-label={`${key} subclass`} placeholder="Subclass (optional)" value={classSubclasses[key] ?? ""} onChange={(event) => setClassSubclasses((current) => ({ ...current, [key]: event.target.value }))} /><button type="button" className="text-button" onClick={() => setClassLevels((current) => { const next = { ...current }; delete next[key]; return next; })}>Remove</button></div></div>)}
-        <label className="form-field"><span>Multiclass <small>OPTIONAL</small></span><select value="" disabled={!characterClass} onChange={(event) => { const next = event.target.value; if (next) setClassLevels((current) => current[next] ? current : { ...current, [next]: 1 }); }}><option value="">Add a class…</option>{CLASSES.filter((item) => item !== characterClass && !classLevels[item]).map((item) => <option key={item}>{item}</option>)}</select></label>
-        <p className="form-hint form-field-wide">For a first character, level 1 keeps the choices simple. Spellcasting classes can choose starting spells before review.</p>
+        <div className="form-field form-field-wide"><span>{character ? "Current progression" : "Starting level"}</span><strong>{character ? calculated.classBreakdown.map((entry) => entry.name + " " + entry.level).join(" / ") : "Level 1"}</strong><p className="form-hint">{character ? "Use Level up on the character sheet to gain levels, choose a subclass, or multiclass. Editing basics keeps your existing progression." : "New characters start at level 1. Use Level up on the character sheet for further levels, subclass choices, and multiclassing."}</p></div>
         {speciesData && <p className="form-hint form-field-wide">{speciesData.note} Base size {speciesData.size}; speed {speciesData.speed} ft.</p>}
       </div>}
 
