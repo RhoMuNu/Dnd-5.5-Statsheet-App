@@ -1,0 +1,52 @@
+TALEFORGE - START HERE
+
+HOST A GAME ON WINDOWS
+1. Right-click the release ZIP and choose Extract All.
+2. Open the extracted folder, then double-click Start TaleForge Host.bat.
+3. Your browser opens automatically. Choose LAN campaign, then Host a campaign.
+4. Give friends the LAN address and room code shown in the app.
+
+No Node.js install, npm commands, administrator access, or build step is needed.
+The included runtime and rules work without an internet connection.
+Keep the host window open and your PC awake while playing. Stop with Ctrl+C.
+If Windows asks about network access, allow Private networks for LAN play.
+
+JOIN AS A PLAYER
+You do not need this ZIP or any installation. On the same Wi-Fi, open the
+host's LAN address in your browser, choose Join a campaign, and enter the code.
+Use the same browser and host address next session to resume your identity.
+
+PLAY ON YOUR OWN
+Start TaleForge as above and use My characters. No campaign room is required.
+
+YOUR SAVES AND UPDATES
+Campaign data lives in %APPDATA%\TaleForge, outside this app folder.
+Open campaign data.bat opens that folder. Local character libraries and saved
+room access live in your browser; use Export library to protect local sheets.
+Before updating, stop the host and copy the campaign-data folder to a private
+backup location. Extract the new release into a new folder and launch it.
+Use the same Windows account, browser, address, and port to keep your saves.
+Do not send your campaign-data folder to friends: it contains room credentials.
+
+IF THE APP DOES NOT OPEN
+Read the message in the host window. You can open http://localhost:4173 yourself.
+Starting it again reopens an existing TaleForge host rather than starting two.
+If another app uses port 4173, close that app or edit port in host-settings.json.
+Changing the port changes the browser storage address; export local sheets first.
+Do not run files directly inside the ZIP. Keep runtime, server, and dist together.
+This release targets Windows x64. macOS and Linux are not included in this ZIP.
+
+HOST ONLINE, FRIEND OFFLINE?
+Make sure everyone uses the same private network, not a guest Wi-Fi network.
+Use the LAN address shown by the host, not localhost, on another device.
+Check Windows Firewall Private-network permission and keep the host PC awake.
+For a trusted private LAN only; do not port-forward this host onto the internet.
+
+ASSISTANCE LEVELS
+Play settings offers Paper sheet, Tracked sheet, and Assisted play.
+Assisted play supports physical or digital dice. Automation labels explain the
+implemented effects and what still needs to be resolved at the table.
+
+THIRD-PARTY NOTICES
+See licenses for the runtime and bundled UI dependencies. The rules attribution
+is in licenses/SRD-ATTRIBUTION.md. This is a beta release for private LAN play.

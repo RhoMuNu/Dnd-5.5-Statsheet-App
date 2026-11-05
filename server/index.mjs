@@ -2,25 +2,26 @@ import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { homedir, networkInterfaces } from "node:os";
+import { homedir } from "node:os";
 import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeActivity } from "./activity.mjs";
 import { changeEncounter, emptyEncounter } from "./encounters.mjs";
 import { campaignPersistence, CampaignSaveError } from "./persistence.mjs";
+import { hostPort, lanAddresses } from "./startup.mjs";
 
 const isProduction = process.env.NODE_ENV === "production" || process.argv.includes("--production");
 const rules = isProduction ? await import("../dist/rules.mjs") : (await import("./rules-dev.mjs")).rules;
-const port = Number(process.env.TALEFORGE_PORT ?? (isProduction ? 4173 : 4174));
+const port = hostPort(process.env.TALEFORGE_PORT ?? (isProduction ? 4173 : 4174), true);
 const appRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distRoot = join(appRoot, "dist");
 const dataRoot = resolve(process.env.TALEFORGE_DATA_DIR ?? join(process.env.APPDATA ?? join(homedir(), ".local", "share"), "TaleForge"));
 const dataFile = join(dataRoot, "lan-campaigns.json");
 const clients = new Map();
 
-mkdirSync(dataRoot, { recursive: true });
 let store = { campaigns: [] };
 try {
+  mkdirSync(dataRoot, { recursive: true });
   if (existsSync(dataFile)) store = JSON.parse(readFileSync(dataFile, "utf8"));
   if (!store || !Array.isArray(store.campaigns)) throw new Error("Campaign store has an unsupported format.");
 } catch (error) {
@@ -170,9 +171,7 @@ const apiServer = createServer(async (request, response) => {
     const requestUrl = new URL(request.url ?? "/", "http://localhost");
     const pathname = requestUrl.pathname;
     if (request.method === "GET" && pathname === "/api/health") {
-      const addresses = Object.values(networkInterfaces()).flatMap((items) => items ?? [])
-        .filter((item) => !item.internal && (item.family === "IPv4" || item.family === 4) && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(item.address))
-        .map((item) => item.address);
+      const addresses = lanAddresses();
       return sendJson(response, 200, { ok: true, service: "taleforge-lan", version: 1, addresses: [...new Set(addresses)] });
     }
 
@@ -387,12 +386,24 @@ function serveStatic(pathname, response) {
   response.end(readFileSync(file));
 }
 
+apiServer.on("error", (error) => {
+  console.error(error.code === "EADDRINUSE" ? `\nPort ${port} is already used by another app. Close that app, or choose a different port in host-settings.json, then start TaleForge again.` : `\nTaleForge could not start its host: ${error.message}`);
+  process.exitCode = 1;
+});
 apiServer.listen(port, "0.0.0.0", () => {
+  const listeningPort = apiServer.address().port;
   console.log(`TaleForge LAN server listening on 0.0.0.0:${apiServer.address().port}`);
   console.log(`Campaign data: ${dataFile}`);
-  if (isProduction) console.log("Open this PC's LAN address from the other devices on the same Wi-Fi.");
+  if (isProduction) {
+    console.log(`\nREADY - open http://localhost:${listeningPort} on this PC.`);
+    for (const address of lanAddresses()) console.log(`Players on your Wi-Fi: http://${address}:${listeningPort}`);
+    if (!lanAddresses().length) console.log("No private Wi-Fi/Ethernet address found. Connect to your network to invite players.");
+    console.log("Open LAN campaign to create a room, then share its address and room code.");
+    console.log("Keep this window open while playing. Press Ctrl+C to stop the host.\n");
+  }
   if (isProduction && process.env.TALEFORGE_OPEN_BROWSER === "1") {
-    const openBrowser = spawn(process.env.ComSpec ?? "cmd.exe", ["/c", "start", "", `http://localhost:${port}`], { detached: true, stdio: "ignore", windowsHide: true });
+    const openBrowser = spawn(process.env.ComSpec ?? "cmd.exe", ["/c", "start", "", `http://localhost:${listeningPort}`], { detached: true, stdio: "ignore", windowsHide: true });
+    openBrowser.on("error", () => console.log(`Open http://localhost:${listeningPort} in your browser.`));
     openBrowser.unref();
   }
 });

@@ -520,3 +520,5 @@ summary { padding-block: 8px; line-height: 1.5; }
 .play-dice-choice { display: grid; gap: 6px; font-size: 13px; }
 .app-shell .play-dice-choice select, .level-up-dialog .play-dice-choice select { width: 100%; max-width: 100%; white-space: normal; }
 @media (max-width: 700px) { .spell-card-summary .spell-summary-name { max-width: calc(100% - 24px); } .spell-card-summary .automation-badge { margin-left: 18px; } .play-settings-panel { position: fixed; right: 16px; top: 110px; max-height: calc(100dvh - 135px); } }
+.lan-invite-address { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.lan-invite-address code { overflow-wrap: anywhere; user-select: all; }

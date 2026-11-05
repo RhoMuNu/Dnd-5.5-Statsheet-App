@@ -9,7 +9,8 @@
     "dev:lan": "node server/dev.mjs",
     "build": "tsc -b && vite build && node server/build-rules.mjs",
     "preview": "vite preview",
-    "host": "npm run build && node server/index.mjs --production",
+    "host": "npm run build && node server/launch.mjs",
+    "release:windows": "npm run verify && node scripts/package-windows.mjs",
     "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
     "verify": "npm run build && npm test && node --import ./tests/register.mjs --test tests/productionHost.smoke.mjs"
   },
