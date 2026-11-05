@@ -1,7 +1,10 @@
 import type { Character, CharacterDraft } from "./characters";
 
 export type LanSession = { code: string; token: string; role: "dm" | "player"; playerId: string | null; name: string };
+export type EncounterEntry = { id: string; name: string; initiative: number; tieOrder: number; characterId: string | null };
+export type Encounter = { revision: number; round: number; activeId: string | null; entries: EncounterEntry[] };
 export type LanSnapshot = {
+  encounter?: Encounter;
   campaign: { code: string; name: string; dmName: string };
   role: "dm" | "player";
   playerId: string | null;

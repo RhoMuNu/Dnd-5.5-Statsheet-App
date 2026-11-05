@@ -639,3 +639,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 .gameplay-panel summary { cursor: pointer; }
 .death-tracker { padding: 12px 0; border-top: 1px solid var(--line); margin-top: 12px; }
 .gameplay-panel [role="status"] { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+
+.condition-toggle { display:flex; align-items:flex-start; gap:8px; margin:12px 0; font-size:12px; }
+.condition-toggle input { flex:0 0 auto; margin-top:3px; }
+.condition-toggle span { display:flex; flex-direction:column; gap:4px; }
+.condition-toggle small { color:var(--muted); line-height:1.5; }
+.attack-card { border-top:1px solid var(--line); padding:14px 0; font-size:13px; }
+.encounter-panel { margin:20px 0; }
+.encounter-panel fieldset { border:0; padding:0; margin:0; min-width:0; }
+.initiative-list { padding:0; list-style:none; }
+.initiative-list li { display:flex; flex-wrap:wrap; align-items:center; gap:14px; border-top:1px solid var(--line); padding:12px; }
+.initiative-list li[aria-current] { background:#29251f; box-shadow:inset 3px 0 var(--gold); }
+.initiative-list li>strong { color:var(--gold); min-width:28px; }
+.initiative-list li>span { flex:1; min-width:120px; }
+.initiative-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.initiative-actions label { display:flex; flex-direction:column; gap:3px; font-size:10px; color:var(--muted); }
+.initiative-actions input { width:70px; border:1px solid var(--line); border-radius:5px; background:var(--bg); color:var(--cream); padding:6px; }

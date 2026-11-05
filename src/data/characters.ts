@@ -1,3 +1,6 @@
+import { CONDITIONS, type Condition } from "./conditions";
+import { normalizeEffects, type ActiveEffect } from "./effects";
+
 export type Character = {
   id: string;
   name: string;
@@ -12,6 +15,7 @@ export type Character = {
   currentHitPoints: number | null;
   temporaryHitPoints: number;
   combat?: CombatState;
+  attacks?: CharacterAttack[];
   unarmoredDefenseChoice: "Barbarian" | "Monk" | "";
   background: string;
   level: number;
@@ -41,6 +45,9 @@ export type Character = {
 export type CustomResource = { id: string; name: string; maxUses: number; used: number; recovery: "short-one" | "short-all" | "long" | "manual" };
 
 export type CombatState = {
+  effects: ActiveEffect[];
+  conditions: Condition[];
+  exhaustion: number;
   deathSuccesses: number;
   deathFailures: number;
   stable: boolean;
@@ -51,15 +58,17 @@ export type CombatState = {
 };
 
 export function defaultCombatState(): CombatState {
-  return { deathSuccesses: 0, deathFailures: 0, stable: false, dead: false, hitDiceUsed: {}, concentration: "", concentrationDC: null };
+  return { effects: [], conditions: [], exhaustion: 0, deathSuccesses: 0, deathFailures: 0, stable: false, dead: false, hitDiceUsed: {}, concentration: "", concentrationDC: null };
 }
+
+export type CharacterAttack = { id: string; name: string; ability: AbilityName; proficient: boolean; diceCount: number; dieSize: number; damageType: string; attackBonus: number; damageBonus: number; addAbilityToDamage: boolean; notes: string };
 
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
 export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string };
 export type InventoryCurrency = { cp: number; sp: number; ep: number; gp: number; pp: number };
 export type InventoryItem = { id: string; name: string; quantity: number; weight: number; category: string; equipped: boolean; notes: string };
 export type CharacterInventory = { items: InventoryItem[]; currency: InventoryCurrency; startingKitsAdded: boolean };
-export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean };
+export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean; automation?: string };
 export type CharacterNotes = { backstory: string; entries: { id: string; title: string; body: string; createdAt: string; updatedAt: string }[] };
 export type CharacterCreationDetails = {
   abilityMethod: "standard" | "point-buy" | "manual" | "rolled";
@@ -178,6 +187,7 @@ export function normalizeCharacter(value: unknown): Character | null {
     currentHitPoints: Number.isFinite(character.currentHitPoints) ? Math.max(0, Math.trunc(character.currentHitPoints!)) : null,
     temporaryHitPoints: Number.isFinite(character.temporaryHitPoints) ? Math.max(0, Math.trunc(character.temporaryHitPoints!)) : 0,
     combat: normalizeCombatState(character.combat),
+    attacks: Array.isArray(character.attacks) ? character.attacks.filter(isCharacterAttack).slice(0, 100) : [],
     subclass: character.subclass ?? "",
     classLevels: character.classLevels && Object.keys(character.classLevels).length
       ? character.classLevels
@@ -202,12 +212,27 @@ function normalizeCombatState(value: unknown): CombatState {
   const state = value && typeof value === "object" ? value as Partial<CombatState> : {};
   const count = (value: unknown, max: number) => typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(0, Math.trunc(value))) : 0;
   return {
+    conditions: Array.isArray(state.conditions) ? [...new Set(state.conditions.filter((entry) => CONDITIONS.includes(entry)))] : [],
+    effects: normalizeEffects(state.effects),
+    exhaustion: count(state.exhaustion, 6),
     deathSuccesses: count(state.deathSuccesses, 3), deathFailures: count(state.deathFailures, 3),
-    stable: state.stable === true, dead: state.dead === true,
+    stable: state.stable === true, dead: state.dead === true || count(state.exhaustion, 6) >= 6,
     hitDiceUsed: Object.fromEntries(Object.entries(state.hitDiceUsed && typeof state.hitDiceUsed === "object" ? state.hitDiceUsed : {}).map(([key, used]) => [key, count(used, 20)])),
     concentration: typeof state.concentration === "string" ? state.concentration.slice(0, 100) : "",
     concentrationDC: typeof state.concentrationDC === "number" && Number.isFinite(state.concentrationDC) ? Math.max(10, Math.min(30, Math.trunc(state.concentrationDC))) : null,
   };
+}
+
+function isCharacterAttack(value: unknown): value is CharacterAttack {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<CharacterAttack>;
+  return typeof item.id === "string" && typeof item.name === "string" && ABILITIES.includes(item.ability as AbilityName)
+    && typeof item.proficient === "boolean" && typeof item.addAbilityToDamage === "boolean"
+    && Number.isInteger(item.diceCount) && item.diceCount! >= 0 && item.diceCount! <= 30
+    && [4, 6, 8, 10, 12, 20].includes(item.dieSize!)
+    && Number.isInteger(item.attackBonus) && Math.abs(item.attackBonus!) <= 100
+    && Number.isInteger(item.damageBonus) && Math.abs(item.damageBonus!) <= 100
+    && typeof item.damageType === "string" && typeof item.notes === "string";
 }
 
 function isCharacterFeature(value: unknown): value is CharacterFeature {
@@ -236,6 +261,7 @@ function isCharacterSpell(value: unknown): value is CharacterSpell {
     && typeof spell.school === "string" && typeof spell.castingTime === "string"
     && typeof spell.range === "string" && typeof spell.components === "string"
     && typeof spell.concentration === "boolean" && typeof spell.description === "string"
+    && (spell.automation === undefined || typeof spell.automation === "string")
     && typeof spell.prepared === "boolean";
 }
 

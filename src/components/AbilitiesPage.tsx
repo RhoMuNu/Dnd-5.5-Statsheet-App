@@ -1,6 +1,8 @@
 import { ABILITIES, SKILLS, type AbilityName, type Character, type SkillName } from "../data/characters";
 import { calculateCharacterStats, isClassSavingThrowProficient } from "../data/calculations";
 import { useState } from "react";
+import { EffectsPanel } from "./EffectsPanel";
+import { AttacksPanel } from "./AttacksPanel";
 import { GameplayPanel } from "./GameplayPanel";
 import { applyDamage, combatState, healCharacter, restCharacter } from "../data/gameplay";
 
@@ -146,11 +148,11 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
         </div>
 
         <aside className="derived-column" aria-label="Calculated stats">
-          <GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} />
+
           <section className="derived-panel highlight-panel">
             <p className="eyebrow">AT A GLANCE</p>
             <div className="headline-stat"><span>Proficiency bonus</span><strong>+{stats.proficiencyBonus}</strong><small>Based on total character level {stats.totalLevel}</small></div>
-            <div className="headline-stat"><span>Initiative</span><strong>{formatModifier(stats.initiative)}</strong><small>Dexterity modifier</small></div>
+            <div className="headline-stat"><span>Initiative</span><strong>{formatModifier(stats.initiative)}</strong><small>Dexterity modifier, including exhaustion</small></div>
             <div className="headline-stat"><span>Passive Perception</span><strong>{stats.passivePerception}</strong><small>10 + Perception check modifier</small></div>
           </section>
 
@@ -170,6 +172,9 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
           </section>
 
+          <GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} />
+          <AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} />
+          <EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} />
           <section className="derived-panel">
             <p className="eyebrow">STRENGTH &amp; MAGIC</p>
             <div className="derived-line"><span>Carry</span><strong>{formatWeight(stats.carryingCapacity)} lb.</strong></div>

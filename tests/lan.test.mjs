@@ -5,7 +5,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
-import { defaultCharacterStats } from "../src/data/characters.ts";
+import { defaultCharacterStats, defaultCombatState } from "../src/data/characters.ts";
+import { makeEffect } from "../src/data/effects.ts";
+import { makeWeaponAttack } from "../src/data/attacks.ts";
 
 test("LAN host enforces ownership, sharing and conflicts, streams updates, and persists campaign sheets", { timeout: 20000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "taleforge-lan-test-"));
@@ -30,19 +32,35 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
     const other = (await request(`${route}/join`, "POST", { name: "Bob" })).data;
     assert.equal((await request(route)).status, 401);
     const character = { ...defaultCharacterStats(), id: "lan-hero", name: "LAN hero", concept: "", species: "Human", characterClass: "Fighter", background: "", classLevels: { Fighter: 1 }, level: 1, createdAt: "2026-11-05T00:00:00Z", updatedAt: "2026-11-05T00:00:00Z" };
+    character.combat = { ...defaultCombatState(), effects: [makeEffect("Bless", "bless")] };
+    character.attacks = [makeWeaponAttack(character, "Dagger", "dagger")];
     assert.equal((await request(`${route}/characters`, "POST", { character, shared: false }, player.token)).status, 200);
+    assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, combat: { conditions: "Poisoned" } } }, player.token)).status, 400);
+    assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, attacks: [{ diceCount: 1000000 }] } }, player.token)).status, 400);
     assert.equal((await request(route, "GET", undefined, dm.token)).data.characters.length, 0);
     assert.equal((await request(route, "GET", undefined, other.token)).data.characters.length, 0);
+    assert.equal((await request(`${route}/encounter`, "POST", { revision: 0, action: { type: "add", characterId: character.id, initiative: 10 } }, dm.token)).status, 400);
     assert.equal((await request(`${route}/characters`, "POST", { character }, dm.token)).status, 403);
     assert.equal((await request(`${route}/characters`, "POST", { character }, other.token)).status, 409);
     assert.equal((await request(`${route}/characters/lan-hero/share`, "POST", { shared: true }, other.token)).status, 404);
     await request(`${route}/characters/lan-hero/share`, "POST", { shared: true }, player.token);
     assert.equal((await request(route, "GET", undefined, dm.token)).data.characters.length, 1);
+    assert.equal((await request(`${route}/encounter`, "POST", { revision: 0, action: { type: "add", name: "Goblin", initiative: 12 } }, player.token)).status, 403);
+    const added = await request(`${route}/encounter`, "POST", { revision: 0, action: { type: "add", name: "Goblin", initiative: 12 } }, dm.token);
+    assert.equal(added.status, 200);
+    assert.equal(added.data.encounter.revision, 1);
+    assert.equal((await request(`${route}/encounter`, "POST", { revision: 0, action: { type: "clear" } }, dm.token)).status, 409);
+    const started = await request(`${route}/encounter`, "POST", { revision: 1, action: { type: "start" } }, dm.token);
+    assert.equal(started.data.encounter.round, 1);
+    assert.equal((await request(route, "GET", undefined, other.token)).data.encounter.activeId, added.data.encounter.entries[0].id);
     const controller = new AbortController();
     const events = await fetch(`${base}${route}/events?token=${dm.token}`, { signal: controller.signal });
     const reader = events.body.getReader();
     try {
       assert.match(new TextDecoder().decode((await reader.read()).value), /event: snapshot/);
+      assert.equal((await request(`${route}/encounter`, "POST", { revision: 2, action: { type: "next" } }, dm.token)).status, 200);
+      let encounterStream = "";
+      while (!encounterStream.includes('"round":2')) encounterStream += new TextDecoder().decode((await reader.read()).value);
       const next = { ...character, currentHitPoints: 4, updatedAt: "2026-11-05T00:01:00Z", notes: { backstory: "Synced journal", entries: [] } };
       assert.equal((await request(`${route}/characters`, "POST", { character: next, shared: true, baseUpdatedAt: character.updatedAt }, player.token)).status, 200);
       let stream = "";
@@ -52,6 +70,9 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
       assert.equal(conflict.data.current.currentHitPoints, 4);
       const saved = JSON.parse(await readFile(join(directory, "lan-campaigns.json"), "utf8"));
       assert.equal(saved.campaigns[0].characters[0].character.notes.backstory, "Synced journal");
+      assert.equal(saved.campaigns[0].encounter.round, 2);
+      assert.equal(saved.campaigns[0].characters[0].character.combat.effects[0].name, "Bless");
+      assert.equal(saved.campaigns[0].characters[0].character.attacks[0].name, "Dagger");
     } finally { controller.abort(); await reader.cancel().catch(() => {}); }
   } finally {
     const stopped = once(child, "exit");
