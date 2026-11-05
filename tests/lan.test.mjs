@@ -1,0 +1,62 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { once } from "node:events";
+import { defaultCharacterStats } from "../src/data/characters.ts";
+
+test("LAN host enforces ownership, sharing and conflicts, streams updates, and persists campaign sheets", { timeout: 20000 }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), "taleforge-lan-test-"));
+  const child = spawn(process.execPath, ["server/index.mjs"], { env: { ...process.env, TALEFORGE_PORT: "0", TALEFORGE_DATA_DIR: directory }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  let output = "";
+  let errors = "";
+  child.stderr.on("data", (data) => { errors += data; });
+  try {
+    const port = await new Promise((resolve, reject) => {
+      child.stdout.on("data", (data) => { output += data; const match = output.match(/listening on 0\.0\.0\.0:(\d+)/); if (match) resolve(Number(match[1])); });
+      child.once("error", reject);
+      child.once("exit", (code) => reject(new Error(`Host exited ${code}: ${errors}`)));
+    });
+    const base = `http://localhost:${port}`;
+    const request = async (path, method = "GET", body, token) => {
+      const response = await fetch(base + path, { method, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+      return { status: response.status, data: await response.json() };
+    };
+    const dm = (await request("/api/campaigns", "POST", { name: "Test campaign" })).data;
+    const route = `/api/campaigns/${dm.code}`;
+    const player = (await request(`${route}/join`, "POST", { name: "Alice" })).data;
+    const other = (await request(`${route}/join`, "POST", { name: "Bob" })).data;
+    assert.equal((await request(route)).status, 401);
+    const character = { ...defaultCharacterStats(), id: "lan-hero", name: "LAN hero", concept: "", species: "Human", characterClass: "Fighter", background: "", classLevels: { Fighter: 1 }, level: 1, createdAt: "2026-11-05T00:00:00Z", updatedAt: "2026-11-05T00:00:00Z" };
+    assert.equal((await request(`${route}/characters`, "POST", { character, shared: false }, player.token)).status, 200);
+    assert.equal((await request(route, "GET", undefined, dm.token)).data.characters.length, 0);
+    assert.equal((await request(route, "GET", undefined, other.token)).data.characters.length, 0);
+    assert.equal((await request(`${route}/characters`, "POST", { character }, dm.token)).status, 403);
+    assert.equal((await request(`${route}/characters`, "POST", { character }, other.token)).status, 409);
+    assert.equal((await request(`${route}/characters/lan-hero/share`, "POST", { shared: true }, other.token)).status, 404);
+    await request(`${route}/characters/lan-hero/share`, "POST", { shared: true }, player.token);
+    assert.equal((await request(route, "GET", undefined, dm.token)).data.characters.length, 1);
+    const controller = new AbortController();
+    const events = await fetch(`${base}${route}/events?token=${dm.token}`, { signal: controller.signal });
+    const reader = events.body.getReader();
+    try {
+      assert.match(new TextDecoder().decode((await reader.read()).value), /event: snapshot/);
+      const next = { ...character, currentHitPoints: 4, updatedAt: "2026-11-05T00:01:00Z", notes: { backstory: "Synced journal", entries: [] } };
+      assert.equal((await request(`${route}/characters`, "POST", { character: next, shared: true, baseUpdatedAt: character.updatedAt }, player.token)).status, 200);
+      let stream = "";
+      while (!stream.includes("Synced journal")) stream += new TextDecoder().decode((await reader.read()).value);
+      const conflict = await request(`${route}/characters`, "POST", { character, shared: true, baseUpdatedAt: character.updatedAt }, player.token);
+      assert.equal(conflict.status, 409);
+      assert.equal(conflict.data.current.currentHitPoints, 4);
+      const saved = JSON.parse(await readFile(join(directory, "lan-campaigns.json"), "utf8"));
+      assert.equal(saved.campaigns[0].characters[0].character.notes.backstory, "Synced journal");
+    } finally { controller.abort(); await reader.cancel().catch(() => {}); }
+  } finally {
+    const stopped = once(child, "exit");
+    child.kill();
+    await stopped;
+    await rm(directory, { recursive: true, force: true });
+  }
+});

@@ -1,6 +1,8 @@
 import { ABILITIES, SKILLS, type AbilityName, type Character, type SkillName } from "../data/characters";
 import { calculateCharacterStats, isClassSavingThrowProficient } from "../data/calculations";
 import { useState } from "react";
+import { GameplayPanel } from "./GameplayPanel";
+import { applyDamage, combatState, healCharacter, restCharacter } from "../data/gameplay";
 
 type AbilitiesPageProps = { character: Character; onChange?: (updates: Partial<Character>) => void; readOnly?: boolean };
 
@@ -55,13 +57,16 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
   }
 
   function changeHitPoints(amount: number) {
-    onChange?.({ currentHitPoints: Math.min(maximumHp, Math.max(0, currentHp + amount)) });
+    onChange?.(amount < 0 ? applyDamage(character, -amount) : healCharacter(character, amount));
   }
 
   function setHitPoints(rawValue: string) {
     if (rawValue === "") return;
     const value = Number(rawValue);
-    if (Number.isInteger(value)) onChange?.({ currentHitPoints: Math.min(maximumHp, Math.max(0, value)) });
+    if (Number.isInteger(value)) {
+      const hp = Math.min(maximumHp, Math.max(0, value));
+      onChange?.({ currentHitPoints: hp, ...(hp > 0 ? { combat: { ...combatState(character), dead: false, stable: false, deathSuccesses: 0, deathFailures: 0 } } : {}) });
+    }
   }
 
   function setTemporaryHitPoints(rawValue: string) {
@@ -80,31 +85,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
   }
 
   function recoverResources(recovery: "Short Rest" | "Long Rest") {
-    const updates = { ...character.resourceUses };
-    for (const resource of stats.classResources) {
-      if (!resource.key || resource.maxUses === undefined) continue;
-      if (recovery === "Long Rest") updates[resource.key] = 0;
-      else if (resource.recovery === "Short Rest") {
-        updates[resource.key] = resource.shortRestRecovery === "all"
-          ? 0
-          : Math.max(0, (updates[resource.key] ?? 0) - 1);
-      }
-    }
-    for (const slot of stats.spellSlots) {
-      const key = spellSlotKey(slot.pool, slot.spellLevel);
-      if (recovery === "Long Rest" || slot.pool.startsWith("Pact Magic")) updates[key] = 0;
-    }
-    const customResources = character.customResources.map((resource) => {
-      if (recovery === "Long Rest" && resource.recovery !== "manual") return { ...resource, used: 0 };
-      if (recovery === "Short Rest" && resource.recovery === "short-all") return { ...resource, used: 0 };
-      if (recovery === "Short Rest" && resource.recovery === "short-one") return { ...resource, used: Math.max(0, resource.used - 1) };
-      return resource;
-    });
-    onChange?.({
-      resourceUses: updates,
-      customResources,
-      ...(recovery === "Long Rest" && stats.maxHitPoints !== null ? { currentHitPoints: stats.maxHitPoints, temporaryHitPoints: 0 } : {}),
-    });
+    onChange?.(restCharacter(character, recovery));
   }
 
   return (
@@ -165,6 +146,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
         </div>
 
         <aside className="derived-column" aria-label="Calculated stats">
+          <GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} />
           <section className="derived-panel highlight-panel">
             <p className="eyebrow">AT A GLANCE</p>
             <div className="headline-stat"><span>Proficiency bonus</span><strong>+{stats.proficiencyBonus}</strong><small>Based on total character level {stats.totalLevel}</small></div>
@@ -183,7 +165,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <div className="hp-tracker" aria-label="Hit points">
               <div className="hp-tracker-heading"><strong>Hit points</strong><span>{stats.maxHitPoints === null ? "Choose a class to calculate maximum HP" : `${currentHp} / ${maximumHp} HP`}</span></div>
               <div className="hp-bar" role="meter" aria-label="Hit points remaining" aria-valuemin={0} aria-valuemax={maximumHp} aria-valuenow={currentHp}><span style={{ width: `${hpPercent}%` }} /></div>
-              <div className="hp-controls"><button type="button" aria-label="Take one damage" disabled={readOnly || currentHp <= 0 || maximumHp === 0} onClick={() => changeHitPoints(-1)}>− Damage</button><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><button type="button" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label></div>
+              <div className="hp-controls"><button type="button" aria-label="Take one damage" disabled={readOnly || (currentHp <= 0 && character.temporaryHitPoints <= 0) || maximumHp === 0 || combatState(character).dead} onClick={() => changeHitPoints(-1)}>− Damage</button><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><button type="button" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label></div>
             </div>
             {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
           </section>
@@ -210,8 +192,8 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <p className="eyebrow">FEATS &amp; CUSTOM FEATURE TRACKERS</p>
             <p className="setup-note">Add limited-use feats, subclass features, magic items, or any other resource. Choose how it recovers.</p>
             {character.customResources.map((resource) => <div className="derived-line tracked-resource" key={resource.id}><span>{resource.name}<small className="resource-recovery">{resourceRecoveryLabel(resource.recovery)}</small></span><div className="resource-controls"><button type="button" disabled={readOnly || resource.used >= resource.maxUses} aria-label={`Use one ${resource.name}`} onClick={() => changeCustomResource(resource.id, 1)}>−</button><strong>{resource.maxUses - resource.used} / {resource.maxUses}</strong><button type="button" disabled={readOnly || resource.used <= 0} aria-label={`Restore one ${resource.name}`} onClick={() => changeCustomResource(resource.id, -1)}>+</button><button type="button" className="resource-remove" disabled={readOnly} aria-label={`Remove ${resource.name} tracker`} onClick={() => onChange?.({ customResources: character.customResources.filter((entry) => entry.id !== resource.id) })}>×</button></div></div>)}
-            {!readOnly && (stats.classResources.some(({ recovery }) => recovery === "Short Rest") || stats.spellSlots.some(({ pool }) => pool.startsWith("Pact Magic")) || character.customResources.some(({ recovery }) => recovery.startsWith("short-"))) && <button type="button" className="resource-rest-button" onClick={() => recoverResources("Short Rest")}>Take a Short Rest <span>↻</span></button>}
-            {!readOnly && stats.maxHitPoints !== null && <button type="button" className="resource-rest-button" onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
+            {!readOnly && (stats.classResources.some(({ recovery }) => recovery === "Short Rest") || stats.spellSlots.some(({ pool }) => pool.startsWith("Pact Magic")) || character.customResources.some(({ recovery }) => recovery.startsWith("short-"))) && <button type="button" className="resource-rest-button" disabled={currentHp <= 0 || combatState(character).dead} onClick={() => recoverResources("Short Rest")}>Take a Short Rest <span>↻</span></button>}
+            {!readOnly && stats.maxHitPoints !== null && <button type="button" className="resource-rest-button" disabled={currentHp <= 0 || combatState(character).dead} onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
             {!readOnly && <div className="custom-resource-form"><label><span>Feature / feat name</span><input value={resourceName} maxLength={50} placeholder="e.g. Lucky" onChange={(event) => setResourceName(event.target.value)} /></label><label><span>Uses</span><input type="number" min={1} max={999} value={resourceMax} onChange={(event) => setResourceMax(event.target.value)} /></label><label><span>Recovery</span><select value={resourceRecovery} onChange={(event) => setResourceRecovery(event.target.value as typeof resourceRecovery)}><option value="long">Long rest · all</option><option value="short-one">Short rest · one</option><option value="short-all">Short rest · all</option><option value="manual">Manual only</option></select></label><button type="button" className="resource-add-button" disabled={!resourceName.trim() || !Number.isInteger(Number(resourceMax)) || Number(resourceMax) < 1 || Number(resourceMax) > 999} onClick={addCustomResource}>Add tracker</button></div>}
           </section>
 

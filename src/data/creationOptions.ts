@@ -8,30 +8,42 @@ export const BACKGROUNDS: Record<string, {
   equipmentA: string;
   equipmentB: string;
 }> = {
+  Artisan: { abilities: ["Strength", "Dexterity", "Intelligence"], feat: "Crafter", skills: ["Investigation", "Persuasion"], tool: "Choose Artisan’s Tools", equipmentA: "Artisan’s Tools, 2 Pouches, Traveler’s Clothes, 32 GP", equipmentB: "50 GP" },
   Acolyte: {
     abilities: ["Intelligence", "Wisdom", "Charisma"], feat: "Magic Initiate (Cleric)",
     skills: ["Insight", "Religion"], tool: "Calligrapher’s Supplies",
     equipmentA: "Calligrapher’s Supplies, book of prayers, holy symbol, parchment, robe, 8 GP",
     equipmentB: "50 GP",
   },
+  Charlatan: { abilities: ["Dexterity", "Constitution", "Charisma"], feat: "Skilled", skills: ["Deception", "Sleight of Hand"], tool: "Forgery Kit", equipmentA: "Forgery Kit, Costume, Fine Clothes, 15 GP", equipmentB: "50 GP" },
   Criminal: {
     abilities: ["Dexterity", "Constitution", "Intelligence"], feat: "Alert",
     skills: ["Sleight of Hand", "Stealth"], tool: "Thieves’ Tools",
     equipmentA: "2 Daggers, Thieves’ Tools, Crowbar, 2 Pouches, Traveler’s Clothes, 16 GP",
     equipmentB: "50 GP",
   },
+  Entertainer: { abilities: ["Strength", "Dexterity", "Charisma"], feat: "Musician", skills: ["Acrobatics", "Performance"], tool: "Choose a Musical Instrument", equipmentA: "Musical Instrument, 2 Costumes, Mirror, Perfume, Traveler’s Clothes, 11 GP", equipmentB: "50 GP" },
+  Farmer: { abilities: ["Strength", "Constitution", "Wisdom"], feat: "Tough", skills: ["Animal Handling", "Nature"], tool: "Carpenter’s Tools", equipmentA: "Sickle, Carpenter’s Tools, Healer’s Kit, Iron Pot, Shovel, Traveler’s Clothes, 30 GP", equipmentB: "50 GP" },
+  Guard: { abilities: ["Strength", "Intelligence", "Wisdom"], feat: "Alert", skills: ["Athletics", "Perception"], tool: "Choose a Gaming Set", equipmentA: "Spear, Light Crossbow, 20 Bolts, Gaming Set, Hooded Lantern, Manacles, Quiver, Traveler’s Clothes, 12 GP", equipmentB: "50 GP" },
+  Guide: { abilities: ["Dexterity", "Constitution", "Wisdom"], feat: "Magic Initiate (Druid)", skills: ["Stealth", "Survival"], tool: "Cartographer’s Tools", equipmentA: "Shortbow, 20 Arrows, Cartographer’s Tools, Bedroll, Quiver, Tent, Traveler’s Clothes, 3 GP", equipmentB: "50 GP" },
+  Hermit: { abilities: ["Constitution", "Wisdom", "Charisma"], feat: "Healer", skills: ["Medicine", "Religion"], tool: "Herbalism Kit", equipmentA: "Quarterstaff, Herbalism Kit, Bedroll, Book (philosophy), Lamp, 3 Oil Flasks, Traveler’s Clothes, 16 GP", equipmentB: "50 GP" },
+  Merchant: { abilities: ["Constitution", "Intelligence", "Charisma"], feat: "Lucky", skills: ["Animal Handling", "Persuasion"], tool: "Navigator’s Tools", equipmentA: "Navigator’s Tools, 2 Pouches, Traveler’s Clothes, 22 GP", equipmentB: "50 GP" },
+  Noble: { abilities: ["Strength", "Intelligence", "Charisma"], feat: "Skilled", skills: ["History", "Persuasion"], tool: "Choose a Gaming Set", equipmentA: "Gaming Set, Fine Clothes, Perfume, 29 GP", equipmentB: "50 GP" },
   Sage: {
     abilities: ["Constitution", "Intelligence", "Wisdom"], feat: "Magic Initiate (Wizard)",
     skills: ["Arcana", "History"], tool: "Calligrapher’s Supplies",
     equipmentA: "Quarterstaff, Calligrapher’s Supplies, book, parchment, robe, 8 GP",
     equipmentB: "50 GP",
   },
+  Sailor: { abilities: ["Strength", "Dexterity", "Wisdom"], feat: "Tavern Brawler", skills: ["Acrobatics", "Perception"], tool: "Navigator’s Tools", equipmentA: "Dagger, Navigator’s Tools, Rope, Traveler’s Clothes, 20 GP", equipmentB: "50 GP" },
+  Scribe: { abilities: ["Dexterity", "Intelligence", "Wisdom"], feat: "Skilled", skills: ["Investigation", "Perception"], tool: "Calligrapher’s Supplies", equipmentA: "Calligrapher’s Supplies, Fine Clothes, Lamp, 3 Oil Flasks, Parchment (12 sheets), 23 GP", equipmentB: "50 GP" },
   Soldier: {
     abilities: ["Strength", "Dexterity", "Constitution"], feat: "Savage Attacker",
     skills: ["Athletics", "Intimidation"], tool: "Gaming Set (your choice)",
     equipmentA: "Spear, Shortbow, 20 Arrows, Gaming Set, Healer’s Kit, Quiver, Traveler’s Clothes, 14 GP",
     equipmentB: "50 GP",
   },
+  Wayfarer: { abilities: ["Dexterity", "Wisdom", "Charisma"], feat: "Lucky", skills: ["Insight", "Stealth"], tool: "Thieves’ Tools", equipmentA: "2 Daggers, Thieves’ Tools, Gaming Set, Bedroll, 2 Pouches, Traveler’s Clothes, 16 GP", equipmentB: "50 GP" },
 };
 
 export const SPECIES: Record<string, { size: "Small" | "Medium"; speed: number; note: string }> = {
@@ -45,6 +57,12 @@ export const SPECIES: Record<string, { size: "Small" | "Medium"; speed: number; 
   Human: { size: "Medium", speed: 30, note: "Resourceful, Skillful, and Versatile." },
   Orc: { size: "Medium", speed: 30, note: "Adrenaline Rush, Darkvision, and Relentless Endurance." },
   Tiefling: { size: "Medium", speed: 30, note: "Darkvision and Fiendish Legacy; choose Abyssal, Chthonic, or Infernal." },
+};
+
+/** Skill proficiencies granted by species traits that ask the player to choose a skill. */
+export const SPECIES_SKILL_CHOICES: Record<string, SkillName[]> = {
+  Elf: ["Insight", "Perception", "Survival"],
+  Human: ["Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History", "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception", "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival"],
 };
 
 export const CLASS_SKILLS: Record<string, { count: number; options: SkillName[] }> = {

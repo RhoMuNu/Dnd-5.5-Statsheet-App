@@ -235,7 +235,7 @@ function serveStatic(pathname, response) {
 }
 
 apiServer.listen(port, "0.0.0.0", () => {
-  console.log(`TaleForge LAN server listening on 0.0.0.0:${port}`);
+  console.log(`TaleForge LAN server listening on 0.0.0.0:${apiServer.address().port}`);
   console.log(`Campaign data: ${dataFile}`);
   if (isProduction) console.log("Open this PC's LAN address from the other devices on the same Wi-Fi.");
   if (isProduction && process.env.TALEFORGE_OPEN_BROWSER === "1") {
