@@ -182,9 +182,8 @@ function App() {
         <main className="page-content" id="main-content" tabIndex={-1}>
           <section className="welcome-row" aria-labelledby="page-title">
             <div>
-              <p className="eyebrow"><span className="eyebrow-star" aria-hidden="true">✦</span> {current.eyebrow}</p>
               <h1 id="page-title" tabIndex={-1}>{current.title}</h1>
-              <p className="welcome-subtitle">{current.description}</p>
+              {current.description && <p className="welcome-subtitle">{current.description}</p>}
             </div>
             {activeSection !== "builder" && activeSection !== "lan" && (
               <button className="create-button" onClick={() => { setEditingCharacterId(null); navigate("builder"); }}>
@@ -226,7 +225,6 @@ function App() {
           )}
 
           <footer className="page-footer">
-            <span>Made for your next great story</span>
             <span>✦ &nbsp; D&amp;D 2024 &nbsp; · &nbsp; Personal project</span>
           </footer>
         </main>
