@@ -35,6 +35,7 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
   const [saveStatus, setSaveStatus] = useState("No campaign selected");
   const [hostAvailable, setHostAvailable] = useState(false);
   const [lanAddresses, setLanAddresses] = useState<string[]>([]);
+  const [inviteMessage, setInviteMessage] = useState("");
   const [error, setError] = useState("");
   const [campaignName, setCampaignName] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -178,6 +179,16 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
     } catch {
       setError("Room access could not be saved in this browser. Keep this tab open; clearing or closing it may lose access to this identity.");
     }
+  }
+
+  async function copyInvite(address: string) {
+    if (!session) return;
+    const url = `http://${address}:${window.location.port || "80"}/#lan`;
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(`Join ${snapshot?.campaign.name ?? "our campaign"} in TaleForge:\n${url}\nRoom code: ${session.code}\nConnect to the same Wi-Fi, then choose Join a campaign. No installation needed.`);
+      setInviteMessage("Invite copied: address, room code, and joining instructions.");
+    } catch { setInviteMessage("Copy is unavailable in this browser. Select the address above and copy it with the room code."); }
   }
 
   async function hostCampaign(event: FormEvent<HTMLFormElement>) {
@@ -331,7 +342,7 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
     </TableRoom>
     </LanSpellProvider>
     </AdvancementContext.Provider>
-    {session.role === "dm" && <div className="lan-host-address"><strong>Invite your players</strong><span>Open this address on devices using the same Wi-Fi, then enter room code <b>{session.code}</b>.</span>{lanAddresses.length ? lanAddresses.map((address) => <code key={address}>http://{address}:{window.location.port || "80"}</code>) : <code>http://{window.location.hostname}:{window.location.port || "80"}</code>}</div>}
+    {session.role === "dm" && <div className="lan-host-address"><strong>Invite your players</strong><span>Open this address on devices using the same Wi-Fi, then enter room code <b>{session.code}</b>.</span>{(lanAddresses.length ? lanAddresses : [window.location.hostname]).map((address) => <div className="lan-invite-address" key={address}><code>http://{address}:{window.location.port || "80"}/#lan</code><button type="button" className="backup-button" aria-label={`Copy invite for ${address}`} onClick={() => void copyInvite(address)}>Copy invite</button></div>)}{inviteMessage && <span role="status">{inviteMessage}</span>}</div>}
     {session.role === "dm" && <button className="lan-leave-button dm-end-note" onClick={forgetSession}>Return to campaign menu on this device</button>}
   </section>;
 }

@@ -2,6 +2,20 @@
 
 A personal character sheet maker for the 2024 Dungeons & Dragons rules.
 
+## Easiest way to play on Windows
+
+1. Download the **TaleForge Windows x64 ZIP** from your distributor and choose **Extract All**.
+2. Open the extracted folder and double-click **Start TaleForge Host.bat**. The browser opens automatically.
+3. Choose **LAN campaign → Host a campaign**, then **Copy invite** to share the address and room code with friends on the same Wi-Fi.
+
+The portable release includes its runtime and built app. The host needs no Node.js installation, npm commands, build step, or internet download. Players only need a browser and the invite. Keep the host window open and PC awake during play. Allow Windows Firewall access on Private networks if prompted. Only the host needs the ZIP; players can use Windows, macOS, Linux, or mobile browsers.
+
+Double-clicking the launcher again reopens the running host. If another application uses the configured port, the launcher explains how to resolve the conflict. Use `host-settings.json` for the port and automatic browser opening; keep the same port to retain the browser's storage origin.
+
+Campaign data remains in `%APPDATA%\TaleForge` when you replace the app folder. **Open campaign data.bat** opens it for backups. Stop the host and back up that folder before updates. Local sheets and room identities also depend on browser storage: export local character libraries and keep using the same browser/address. Run only one host per data folder, and stop it before changing ports.
+
+See [Windows release packaging](docs/WINDOWS-RELEASE.md) to build a distributable ZIP from this repository.
+
 ## Stack
 
 - React + TypeScript
@@ -31,7 +45,7 @@ The LAN host and party dashboard are available from the **LAN campaign** menu. S
 
 ### Production host
 
-**Easy Windows launch:** double-click `Start TaleForge Host.bat`. It checks for Node.js, installs app dependencies the first time, builds TaleForge, and opens it on the host PC. Keep the terminal window open while playing; press Ctrl+C there to stop the host. Node.js LTS is a one-time install on the DM's PC only. Players need no install; they open the invite address in a browser.
+**Portable release:** double-click `Start TaleForge Host.bat`; no dependency setup or compilation is needed. **Source checkout:** the same launcher checks for Node.js, installs locked dependencies the first time, and builds the app. Keep the host window open while playing; press Ctrl+C there to stop it. Players need no install; they open the invite address in a browser.
 
 You can also run `npm run host` from a terminal. This builds the app and starts the combined web and campaign server at port `4173`; open `http://localhost:4173` on the host PC, then give players a LAN address displayed in the DM dashboard.
 

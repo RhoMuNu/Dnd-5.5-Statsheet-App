@@ -1,6 +1,9 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+title TaleForge - Campaign Host
+
+if exist "runtime\node.exe" goto portable
 
 where node >nul 2>nul
 if errorlevel 1 goto missing_node
@@ -43,3 +46,15 @@ exit /b 1
 echo First-time setup could not download the app dependencies. Check your internet connection and try again.
 pause
 exit /b 1
+
+:portable
+echo Starting TaleForge. No install or internet connection is needed.
+echo Keep this window open while your group is playing.
+"%~dp0runtime\node.exe" "%~dp0server\launch.mjs"
+if errorlevel 1 (
+  echo.
+  echo TaleForge could not start. See the message above or open START HERE.txt.
+  pause
+  exit /b 1
+)
+exit /b 0

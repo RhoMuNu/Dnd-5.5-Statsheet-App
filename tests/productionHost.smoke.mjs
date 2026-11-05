@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, rename, mkdir, rmdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,13 +10,18 @@ import { once } from "node:events";
 
 test("built production host serves assets, rejects missing routes, recovers from failed saves, and resumes rooms after restart", { timeout: 30000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "taleforge-production-"));
+  const releaseRoot = process.env.TALEFORGE_RELEASE_ROOT;
+  const executable = releaseRoot ? join(releaseRoot, "runtime/node.exe") : process.execPath;
+  const workingDirectory = releaseRoot ?? process.cwd();
+  const hostScript = releaseRoot ? "server/launch.mjs" : "server/index.mjs";
+  const hostEnvironment = { ...process.env, TALEFORGE_OPEN_BROWSER: "0", TALEFORGE_PORT: "0", TALEFORGE_DATA_DIR: directory, ...(releaseRoot ? { PATH: join(process.env.SystemRoot ?? "C:\\Windows", "System32") } : {}) };
   let child;
   async function stop() {
     if (!child || child.exitCode !== null) return;
     const stopped = once(child, "exit"); child.kill(); await stopped; child = null;
   }
   async function start() {
-    child = spawn(process.execPath, ["server/index.mjs", "--production"], { env: { ...process.env, TALEFORGE_OPEN_BROWSER: "0", TALEFORGE_PORT: "0", TALEFORGE_DATA_DIR: directory }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    child = spawn(executable, [hostScript, "--production"], { cwd: workingDirectory, env: hostEnvironment, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let output = "", errors = "";
     child.stderr.on("data", (chunk) => { errors += chunk; });
     return await new Promise((resolve, reject) => {
@@ -24,7 +31,29 @@ test("built production host serves assets, rejects missing routes, recovers from
     });
   }
   try {
+    if (releaseRoot) {
+      assert.equal(existsSync(join(releaseRoot, "node_modules")), false);
+      assert.equal(existsSync(join(releaseRoot, "src")), false);
+      assert.equal(existsSync(join(releaseRoot, "lan-campaigns.json")), false);
+      for (const file of ["Start TaleForge Host.bat", "START HERE.txt", "host-settings.json", "licenses/Node.js-LICENSE.txt", "licenses/SRD-ATTRIBUTION.md"]) assert.ok(existsSync(join(releaseRoot, file)), `Missing ${file}`);
+      const manifest = JSON.parse(await readFile(join(releaseRoot, "release.json"), "utf8"));
+      const runtime = await readFile(executable);
+      assert.equal(createHash("sha256").update(runtime).digest("hex"), manifest.nodeSha256);
+      const check = spawnSync(executable, ["server/launch.mjs", "--check"], { cwd: workingDirectory, env: hostEnvironment, encoding: "utf8", windowsHide: true });
+      assert.equal(check.status, 0, check.stderr);
+      assert.match(check.stdout, /launch files are ready/);
+      assert.equal(existsSync(join(directory, "lan-campaigns.json")), false);
+    }
     let base = await start();
+    const conflict = spawnSync(executable, ["server/index.mjs", "--production"], { cwd: workingDirectory, env: { ...hostEnvironment, TALEFORGE_PORT: new URL(base).port, TALEFORGE_DATA_DIR: join(directory, "conflict-check") }, encoding: "utf8", timeout: 5000, windowsHide: true });
+    assert.equal(conflict.status, 1, conflict.stderr);
+    assert.match(conflict.stderr, /already used by another app/);
+    assert.doesNotMatch(conflict.stderr, /Unhandled 'error' event/);
+    if (releaseRoot) {
+      const reopened = spawnSync(executable, ["server/launch.mjs"], { cwd: workingDirectory, env: { ...hostEnvironment, TALEFORGE_PORT: new URL(base).port }, encoding: "utf8", timeout: 5000, windowsHide: true });
+      assert.equal(reopened.status, 0, reopened.stderr);
+      assert.match(reopened.stdout, /already running/);
+    }
     const request = async (path, body, token) => {
       const response = await fetch(base + path, { method: body ? "POST" : "GET", headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
       return { status: response.status, data: await response.json() };
