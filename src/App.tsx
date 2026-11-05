@@ -11,6 +11,7 @@ import { createCharacterBackup, parseCharacterBackup } from "./data/backup";
 import {
   loadActiveCharacterId,
   loadCharacters,
+  characterLibraryRecovery,
   makeCharacterId,
   saveActiveCharacterId,
   saveCharacters,
@@ -23,6 +24,7 @@ function App() {
   const [activeSection, setActiveSection] = useState<SectionId>(() => sectionFromHash(window.location.hash));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [characters, setCharacters] = useState<Character[]>(loadCharacters);
+  const [recoveryData] = useState(characterLibraryRecovery);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(loadActiveCharacterId);
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
   const [storageAvailable, setStorageAvailable] = useState(true);
@@ -125,6 +127,16 @@ function App() {
     setBackupMessage(`Exported ${backupCharacters.length} ${backupCharacters.length === 1 ? "character" : "characters"}.`);
   }
 
+  function exportRecovery() {
+    if (recoveryData === null) return;
+    const url = URL.createObjectURL(new Blob([recoveryData], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "taleforge-library-recovery.json";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   function importBackup(contents: string) {
     try {
       const backup = parseCharacterBackup(contents);
@@ -182,6 +194,8 @@ function App() {
         </header>
 
         <main className="page-content" id="main-content" tabIndex={-1}>
+          {recoveryData !== null && <div className="lan-help-note" role="alert"><strong>Saved library recovery available</strong><span>Some saved character data could not be read. The original data has been preserved. Download it for recovery; readable characters are still available.</span><button className="backup-button" onClick={exportRecovery}>Download recovery file</button></div>}
+          {!storageAvailable && <p className="lan-error" role="alert">Changes are only kept in this session. Export your character library before closing this page. Browser storage may be full, unavailable, or protecting unreadable saved data.</p>}
           <section className="welcome-row" aria-labelledby="page-title">
             <div>
               <h1 id="page-title" tabIndex={-1}>{current.title}</h1>

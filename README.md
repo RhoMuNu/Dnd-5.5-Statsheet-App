@@ -14,6 +14,8 @@ A personal character sheet maker for the 2024 Dungeons & Dragons rules.
 1. Install dependencies with `npm install`.
 2. Start the development server with `npm run dev`.
 
+Use Node.js 24 or newer. For a deployment checkout, install the locked dependencies with `npm ci`, then run `npm run verify` before starting the host. Keep development dependencies installed: the host command builds the browser app and server rules bundle.
+
 Use `npm run dev:lan` when working on LAN sharing; it starts Vite and the campaign API together.
 
 ## LAN campaign sharing
@@ -38,6 +40,12 @@ On Windows, allow Node.js through Windows Defender Firewall for **Private networ
 Players can create a character or copy one of their local sheets into the room. They control and edit their own campaign characters. Each character has a **Share with DM** switch; only opted-in sheets appear in the DM's live, read-only dashboard. Player changes save to the host immediately when connected. If a connection drops, edits are kept in that browser and retried after reconnecting. If the host has a newer copy, the player gets a choice between the host version and their offline version.
 
 Campaigns are stored on the host PC in `%APPDATA%\TaleForge\lan-campaigns.json` on Windows. The LAN version uses HTTP and room codes, so use it on a trusted private network. Do not forward the host port to the public internet.
+
+The host saves the previous committed snapshot as `lan-campaigns.json.bak`. Failed disk writes roll back uncommitted changes and return a retryable error. Keep a separate copy of the entire TaleForge data folder while the host is stopped; the rotating backup does not replace an off-device backup. Room access credentials are inside these files, so keep backups private. If the main file becomes unreadable, stop the host, preserve it, then restore a known-good copy to `lan-campaigns.json` before restarting. The host deliberately stops on an unreadable store rather than silently starting empty.
+
+Unreadable browser libraries are retained under a recovery key before autosave can replace them. A recovery notice offers the original data as a download. If a recovery copy cannot be safely saved, autosave is paused and a warning asks you to export the current session.
+
+See the [deployment readiness review](docs/DEPLOYMENT-READINESS.md) for tested behavior, remaining scope, and the first-session rehearsal.
 
 ## Project layout
 
