@@ -1,3 +1,4 @@
+import { DiceModeControl, useDiceRoll } from "./DiceProvider";
 import { subclassSpellNames } from "../data/subclassSpells";
 import { useContext } from "react";
 import { AdvancementContext } from "../data/advancementTransport";
@@ -6,12 +7,12 @@ import { ABILITIES, CLASSES, makeCharacterId, type Character } from "../data/cha
 import { applyLevelUp, eligibleFeats, hasFeatChoice, levelChoices, levelUpErrors, newLevelUpPlan, previewLevel, spellLimits } from "../data/advancement";
 import { CLASS_CATALOG, SPELL_CATALOG, classLevel, gainedRuleFeatures, subclassOf } from "../data/rulesCatalog";
 import { calculateCharacterStats } from "../data/calculations";
-import { rollDie } from "../data/gameplay";
 
 const steps = ["Your next level", "Features & choices", "Spells", "Review"];
 const fingerprint = (character: Character) => JSON.stringify([character.classLevels, character.level, character.abilityScores, character.spells, character.features, character.rulesChoices]);
 
 export function LevelUpWizard({ character, onApply, onClose }: { character: Character; onApply: (updates: Partial<Character>) => void; onClose: () => void }) {
+  const diceSource = useDiceRoll(character.updatedAt);
   const transport = useContext(AdvancementContext);
   const requestId = useRef(makeCharacterId());
   const committing = useRef(false);
@@ -42,6 +43,13 @@ export function LevelUpWizard({ character, onApply, onClose }: { character: Char
 
   useEffect(() => { dialog.current?.querySelector(".level-up-options")?.scrollTo(0, 0); }, [step]);
 
+  async function rollLevelHp() {
+    try {
+      const className = plan.className, sides = Number(CLASS_CATALOG.find((entry) => entry.name === className)?.hit_dice?.slice(1) ?? 8);
+      const rolled = await diceSource.run(className + " level-up Hit Die", (die) => die(sides, base.name + ": " + className + " level-up HP"));
+      if (rolled) setPlan((current) => current.className === className ? { ...current, hpRoll: rolled.result } : current);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not enter HP roll."); }
+  }
   async function confirm() {
     if (committing.current) return;
     committing.current = true; setBusy(true);
@@ -67,11 +75,11 @@ export function LevelUpWizard({ character, onApply, onClose }: { character: Char
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
   }}>
-    <header className="level-up-heading"><div><p className="eyebrow">A NEW CHAPTER</p><h2 id="level-up-title">Level {currentStats.totalLevel + 1} awaits</h2><p>{base.name} · {plan.className} {nextClassLevel}</p></div><button type="button" className="backup-button" onClick={onClose} aria-label="Cancel level up">Close ×</button></header>
+    <header className="level-up-heading"><div><p className="eyebrow">A NEW CHAPTER</p><h2 id="level-up-title">Level {currentStats.totalLevel + 1} awaits</h2><p>{base.name} · {plan.className} {nextClassLevel}</p></div><DiceModeControl /><button type="button" className="backup-button" onClick={onClose} aria-label="Cancel level up">Close ×</button></header>
     <nav className="level-up-steps" aria-label="Level-up steps">{steps.map((title, index) => <button type="button" key={title} aria-current={step === index ? "step" : undefined} onClick={() => setStep(index)}><span>{index + 1}</span>{title}</button>)}</nav>
     <div className="level-up-body"><section className="level-up-options">
       {step === 0 && <><h3>Choose your path</h3><p>Gain one class level. You can continue your class or multiclass if you meet the ability requirements.</p><div className="level-up-card-grid">{CLASSES.map((name) => <button type="button" className={`level-choice-card ${plan.className === name ? "selected" : ""}`} key={name} aria-pressed={plan.className === name} onClick={() => setPlan({ ...newLevelUpPlan(base), className: name, subclass: subclassOf(base, name) })}><strong>{name}</strong><span>{classLevel(base, name) ? `${classLevel(base, name)} → ${classLevel(base, name) + 1}` : "Begin at level 1"}</span></button>)}</div>
-        <h3>Hit points</h3><p>Use the fixed class average or roll the new Hit Die. Constitution increases apply to every character level.</p><div className="play-controls"><button type="button" className="backup-button" onClick={() => setPlan({ ...plan, hpRoll: null })}>Use class average</button><button type="button" className="backup-button" onClick={() => setPlan({ ...plan, hpRoll: rollDie(Number(CLASS_CATALOG.find((entry) => entry.name === plan.className)?.hit_dice?.slice(1) ?? 8)) })}>Roll Hit Die</button><span>{plan.hpRoll === null ? "Fixed average selected" : `Rolled ${plan.hpRoll}`}</span></div></>}
+        <h3>Hit points</h3><p>Use the fixed class average or roll the new Hit Die. Constitution increases apply to every character level.</p><div className="play-controls"><button type="button" className="backup-button" onClick={() => setPlan({ ...plan, hpRoll: null })}>Use class average</button><button type="button" className="backup-button" onClick={() => void rollLevelHp()}>Roll Hit Die</button><span>{plan.hpRoll === null ? "Fixed average selected" : `Rolled ${plan.hpRoll}`}</span></div></>}
       {step === 1 && <><h3>New features</h3>{features.map((feature) => <details className="level-feature" key={`${feature.source}-${feature.name}`}><summary>{feature.name}<small>{feature.source}</small></summary><p>{feature.description}</p></details>)}{!features.length && <p>Your class resources and spell slots improve automatically at this level.</p>}
         {nextClassLevel >= 3 && !subclassOf(base, plan.className) && <section className="level-choice-section"><h3>Choose your subclass</h3><p>Included subclasses come from the 2024 SRD. Their feature descriptions unlock at each class level.</p>{subclasses.map((subclass) => <button type="button" className={`level-choice-card ${plan.subclass === subclass.name ? "selected" : ""}`} key={subclass.key} aria-pressed={plan.subclass === subclass.name} onClick={() => setPlan({ ...plan, subclass: subclass.name, choices: {}, spellKeys: [] })}><strong>{subclass.name}</strong><span>{subclass.desc.split("\n")[0].replaceAll("*", "")}</span></button>)}</section>}
         {featChoice && <section className="level-choice-section"><h3>Feat or ability improvement</h3><label>Choose a feat<select value={plan.feat} onChange={(event) => setPlan({ ...plan, feat: event.target.value, boosts: {}, choices: {} })}>{eligibleFeats(base, plan).map((feat) => <option key={feat.key}>{feat.name}</option>)}</select></label><p className="level-feature-description">{eligibleFeats(base, plan).find((feat) => feat.name === plan.feat)?.description}</p><div className="level-ability-grid">{ABILITIES.map((ability) => <label key={ability}>{ability}<span>{base.abilityScores[ability]} → {base.abilityScores[ability] + (plan.boosts[ability] ?? 0)}</span><select aria-label={`${ability} level-up boost`} value={plan.boosts[ability] ?? 0} onChange={(event) => setPlan({ ...plan, boosts: { ...plan.boosts, [ability]: Number(event.target.value) } })}><option value={0}>No increase</option><option value={1}>+1</option>{plan.feat === "Ability Score Improvement" && <option value={2}>+2</option>}</select></label>)}</div></section>}

@@ -3,12 +3,15 @@ import { makeCharacterId, type Character, type CharacterSpell } from "../data/ch
 import { lanRequest, LanRequestError, type LanSession, type LanSnapshot } from "../data/lan";
 import { TARGETED_SPELLS, type TargetCast, type TargetChoice } from "../data/targetedSpells";
 import type { RollMode } from "../data/conditions";
+import { useDiceRoll } from "./DiceProvider";
+import { PhysicalDiceRequired, type DiceSource, type DieRequest } from "../data/physicalDice";
 
 type PendingCast = TargetCast & { requestId: string; baseUpdatedAt: string };
 type TargetContext = { targets: { id: string; name: string }[]; connected: boolean; cast: (request: TargetCast) => Promise<string> };
 const Context = createContext<TargetContext | null>(null);
 
 export function LanSpellProvider({ session, snapshot, connected, pendingIds, onRefresh, children }: { session: LanSession; snapshot: LanSnapshot | null; connected: boolean; pendingIds: string[]; onRefresh: () => Promise<void>; children: ReactNode }) {
+  const diceSource = useDiceRoll();
   const key = `taleforge.pending-cast.v1.${session.code}.${session.playerId ?? "dm"}`;
   const pending = useRef<PendingCast | null>(null);
   const initialized = useRef(false);
@@ -22,9 +25,27 @@ export function LanSpellProvider({ session, snapshot, connected, pendingIds, onR
     if (sending.current) throw new Error("A spell cast is already being resolved.");
     if (!connected) throw new Error("Reconnect to the host before casting.");
     sending.current = true; setBusy(true);
+    let definitelyUncommitted = false;
     try {
-      const result = await lanRequest<{ summary: string }>(`/api/campaigns/${session.code}/cast`, { method: "POST", body: JSON.stringify(request), signal: AbortSignal.timeout(15000) }, session.token);
-      remember(null); setMessage(result.summary); await onRefresh(); return result.summary;
+      const rolled = await diceSource.remote("LAN spell cast · table dice", async (faces) => {
+        const submission = { ...request, diceMode: faces === undefined ? "digital" as const : "physical" as const, diceFaces: faces };
+        Object.assign(request, submission); remember(submission); definitelyUncommitted = false;
+        let reply;
+        try { reply = await lanRequest<{ summary?: string; diceRequest?: DieRequest; targetVersions?: Record<string, string> }>(`/api/campaigns/${session.code}/cast`, { method: "POST", body: JSON.stringify(submission), signal: AbortSignal.timeout(15000) }, session.token); }
+        catch (reason) { if (reason instanceof LanRequestError && reason.status >= 400 && reason.status < 500) { definitelyUncommitted = true; remember(null); } throw reason; }
+        if (reply.diceRequest) {
+          definitelyUncommitted = true;
+          request.targetVersions = reply.targetVersions; remember(request);
+          throw new PhysicalDiceRequired(reply.diceRequest);
+        }
+        if (!reply.summary) throw new Error("The host did not confirm the spell cast.");
+        return reply.summary;
+      }, request.diceMode ?? diceSource.mode, request.diceFaces ?? []);
+      if (!rolled) {
+        if (definitelyUncommitted) { remember(null); setMessage("Physical cast canceled. No slot, action, or target HP was changed."); return "Cast canceled."; }
+        setMessage("Cast status is uncertain. Retry the original request before starting another spell."); return "Check the unconfirmed cast above.";
+      }
+      remember(null); setMessage(rolled.result); await onRefresh(); return rolled.result;
     } catch (reason) {
       if (reason instanceof LanRequestError && reason.status >= 400 && reason.status < 500) remember(null);
       const text = reason instanceof Error ? reason.message : "Could not resolve this spell."; setMessage(text); throw reason;
@@ -46,6 +67,8 @@ export function LanSpellProvider({ session, snapshot, connected, pendingIds, onR
 }
 
 export function LanSpellTargets({ character, spell, slotKey, className, mode }: { character: Character; spell: CharacterSpell; slotKey?: string; className: string; mode: RollMode }) {
+  const diceSource = useDiceRoll();
+  const [diceOverride, setDiceOverride] = useState<DiceSource | "">("");
   const context = useContext(Context);
   const [targets, setTargets] = useState<TargetChoice[]>([]);
   const [confirmed, setConfirmed] = useState(false);
@@ -57,11 +80,12 @@ export function LanSpellTargets({ character, spell, slotKey, className, mode }: 
   async function cast() {
     if (!context || busy) return;
     setBusy(true); setMessage("");
-    try { setMessage(await context.cast({ casterId: character.id, spellId: spell.id, slotKey, className, mode, targets })); }
+    try { setMessage(await context.cast({ casterId: character.id, spellId: spell.id, slotKey, className, mode, targets, diceMode: diceOverride || diceSource.mode })); }
     catch (reason) { setMessage(reason instanceof Error ? reason.message : "Could not cast spell."); }
     finally { setBusy(false); }
   }
-  return <details className="lan-target-picker"><summary>Cast on LAN targets · host resolves saves &amp; effects</summary><p>Other targets must be shared sheets in the public initiative roster. Saves roll on the host; choose situational save modes and damage defenses below.</p>
+  return <details className="lan-target-picker"><summary>Cast on LAN targets · host resolves saves &amp; effects</summary><p>Other targets must be shared sheets in the public initiative roster. Digital mode rolls on the host; physical mode asks for the caster’s dice and each target’s saves, bonus dice, and concentration checks at the table.</p>
+    <label>Dice for this cast<select aria-label={`Dice for ${spell.name} LAN cast`} value={diceOverride} onChange={(event) => setDiceOverride(event.target.value as DiceSource | "")}><option value="">Use preference · {diceSource.mode === "physical" ? "Physical" : "Digital"}</option><option value="physical">Physical dice · everyone enters natural faces</option><option value="digital">Digital dice · host rolls</option></select></label>
     {options.map((option) => { const selected = targets.find((target) => target.id === option.id); return <div key={option.id} className="lan-target-row"><label className="toggle-row"><input type="checkbox" checked={!!selected} onChange={(event) => { setTargets(event.target.checked ? [...targets, { id: option.id }] : targets.filter((target) => target.id !== option.id)); setConfirmed(false); }} />{option.name}</label>{selected && <div className="play-controls"><label>Save mode<select value={selected.mode ?? "normal"} onChange={(event) => update(option.id, { mode: event.target.value as RollMode })}><option value="normal">Normal</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option></select></label><label>Damage defense<select value={selected.defense ?? "normal"} onChange={(event) => update(option.id, { defense: event.target.value as TargetChoice["defense"] })}><option value="normal">Normal</option><option value="resistant">Resistance</option><option value="vulnerable">Vulnerability</option><option value="immune">Immunity</option></select></label></div>}</div>; })}
     <label className="toggle-row"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />Range, visibility, components, and target eligibility checked</label><button type="button" className="backup-button" disabled={!confirmed || !targets.length || !context.connected || busy || !spell.prepared} onClick={() => void cast()}>Cast once on selected targets</button>{message && <p role="status">{message}</p>}
   </details>;

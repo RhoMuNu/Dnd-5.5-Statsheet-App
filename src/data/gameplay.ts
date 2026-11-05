@@ -7,7 +7,7 @@ import { activeConditions, exhaustionLevel, isIncapacitated, type Condition, eff
 
 export const combatState = (character: Character) => ({ ...defaultCombatState(), ...character.combat });
 export const spellSlotKey = (pool: string, level: number) => `spell-slot:${pool}:${level}`;
-export function rollDie(sides: number): number {
+export function rollDie(sides: number, _label?: string): number {
   if (!Number.isInteger(sides) || sides < 2 || sides > 1000) throw new Error("Unsupported die size.");
   // Rejection sampling also works in LAN browsers without a secure context.
   const limit = Math.floor(0x100000000 / sides) * sides;
@@ -125,7 +125,8 @@ export function setExhaustion(character: Character, level: number): Partial<Char
 
 export function rollD20(character: Character, kind: "attack" | "check" | "initiative" | "save", requested: RollMode = "normal", ability = "", extraAdvantage = false, extraDisadvantage = false, die = rollDie) {
   const mode = effectiveRollMode(character, kind, requested, ability, extraAdvantage, extraDisadvantage);
-  const rolls = mode === "normal" ? [die(20)] : [die(20), die(20)];
+  const label = `${character.name}: ${kind}${ability ? ` · ${ability}` : ""}${mode !== "normal" ? ` · ${mode} (two d20s)` : ""}`;
+  const rolls = mode === "normal" ? [die(20, label)] : [die(20, label), die(20, label)];
   const natural = mode === "advantage" ? Math.max(...rolls) : mode === "disadvantage" ? Math.min(...rolls) : rolls[0];
   return { rolls, natural, mode };
 }

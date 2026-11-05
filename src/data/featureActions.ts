@@ -13,6 +13,6 @@ export function useHealingFeature(character: Character, feature: "second-wind" |
   if (!resource || !Number.isInteger(cost) || cost <= 0 || cost > (resource.maxUses ?? 0) - (resource.used ?? 0)) throw new Error("Not enough uses remain.");
   const fighterLevel = stats.classBreakdown.find((entry) => entry.name === "Fighter")?.level ?? 0;
   const costUpdates = spendTurn(character, "bonus");
-  const healing = feature === "second-wind" ? die(10) + fighterLevel : amount;
+  const healing = feature === "second-wind" ? die(10, `${character.name}: Second Wind healing`) + fighterLevel : amount;
   return { updates: { ...costUpdates, ...healCharacter({ ...character, ...costUpdates }, healing), resourceUses: { ...character.resourceUses, [key]: (resource.used ?? 0) + cost } }, healing };
 }

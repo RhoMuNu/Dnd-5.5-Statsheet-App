@@ -1,3 +1,4 @@
+import { DiceModeControl } from "./components/DiceProvider";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { Icon } from "./components/Icon";
 import { Overview } from "./components/Overview";
@@ -171,7 +172,7 @@ function App() {
             <strong>{activeSection === "overview" ? "ALL CHARACTERS" : current.title.toUpperCase()}</strong>
           </div>
           {characters.length > 0 && activeSection !== "lan" && <label className="character-switch"><Icon name="dice" /><span className="sr-only">Active character</span><select aria-label="Active character" value={activeCharacter?.id ?? ""} onChange={(event) => setSelectedCharacterId(event.target.value)}>{characters.map((character) => <option key={character.id} value={character.id}>{character.name}</option>)}</select></label>}
-          <div className="topbar-actions">
+          <div className="topbar-actions"><DiceModeControl />
             <span className={`rules-status ${storageAvailable ? "" : "storage-warning"}`}><span /> {storageAvailable ? "Saved in this browser" : "Local save unavailable"}</span>
             <button type="button" className="text-size-button" aria-label="Larger text" title="Toggle larger text" aria-pressed={largerText} onClick={() => setLargerText((value) => !value)}>Aa<span>+</span></button>
             <button className="help-button" aria-label="About this app" title="About this app" onClick={() => setHelpOpen(true)}>?</button>

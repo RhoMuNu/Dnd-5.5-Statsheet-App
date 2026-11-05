@@ -68,8 +68,8 @@ export function rollWeaponDamage(character: Character, attack: CharacterAttack, 
   if (sneakAttack && turn.enabled && turn.sneakTurn === turn.key) throw new Error("Sneak Attack has already been used this turn.");
   const updates: Partial<Character> = sneakAttack && turn.enabled && character.combat ? { combat: { ...character.combat, turn: { ...turn, sneakTurn: turn.key } } } : {};
   const multiplier = critical ? 2 : 1;
-  const rolls = Array.from({ length: attack.diceCount * multiplier }, () => { const roll = die(attack.dieSize); return attack.twoHanded && hasFeat(character, "Great Weapon Fighting") ? Math.max(3, roll) : roll; });
-  const sneak = Array.from({ length: sneakAttack ? Math.ceil(rogue / 2) * multiplier : 0 }, () => die(6));
+  const rolls = Array.from({ length: attack.diceCount * multiplier }, () => { const roll = die(attack.dieSize, `${character.name}: ${attack.name} damage${critical ? " · critical" : ""}`); return attack.twoHanded && hasFeat(character, "Great Weapon Fighting") ? Math.max(3, roll) : roll; });
+  const sneak = Array.from({ length: sneakAttack ? Math.ceil(rogue / 2) * multiplier : 0 }, () => die(6, `${character.name}: Sneak Attack damage${critical ? " · critical" : ""}`));
   const rageBonus = rage && barbarian > 0 && attack.ability === "Strength" ? barbarian >= 16 ? 4 : barbarian >= 9 ? 3 : 2 : 0;
   const bonus = attackNumbers(character, attack).damageBonus + rageBonus;
   return { updates, rolls, sneak, bonus, total: Math.max(0, [...rolls, ...sneak].reduce((sum, roll) => sum + roll, 0) + bonus) };

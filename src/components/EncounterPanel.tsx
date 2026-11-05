@@ -1,3 +1,4 @@
+import { useDiceRoll } from "./DiceProvider";
 import { useState, type FormEvent } from "react";
 import { lanRequest, type Encounter, type LanSession, type LanSnapshot } from "../data/lan";
 import { calculateCharacterStats } from "../data/calculations";
@@ -8,6 +9,7 @@ export function EncounterPanel({ session, snapshot, connected, onRefresh }: { se
   const dm = session.role === "dm";
   const [name, setName] = useState("");
   const [source, setSource] = useState("");
+  const diceSource = useDiceRoll(`${encounter.revision}:${source}:${snapshot.characters.find((entry) => entry.character.id === source)?.character.updatedAt}`);
   const [initiative, setInitiative] = useState("10");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -23,12 +25,15 @@ export function EncounterPanel({ session, snapshot, connected, onRefresh }: { se
     finally { setBusy(false); }
   }
   function add(event: FormEvent) { event.preventDefault(); void send({ type: "add", name: name.trim(), characterId: source || undefined, initiative: Number(initiative) }); }
-  function rollInitiative() {
+  async function rollInitiative() {
     const character = snapshot.characters.find((entry) => entry.character.id === source)?.character;
     if (!character) return;
-    const roll = rollD20(character, "initiative");
-    const value = roll.natural + calculateCharacterStats(character).initiative;
-    setInitiative(String(value)); setResult(`${character.name}: [${roll.rolls.join(", ")}] → ${value} initiative`);
+    try {
+      const rolled = await diceSource.run(character.name + " initiative", (die) => rollD20(character, "initiative", "normal", "", false, false, die));
+      if (!rolled) return; const roll = rolled.result;
+      const value = roll.natural + calculateCharacterStats(character).initiative;
+      setInitiative(String(value)); setResult(`${rolled.physical ? "Physical dice · " : ""}${character.name}: [${roll.rolls.join(", ")}] → ${value} initiative`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not resolve initiative."); }
   }
   return <section className="collection-panel encounter-panel" aria-label="Shared initiative tracker"><div className="collection-panel-heading"><div><p className="eyebrow">SHARED ENCOUNTER</p><h3>{encounter.round > 0 ? `Round ${encounter.round}` : "Initiative & turn order"}</h3></div><span>{encounter.activeId ? `${encounter.entries.find((entry) => entry.id === encounter.activeId)?.name}’s turn` : "Combat not started"}</span></div>
     <p className="setup-note">This roster is visible to everyone in the campaign. The DM controls turns. Sheet HP and resources remain player-controlled.</p>
