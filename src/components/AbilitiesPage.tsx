@@ -1,4 +1,5 @@
-import { ClassicSheet } from "./ClassicSheet";
+import { CustomModifiersPanel } from "./CustomModifiersPanel";
+import { ClassicHealthPanel } from "./ClassicSheet";
 import { useDiceRoll } from "./DiceProvider";
 import { TurnPanel } from "./TurnPanel";
 import { LevelUpWizard } from "./LevelUpWizard";
@@ -116,7 +117,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
     onChange?.(restCharacter(character, recovery));
   }
 
-  if (dice.classic) return <>{levelingUp && onChange && <LevelUpWizard character={character} onApply={onChange} onClose={() => setLevelingUp(false)} />}<ClassicSheet character={character} onChange={onChange} readOnly={readOnly} onLevelUp={onChange ? () => setLevelingUp(true) : undefined} /></>;
+
 
   return (
     <section className="abilities-page" aria-label={`Character sheet for ${character.name}`}>
@@ -126,10 +127,12 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
         <div className="sheet-hero-copy">{readOnly && <p className="eyebrow">SHARED CHARACTER</p>}<h2>{character.name}</h2><p>{[character.species, character.background].filter(Boolean).join(" · ")}</p><div className="hero-class-chips">{stats.classBreakdown.map(({ name, level }) => <span key={name}>{name} <b>{level}</b></span>)}{readOnly && <span>View only</span>}</div></div>
         <div className="hero-level"><span>LEVEL</span><strong>{stats.totalLevel.toString().padStart(2, "0")}</strong><small>2024 rules</small>{!readOnly && onChange && <button type="button" className="level-up-button" disabled={stats.totalLevel >= 20} onClick={() => setLevelingUp(true)}>{stats.totalLevel >= 20 ? "Maximum level" : "Level up ✦"}</button>}</div>
       </header>
+      {dice.classic && <div className="classic-mode-banner"><Icon name="dice" /><div><strong>Classic sheet</strong><span>Roll at the table. Use the sheet to manage HP, conditions, resources, and custom boosts.</span></div></div>}
       <div className="vitals-strip" aria-label="Character vital statistics">
         <div className="vital-stat hp-vital"><span><Icon name="heart" />Hit points</span><strong>{currentHp}<small> / {stats.maxHitPoints ?? "—"}</small></strong><div className="vital-meter"><i style={{ width: `${hpPercent}%` }} /></div></div>
         {[{ label: "Armor class", value: stats.armorClass, icon: "shield" }, { label: "Initiative", value: formatModifier(stats.initiative), icon: "dice" }, { label: "Speed", value: `${stats.speed} ft`, icon: "arrow" }, { label: "Proficiency", value: formatModifier(stats.proficiencyBonus), icon: "spark" }, { label: "Perception", value: stats.passivePerception, icon: "features" }].map(({label,value,icon}) => <div className="vital-stat" key={label}><span><Icon name={icon} />{label}</span><strong>{value}</strong></div>)}
       </div>
+      <CustomModifiersPanel character={character} onChange={onChange} readOnly={readOnly} />
       {(activeConditions(character).length > 0 || (character.combat?.exhaustion ?? 0) > 0 || character.combat?.concentration) && <div className="sheet-status-chips">{activeConditions(character).map((condition) => <span key={condition}>{condition}</span>)}{(character.combat?.exhaustion ?? 0) > 0 && <span>Exhaustion {character.combat!.exhaustion}</span>}{character.combat?.concentration && <span className="concentration-chip">Concentrating · {character.combat.concentration}</span>}</div>}
       <div className="sheet-view-tabs" role="tablist" aria-label="Character sheet views">{tabs.map((tab) => <button type="button" role="tab" key={tab.id} id={`${tabId}-tab-${tab.id}`} aria-selected={view === tab.id} aria-controls={`${tabId}-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => chooseView(tab.id)} onKeyDown={(event) => {
         const index = tabs.findIndex((entry) => entry.id === tab.id);
@@ -145,11 +148,11 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               <div><small>SPEED</small><strong>{stats.speed}<i> ft</i></strong></div>
               <div><small>HIT DIE</small><strong>{stats.hitDie ? `d${stats.hitDie}` : "—"}</strong></div>
             </div>
-            <div className="hp-tracker" aria-label="Hit points">
+            {dice.classic ? <ClassicHealthPanel character={character} onChange={onChange ? (updates) => { if (updates.currentHitPoints !== undefined && updates.currentHitPoints !== null) setHitPoints(String(updates.currentHitPoints)); else onChange(updates); } : undefined} readOnly={readOnly} /> : <div className="hp-tracker" aria-label="Hit points">
               <div className="hp-tracker-heading"><strong>Hit points</strong><span>{stats.maxHitPoints === null ? "Choose a class to calculate maximum HP" : `${currentHp} / ${maximumHp} HP`}</span></div>
               <div className="hp-bar" role="meter" aria-label="Hit points remaining" aria-valuemin={0} aria-valuemax={maximumHp} aria-valuenow={currentHp}><span style={{ width: `${hpPercent}%` }} /></div>
               <div className="hp-controls"><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label><button type="button" className="button-danger" aria-label="Take one damage" disabled={readOnly || (currentHp <= 0 && character.temporaryHitPoints <= 0) || maximumHp === 0 || combatState(character).dead} onClick={() => changeHitPoints(-1)}>− Damage</button><button type="button" className="button-healing" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button></div>
-            </div>
+            </div>}
             {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
           </section><TurnPanel character={character} onChange={onChange} readOnly={readOnly} /><GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} /></div><div className="sheet-stack"><AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /><EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /></div></div>
       </div>

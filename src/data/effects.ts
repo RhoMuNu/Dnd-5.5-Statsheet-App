@@ -1,3 +1,4 @@
+import { customModifierTotal } from "./customModifiers";
 import type { DieRoller } from "./physicalDice";
 import { hasFeat } from "./advancement";
 import type { Character } from "./characters";
@@ -26,7 +27,7 @@ export function activeEffects(character: Character): ActiveEffect[] {
   });
 }
 export function effectTotal(character: Character, key: "ac" | "attack" | "damage" | "save" | "check" | "speed" | "initiative" | "hpPerLevel") {
-  return activeEffects(character).reduce((sum, effect) => sum + effect[key], 0);
+  return activeEffects(character).reduce((sum, effect) => sum + effect[key], customModifierTotal(character, key));
 }
 export function effectDice(character: Character, kind: "attack" | "save", die: DieRoller) {
   const rolls = activeEffects(character).flatMap((effect) => {

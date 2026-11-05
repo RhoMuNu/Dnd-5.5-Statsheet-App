@@ -1,3 +1,4 @@
+import { normalizeCustomModifiers, type CustomModifier } from "./customModifiers";
 import type { TurnState } from "./economy";
 import type { AdvancementRecord } from "./advancement";
 import { CONDITIONS, type Condition } from "./conditions";
@@ -14,6 +15,7 @@ export type Character = {
   classSubclasses: Record<string, string>;
   resourceUses: Record<string, number>;
   customResources: CustomResource[];
+  customModifiers?: CustomModifier[];
   currentHitPoints: number | null;
   temporaryHitPoints: number;
   combat?: CombatState;
@@ -196,6 +198,7 @@ export function normalizeCharacter(value: unknown): Character | null {
     inventoryArmorTrained: character.inventoryArmorTrained !== false,
     inventoryShieldTrained: character.inventoryShieldTrained !== false,
     resourceUses: character.resourceUses ?? {},
+    customModifiers: normalizeCustomModifiers(character.customModifiers),
     customResources: Array.isArray(character.customResources) ? character.customResources.filter(isCustomResource).map((resource) => ({ ...resource, used: Math.min(Math.trunc(resource.maxUses), Math.max(0, Math.trunc(resource.used))) })) : [],
     currentHitPoints: Number.isFinite(character.currentHitPoints) ? Math.max(0, Math.trunc(character.currentHitPoints!)) : null,
     temporaryHitPoints: Number.isFinite(character.temporaryHitPoints) ? Math.max(0, Math.trunc(character.temporaryHitPoints!)) : 0,

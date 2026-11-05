@@ -442,6 +442,26 @@ summary { padding-block: 8px; line-height: 1.5; }
 .classic-health-range::-moz-range-thumb { width: 28px; height: 28px; border: 2px solid #f9dda4; border-radius: 50%; background: #f5efe6; box-shadow: 0 2px 5px #0008; }
 .app-shell input.classic-health-range:disabled { cursor: default; opacity: .7; }
 .classic-health-panel .collection-helper { margin-bottom: 16px; }
+.classic-mode-banner { display: flex; gap: 14px; align-items: center; padding: 16px 20px; margin-bottom: 20px; border: 1px solid #89724d; border-radius: 10px; background: linear-gradient(110deg,#332a20,#211d29); color: var(--gold); }
+.classic-mode-banner div { display: grid; gap: 4px; }
+.classic-mode-banner span { font-size: 13px; color: var(--muted); }
+.custom-modifier-panel { margin-bottom: 20px; }
+.custom-modifier-panel > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; padding: 0; }
+.custom-modifier-panel > summary strong::before { content: "＋ "; color: var(--gold); }
+.custom-modifier-panel[open] > summary strong::before { content: "− "; }
+.custom-modifier-panel > summary span { border: 1px solid #89724d; border-radius: 20px; padding: 4px 10px; font-size: 12px; color: var(--gold); }
+.custom-modifier-panel > p { margin: 16px 0; }
+.custom-modifier-panel > fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.custom-modifier-row input[type="checkbox"] { width: 18px; }
+.custom-modifier-list { display: grid; gap: 12px; }
+.custom-modifier-row, .custom-modifier-add { display: grid; align-items: end; grid-template-columns: auto minmax(120px,1fr) minmax(180px,1.2fr) 80px auto; gap: 12px; }
+.custom-modifier-row { padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #18151f; }
+.custom-modifier-row label, .custom-modifier-add label { display: grid; gap: 6px; min-width: 0; }
+.custom-modifier-row .toggle-row { display: flex; align-self: center; }
+.custom-modifier-row input, .custom-modifier-row select, .custom-modifier-add input, .custom-modifier-add select { width: 100%; }
+.custom-modifier-add { grid-template-columns: minmax(120px,1fr) minmax(180px,1fr) 90px auto; margin-top: 18px; }
+@container sheet (max-width: 800px) { .custom-modifier-row, .custom-modifier-add { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@container sheet (max-width: 480px) { .custom-modifier-row, .custom-modifier-add { grid-template-columns: minmax(0,1fr); } }
 .spellbook-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
 .spellbook-tools label { flex: 1 1 220px; display: grid; gap: 6px; }
 .spellbook-tools > span { align-self: center; color: var(--muted); font-size: 13px; }
