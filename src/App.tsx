@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from "react";
+import { Icon } from "./components/Icon";
 import { Overview } from "./components/Overview";
 import { SectionPage } from "./components/SectionPage";
 import { Sidebar } from "./components/Sidebar";
@@ -24,6 +25,7 @@ function App() {
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [backupMessage, setBackupMessage] = useState("");
+  const [largerText, setLargerText] = useState(() => { try { return localStorage.getItem("taleforge.largerText") === "true"; } catch { return false; } });
   const [helpOpen, setHelpOpen] = useState(false);
   const current = sectionContent[activeSection];
   const activeCharacter = characters.find((character) => character.id === selectedCharacterId) ?? characters[0] ?? null;
@@ -54,6 +56,11 @@ function App() {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.textSize = largerText ? "large" : "standard";
+    try { localStorage.setItem("taleforge.largerText", String(largerText)); } catch { /* The preference still works for this session. */ }
+  }, [largerText]);
 
   function navigate(section: SectionId) {
     if (section === activeSection) {
@@ -138,6 +145,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>Skip to content</a>
       <Sidebar
         activeSection={activeSection}
         mobileMenuOpen={mobileMenuOpen}
@@ -162,13 +170,15 @@ function App() {
             <span className="crumb-divider" aria-hidden="true">/</span>
             <strong>{activeSection === "overview" ? "ALL CHARACTERS" : current.title.toUpperCase()}</strong>
           </div>
+          {characters.length > 0 && activeSection !== "lan" && <label className="character-switch"><Icon name="dice" /><span className="sr-only">Active character</span><select aria-label="Active character" value={activeCharacter?.id ?? ""} onChange={(event) => setSelectedCharacterId(event.target.value)}>{characters.map((character) => <option key={character.id} value={character.id}>{character.name}</option>)}</select></label>}
           <div className="topbar-actions">
             <span className={`rules-status ${storageAvailable ? "" : "storage-warning"}`}><span /> {storageAvailable ? "Saved in this browser" : "Local save unavailable"}</span>
+            <button type="button" className="text-size-button" aria-label="Larger text" title="Toggle larger text" aria-pressed={largerText} onClick={() => setLargerText((value) => !value)}>Aa<span>+</span></button>
             <button className="help-button" aria-label="About this app" title="About this app" onClick={() => setHelpOpen(true)}>?</button>
           </div>
         </header>
 
-        <main className="page-content" id="main-content">
+        <main className="page-content" id="main-content" tabIndex={-1}>
           <section className="welcome-row" aria-labelledby="page-title">
             <div>
               <p className="eyebrow"><span className="eyebrow-star" aria-hidden="true">✦</span> {current.eyebrow}</p>
@@ -210,7 +220,7 @@ function App() {
               onOpenBuilder={() => { setEditingCharacterId(null); navigate("builder"); }}
               onEdit={editCharacter}
               onUpdate={updateCharacter}
-              onOpenAbilities={() => navigate("abilities")}
+              onOpenAbilities={() => { window.location.hash = "abilities?view=resources"; }}
             />
           )}
 
@@ -220,7 +230,7 @@ function App() {
           </footer>
         </main>
       </div>
-      {helpOpen && <div className="help-scrim" role="presentation" onClick={() => setHelpOpen(false)}><section className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-dialog-title" onClick={(event) => event.stopPropagation()}><button className="help-dialog-close" autoFocus aria-label="Close help" onClick={() => setHelpOpen(false)}>×</button><p className="eyebrow">A QUICK GUIDE</p><h2 id="help-dialog-title">Welcome to TaleForge</h2><p>Create a character, then open <strong>Abilities &amp; skills</strong> to update stats, hit points, spell slots, and limited-use features. Changes save automatically in this browser.</p><p>Use <strong>Import backup</strong> or <strong>Export library</strong> on the Overview page to move or protect your sheets. For a shared game, open <strong>LAN party</strong>; the DM starts the host and players join with the room code.</p><button className="primary-button" onClick={() => setHelpOpen(false)}>Got it</button></section></div>}
+      {helpOpen && <div className="help-scrim" role="presentation" onClick={() => setHelpOpen(false)}><section className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-dialog-title" onClick={(event) => event.stopPropagation()}><button className="help-dialog-close" autoFocus aria-label="Close help" onClick={() => setHelpOpen(false)}>×</button><p className="eyebrow">A QUICK GUIDE</p><h2 id="help-dialog-title">Welcome to TaleForge</h2><p>Create a character, then open <strong>Play sheet</strong>. Use Combat for rolls and hit points, Abilities &amp; skills for scores and proficiencies, Resources &amp; rest for spell slots and feature uses, and Setup for armor and movement. Changes save automatically in this browser.</p><p>Use <strong>Import backup</strong> or <strong>Export library</strong> on My characters to move or protect your sheets. For a shared game, open <strong>LAN campaign</strong>; the DM starts the host and players join with the room code.</p><button className="primary-button" onClick={() => setHelpOpen(false)}>Got it</button></section></div>}
     </div>
   );
 }
