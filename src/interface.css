@@ -495,3 +495,28 @@ summary { padding-block: 8px; line-height: 1.5; }
   .skill-name { font-size: 14px; }
   .save-grid { grid-template-columns: minmax(0,1fr); }
 }
+.automation-badge { display: inline-block; vertical-align: middle; margin: 4px 0 4px 12px; padding: 4px 8px; border: 1px solid; border-radius: 5px; font-size: 11px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+.automation-automatic { background: #18372f; border-color: #4c9b7d; color: #b9f0d9; }
+.automation-partial { background: #3b301b; border-color: #9f8245; color: #f5d998; }
+.automation-manual { background: #272b3c; border-color: #69759d; color: #d5ddff; }
+.automation-details { border-left: 3px solid #7c6b93; background: #19161f; border-radius: 4px; padding: 10px 14px; margin: 12px 0; }
+.automation-details p { margin: 4px 0; line-height: 1.65; font-size: 13px; color: var(--muted); }
+.automation-details strong, .automation-legend strong { color: var(--cream); }
+.automation-legend { color: var(--muted); font-size: 13px; line-height: 1.7; max-width: 900px; }
+.spell-card-summary .spell-summary-name { max-width: calc(100% - 300px); }
+.play-preferences { position: relative; }
+.play-settings-button { text-align: left; line-height: 1.5; max-width: 100%; white-space: normal; }
+.play-settings-panel { position: absolute; right: 0; top: calc(100% + 10px); width: min(440px, calc(100vw - 32px)); max-height: 75vh; overflow-y: auto; border: 1px solid #65536f; border-radius: 12px; background: #201b27; padding: 20px; box-shadow: 0 16px 48px #0009; z-index: 20; color: var(--cream); }
+.play-settings-panel h3 { margin: 0 0 10px; font-size: 18px; }
+.play-settings-panel p { font-size: 12px; line-height: 1.65; color: var(--muted); }
+.play-settings-panel fieldset { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+.play-settings-panel legend { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.play-level-option { display: flex; align-items: flex-start; gap: 12px; border: 1px solid #534859; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer; }
+.play-level-option.selected { border-color: var(--gold); background: #3a3024; }
+.play-level-option input { flex: 0 0 18px; width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--gold); }
+.play-level-option strong, .play-level-option small { display: block; }
+.play-level-option strong { font-size: 14px; color: var(--cream); }
+.play-level-option small { font-size: 12px; line-height: 1.6; color: var(--muted); margin-top: 4px; }
+.play-dice-choice { display: grid; gap: 6px; font-size: 13px; }
+.app-shell .play-dice-choice select, .level-up-dialog .play-dice-choice select { width: 100%; max-width: 100%; white-space: normal; }
+@media (max-width: 700px) { .spell-card-summary .spell-summary-name { max-width: calc(100% - 24px); } .spell-card-summary .automation-badge { margin-left: 18px; } .play-settings-panel { position: fixed; right: 16px; top: 110px; max-height: calc(100dvh - 135px); } }
