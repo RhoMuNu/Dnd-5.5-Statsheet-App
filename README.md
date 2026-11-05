@@ -73,6 +73,8 @@ Menu sections use URL hashes (for example `/#inventory`), so they can be bookmar
 
 ## Character records
 
+New characters start at level 1 with one class and no subclass. Use **Level up** on the character sheet (including Classic sheet mode) for further levels, subclass choices, and multiclassing. Editing basics preserves existing levels, classes, and subclasses; imported higher-level characters retain their progression. Classic mode lets you enter a manually rolled Hit Die result during level-up or use the class average.
+
 Characters autosave to this browser's local storage. The collection supports selecting, editing, and deleting characters. Use **Export library** to download a versioned JSON backup, or export one character from its roster card. **Import backup** merges characters into the current library and skips IDs already present; it never overwrites an existing local character. Keep a downloaded backup somewhere separate from the browser for recovery or transfer to another device.
 
 Character sections include class features and custom traits, a quantity and weight inventory with coin tracking, a spellbook with ready-state and spell-slot spending, and a backstory with a dated journal. These fields are included in character backups.
