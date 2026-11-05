@@ -1,0 +1,63 @@
+import type { Character, CharacterSpell } from "./characters";
+import { hasFeat } from "./advancement";
+import { calculateCharacterStats } from "./calculations";
+import { classLevel, subclassIs } from "./rulesCatalog";
+import { SPELL_FORMULAS } from "./spellEffects";
+import { characterRuleFeatures } from "./featureDescriptions";
+
+export type CoverageMode = "digital" | "physical" | "classic" | "paper";
+export type AutomationCoverage = { level: "automatic" | "partial" | "manual"; app: string; table: string };
+const manual = (app = "Rules reference only.", table = "Resolve this ability’s effects, prerequisites, and timing at the table."): AutomationCoverage => ({ level: "manual", app, table });
+const partial = (app: string, table: string): AutomationCoverage => ({ level: "partial", app, table });
+const automatic = (app: string, table = "No extra adjustment is needed for this benefit. Homebrew changes still need to be entered separately."): AutomationCoverage => ({ level: "automatic", app, table });
+const key = (name: string) => name.trim().toLowerCase().replace(/ feat$/, "").replace("unarmoed", "unarmored");
+
+// Describe implemented behavior, never infer execution from a catalog description.
+// Unknown and homebrew abilities deliberately fall back to manual resolution.
+export function featureCoverage(name: string, character: Character, mode: CoverageMode, custom = false): AutomationCoverage {
+  const normalized = key(name);
+  const feat = (value: string) => normalized === key(value) && hasFeat(character, value);
+  const manualDice = mode === "classic" || mode === "paper";
+  if (feat("Tough")) return automatic("Maximum HP includes +2 per character level automatically.");
+  if (feat("Alert")) return partial("Initiative includes your Proficiency Bonus automatically.", "Arrange any initiative swap with the other player and DM.");
+  if (feat("War Caster")) return manualDice ? manual("The feat and recorded ability-score increase remain on your sheet.", "Apply concentration Advantage, reactive spellcasting, and component exceptions yourself.") : partial("Concentration roll helpers apply Advantage automatically.", "Resolve reactive spellcasting and component exceptions yourself. Apply the recorded ability-score increase through level-up.");
+  if (feat("Defense")) return automatic(character.armorMode === "unarmored" ? "The +1 AC bonus is inactive while unarmored; it applies when armor is recorded as worn." : "AC includes the +1 bonus while armor is recorded as worn.");
+  if (feat("Speedy")) return partial("Speed includes the +10-foot bonus.", "Resolve the Dash terrain benefit and opportunity-attack disadvantage at the table.");
+  if (feat("Archery")) return partial("Ranged attack profiles include +2 to hit.", "Check that the attack profile is marked ranged and that you meet its weapon requirements.");
+  if (feat("Two-Weapon Fighting")) return partial("Off-hand attack profiles include the ability modifier in damage.", "Mark the attack off-hand and check Light, Nick, and Bonus Action eligibility yourself.");
+  if (feat("Great Weapon Fighting")) return manualDice ? manual("The style is recorded.", "Treat eligible damage dice showing 1 or 2 as 3 at the table.") : partial("Damage helpers treat weapon dice below 3 as 3 on profiles marked two-handed.", "Confirm the weapon and damage dice qualify, and mark its profile two-handed.");
+  if (feat("Resilient")) return partial("Saving throws include the proficiency selected during guided level-up.", "Verify your selected ability and recorded ability-score increase; adding a description alone does not select them.");
+  if (normalized === "eldritch mind" && character.features.some((feature) => feature.name === "Eldritch Mind")) return manualDice ? manual("The invocation is recorded.", "Apply Advantage to eligible concentration saves at the table.") : partial("Concentration roll helpers apply Advantage for the recorded invocation.", "Resolve concentration saves outside these helpers yourself.");
+  if (custom && !characterRuleFeatures(character).some((feature) => key(feature.name) === normalized)) return manual("Your description is saved. A matching name alone does not run its rules.", "Resolve its effects yourself, or configure a custom stat boost, effect, or feature tracker.");
+  if (normalized === "dwarven toughness" && character.species.toLowerCase().startsWith("dwarf")) return automatic("Maximum HP includes +1 per character level from your Dwarf species.");
+  if (normalized === "unarmored defense") return automatic("Unarmored AC uses the supported class formula when the matching unarmored defense and armor settings are selected.", "Check Setup for worn armor, shield, and the chosen defense formula.");
+  if (["unarmored movement", "fast movement"].includes(normalized)) return partial("Speed includes the supported class bonus when its armor and shield restrictions are met.", "Check the recorded equipment settings; resolve movement and terrain at the table.");
+  if (normalized === "jack of all trades" && classLevel(character, "Bard") >= 2) return partial("Untrained skill bonuses include half your Proficiency Bonus.", "Apply the benefit yourself to other eligible ability checks outside the listed skills.");
+  if (["expertise", "scholar", "skilled"].includes(normalized)) return partial("Skill bonuses use your recorded proficiency and Expertise ranks. Guided level-up applies its selected ranks.", "Verify your chosen skills in Abilities & skills; a description alone does not change skill ranks.");
+  if (normalized === "disciplined survivor" && classLevel(character, "Monk") >= 14) return partial("All saving throws include proficiency automatically.", "Spend Focus and resolve the saving-throw reroll yourself.");
+  if (normalized === "slippery mind" && classLevel(character, "Rogue") >= 15) return automatic("Wisdom and Charisma saving throws include proficiency automatically.");
+  if (mode === "paper") return manual("Calculated bonuses and reference values remain visible. No activation helper is run in Paper sheet.", "Resolve this ability and enter final HP, resources, conditions, and other changes yourself.");
+  if (["spellcasting", "pact magic"].includes(normalized)) return partial("The sheet calculates class spell slots, spell attack bonuses, and save DCs. Recording casts spends slots and tracks concentration.", "Choose eligible spells and components. Individual spell labels describe their effect automation.");
+  if (normalized === "rage" && classLevel(character, "Barbarian") > 0) return manualDice ? manual("Resources & rest tracks Rage uses and its listed recovery.", "Track active Rage, damage bonuses, resistance, duration, and restrictions yourself.") : partial("The Rage damage checkbox adds the supported damage bonus to Strength attacks; Resources & rest tracks uses.", "Activate Rage, spend its action/use, and manage resistance, duration, and restrictions yourself. The checkbox does not activate Rage.");
+  if (normalized === "remarkable athlete" && subclassIs(character, "Fighter", "Champion")) return manualDice ? manual("Champion is recorded.", "Apply initiative/Athletics Advantage and movement benefits yourself.") : partial("Initiative and Athletics roll helpers apply Champion Advantage.", "Resolve movement after a critical hit and other benefits yourself.");
+  if (normalized === "action surge" && classLevel(character, "Fighter") >= 2) return partial("Use Action Surge on the play sheet to spend a use and gain an additional non-Magic action when turn tracking is enabled.", "Choose and resolve the extra action. A description or counter adjustment alone does not activate it.");
+  if (normalized === "second wind" && classLevel(character, "Fighter") > 0) return partial(manualDice ? "Mark Second Wind used spends its use and Bonus Action when turn tracking is enabled." : "Second Wind rolls or accepts healing dice, applies self-healing, and spends a use and Bonus Action when turn tracking is enabled.", manualDice ? "Roll and apply healing yourself. Resolve Tactical Mind separately." : "Resolve Tactical Mind and any other Second Wind options separately.");
+  if (normalized === "lay on hands" && classLevel(character, "Paladin") > 0) return manualDice ? manual("Resources & rest provides a pool counter and recovery.", "Resolve healing or poison removal, adjust the pool, and mark the Bonus Action yourself.") : partial("The play-sheet control spends pool points and a Bonus Action when turn tracking is enabled; self-healing is supported.", "Apply healing to other recipients and resolve poison removal yourself.");
+  if (["extra attack", "two extra attacks", "three extra attacks"].includes(normalized)) return partial("Attack controls track the supported class’s attacks per Attack action when turn tracking is enabled.", "Resolve target results, special attacks, Nick, and other exceptions at the table.");
+  if (normalized === "sneak attack" && classLevel(character, "Rogue") > 0) return manualDice ? manual("The Sneak Attack dice amount is available in class resources.", "Check eligibility and roll the extra damage yourself; track once-per-turn use.") : partial("Enable Sneak Attack in attack controls to add its damage dice and track once-per-turn use when turn tracking is enabled.", "Confirm the attack meets Sneak Attack requirements before enabling it.");
+  if (["improved critical", "superior critical"].includes(normalized) && subclassIs(character, "Fighter", "Champion")) return manualDice ? manual("Champion is recorded.", "Apply the expanded critical range to your physical attack roll and double the eligible damage dice.") : partial("Weapon attack helpers use Champion’s expanded critical range.", "Resolve the hit against the target and apply damage yourself.");
+  if (normalized === "draconic resilience" && subclassIs(character, "Sorcerer", "Draconic")) return partial("Maximum HP includes the Sorcerer-level bonus; unarmored AC considers Dexterity and Charisma.", "Check the recorded armor settings and resolve any other benefits in the description.");
+  if (["disciple of life", "blessed healer", "supreme healing", "potent cantrip", "empowered evocation", "evasion"].includes(normalized)) return manualDice ? manual("The feature is recorded.", "Apply this feature to eligible rolls and effects at the table.") : partial("Supported spell helpers include this benefit where implemented; LAN targeting resolves supported recipient effects.", "Apply it yourself for unsupported spells, manual rolls, NPCs, and other eligible situations. This does not automate every use of the feature.");
+  const resource = calculateCharacterStats(character).classResources.find((entry) => key(entry.label.split(" · ").at(-1) ?? "") === normalized || (normalized === "resourceful" && entry.key === "species.resourceful"));
+  if (resource) return manual(resource.maxUses !== undefined ? "Resources & rest provides a use counter and its listed rest recovery. Adjusting the counter does not apply the ability’s effects." : "Resources & rest displays a reference value for this ability.");
+  return manual();
+}
+
+export function spellCoverage(spell: CharacterSpell, mode: CoverageMode): AutomationCoverage {
+  const bookkeeping = "Marking a cast tracks its slot, concentration, and action cost when turn tracking is enabled.";
+  if (mode === "classic" || mode === "paper") return manual(mode === "paper" ? "Calculated bonuses and spell references remain visible. Casting is not recorded automatically." : bookkeeping, "Roll dice and resolve all spell effects at the table. This automation level does not execute the saved spell formula.");
+  const formula = SPELL_FORMULAS.find((entry) => entry.name === spell.automation && entry.level === spell.level);
+  if (!formula) return manual(bookkeeping, "Resolve all spell effects at the table. No valid effect formula is selected.");
+  const dice = mode === "physical" ? "You enter physical die faces; the app calculates totals." : "The app rolls the required dice and calculates totals.";
+  return partial(`${bookkeeping} ${formula.kind === "effect" ? "LAN target casting applies the selected effect to eligible shared sheets; a local cast only records casting." : `${dice} The selected ${formula.name} formula scales supported damage or healing; LAN target casting resolves supported saves and HP changes.`}`, `Check range, components, visibility, target eligibility, and any extra spell effects yourself.${spell.name.toLowerCase() !== formula.name.toLowerCase() ? ` This spell is using the ${formula.name} formula; confirm it matches your intended rules.` : ""} Local casts do not update another creature’s sheet; optional self-healing must be enabled in Cast settings.`);
+}

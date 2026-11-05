@@ -81,7 +81,7 @@ Menu sections use URL hashes (for example `/#inventory`), so they can be bookmar
 
 ## Character records
 
-New characters start at level 1 with one class and no subclass. Use **Level up** on the character sheet (including Classic sheet mode) for further levels, subclass choices, and multiclassing. Editing basics preserves existing levels, classes, and subclasses; imported higher-level characters retain their progression. Classic mode lets you enter a manually rolled Hit Die result during level-up or use the class average.
+New characters start at level 1 with one class and no subclass. Use **Level up** on the character sheet (including Tracked sheet mode) for further levels, subclass choices, and multiclassing. Editing basics preserves existing levels, classes, and subclasses; imported higher-level characters retain their progression. Paper and Tracked modes let you enter a manually rolled Hit Die result during level-up or use the class average.
 
 Characters autosave to this browser's local storage. The collection supports selecting, editing, and deleting characters. Use **Export library** to download a versioned JSON backup, or export one character from its roster card. **Import backup** merges characters into the current library and skips IDs already present; it never overwrites an existing local character. Keep a downloaded backup somewhere separate from the browser for recovery or transfer to another device.
 
@@ -93,9 +93,21 @@ Character sections include class features and custom traits, a quantity and weig
 
 ### Table play controls
 
+**Play settings** separates automation level from dice source. Every level keeps calculated bonuses, editable HP, resource counters, inventory, custom boosts, and rules references. Switching levels preserves your sheet and remaining resources.
+
+| Automation level | Behavior |
+|---|---|
+| Paper sheet | Resolve rolls and effects at the table. Enter final HP, conditions, death saves, concentration, and resource changes manually. Cast, action, roll, effect-template, and rest helpers are hidden. |
+| Tracked sheet | Roll and resolve ability/spell effects yourself, without entering die faces. Use casting records, action tracking, slot spending, resource counters, basic damage/healing bookkeeping, and rest controls. |
+| Assisted play | Enable the supported attack, healing, and spell helpers. Choose Physical dice to enter natural faces and let the app calculate totals, or Digital dice to let the app roll as well. |
+
+The former Classic sheet preference migrates to Tracked sheet. Existing digital/physical preferences migrate to Assisted play. Settings persist on this device; they do not change other players’ settings or prevent incoming host updates to campaign sheets. Assisted play remains limited to implemented formulas and rules.
+
+**Automation labels** appear in Features & traits and collapsed spell rows. Automatic means a calculated benefit is applied; Partial automation means only the listed parts are handled; Manual effects means effects must be resolved at the table, even when a counter or cast record is available. Open an entry for **App handles** and **At the table** explanations. Labels follow the selected play settings and spell formula. Unknown homebrew defaults to manual resolution.
+
 The abilities page includes damage and healing amounts, temporary HP absorption, death saves (including natural 1/20, stabilization, and massive damage), concentration reminders and Constitution saves, and skill/save/initiative rolls with advantage or disadvantage. Enter damage before resistance/vulnerability and select **Damage defense**; the app applies that multiplier once, including Petrified resistance. Apply other damage reductions yourself first. Resolve each concentration check before entering the next damage event.
 
-**Equipped weapons:** Standard equipped weapons automatically appear in attacks and Classic sheet attack references, including +1/+2/+3 bonuses. Unequipping, deleting, or reducing an item to zero quantity hides its linked attack. Manual attacks remain independent. Edit linked profiles for proficiency, off-hand attacks, versatile damage, and custom adjustments. Custom weapon names need a manual attack profile. Weapon profiles follow the [2024 Basic Rules equipment table](https://www.dndbeyond.com/sources/dnd/br-2024/equipment/).
+**Equipped weapons:** Standard equipped weapons automatically appear in attacks and attack references in Paper and Tracked sheets, including +1/+2/+3 bonuses. Unequipping, deleting, or reducing an item to zero quantity hides its linked attack. Manual attacks remain independent. Edit linked profiles for proficiency, off-hand attacks, versatile damage, and custom adjustments. Custom weapon names need a manual attack profile. Weapon profiles follow the [2024 Basic Rules equipment table](https://www.dndbeyond.com/sources/dnd/br-2024/equipment/).
 
 **Compact spellbook:** Spell rows start collapsed. Open a row for its description and casting controls, search by name or school, filter readiness, or use Expand all / Collapse all. General casting options are under Cast settings.
 

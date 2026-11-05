@@ -1,13 +1,16 @@
-import { createContext, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { rollDie } from "../data/gameplay";
+import { AUTOMATION_KEY, PLAY_LEVELS, readPlayPreferences, type AutomationLevel } from "../data/playPreferences";
 import { physicalDice, PhysicalDiceRequired, type DiceSource, type DieFace, type DieRequest, type DieRoller } from "../data/physicalDice";
 
 type Outcome<T> = { result: T; physical: boolean };
 type DiceContextValue = {
   mode: DiceSource;
   classic: boolean;
+  paper: boolean;
+  automation: AutomationLevel;
+  setAutomation: (level: AutomationLevel) => void;
   setMode: (mode: DiceSource) => void;
-  setClassic: (classic: boolean) => void;
   run: <T>(title: string, operation: (die: DieRoller) => T, source?: DiceSource) => Promise<Outcome<T> | null>;
   remote: <T>(title: string, operation: (faces: DieFace[] | undefined) => Promise<T>, source?: DiceSource, initialFaces?: DieFace[]) => Promise<Outcome<T> | null>;
 };
@@ -16,8 +19,10 @@ const Context = createContext<DiceContextValue | null>(null);
 const KEY = "taleforge.dice.source.v1";
 
 export function DiceProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<DiceSource>(() => { try { return localStorage.getItem(KEY) === "physical" ? "physical" : "digital"; } catch { return "digital"; } });
-  const [classic, setClassic] = useState(() => { try { return localStorage.getItem("taleforge.sheet.classic.v1") === "true"; } catch { return false; } });
+  const [preferences] = useState(() => { try { return readPlayPreferences(localStorage); } catch { return { automation: "assisted" as const, dice: "digital" as const }; } });
+  const [mode, setMode] = useState<DiceSource>(preferences.dice);
+  const [automation, setAutomation] = useState<AutomationLevel>(preferences.automation);
+  const classic = automation !== "assisted", paper = automation === "paper";
   const pending = useRef<Pending | null>(null);
   const [request, setRequest] = useState<DieRequest | null>(null);
   const [title, setTitle] = useState("");
@@ -30,6 +35,7 @@ export function DiceProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef(false);
   useEffect(() => { try { localStorage.setItem(KEY, mode); } catch { /* The preference works until closing this page. */ } }, [mode]);
   useEffect(() => { try { localStorage.setItem("taleforge.sheet.classic.v1", String(classic)); } catch { /* Keep the preference for this session. */ } }, [classic]);
+  useEffect(() => { try { localStorage.setItem(AUTOMATION_KEY, automation); } catch { /* Keep the preference for this session. */ } }, [automation]);
   useEffect(() => { if (request) input.current?.focus(); }, [request, busy]);
   function close(result: Outcome<unknown> | null) {
     const current = pending.current; pending.current = null; setRequest(null); setError(""); setText(""); setHistory([]); current?.resolve(result);
@@ -65,7 +71,7 @@ export function DiceProvider({ children }: { children: ReactNode }) {
     current.faces = [...current.faces, { sides: request.sides, label: request.label, value }];
     void attempt(current.faces);
   }
-  return <Context.Provider value={{ mode, classic, setMode, setClassic, run, remote }}>{children}
+  return <Context.Provider value={{ mode, classic, paper, automation, setMode, setAutomation, run, remote }}>{children}
     {request && <div className="physical-dice-overlay"><div className="physical-dice-dialog" ref={modal} role="dialog" aria-modal="true" aria-labelledby="physical-dice-title" onKeyDown={(event) => {
       if (event.key === "Escape" && !busy) close(null);
       if (event.key === "Tab") {
@@ -95,6 +101,10 @@ export function useDiceRoll(revision?: string) {
 
 export function DiceModeControl() {
   const dice = useContext(Context);
+  const [open, setOpen] = useState(false);
+  const groupId = useId();
   if (!dice) return null;
-  return <label className="dice-source-control"><span>Play mode</span><select aria-label="Dice source" value={dice.classic ? "classic" : dice.mode} onChange={(event) => { const classic = event.target.value === "classic"; dice.setClassic(classic); if (!classic) dice.setMode(event.target.value as DiceSource); }}><option value="digital">Digital dice</option><option value="physical">Physical dice</option><option value="classic">Classic sheet</option></select></label>;
+  return <div className="play-preferences" onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.stopPropagation(); } }}><button type="button" className="backup-button play-settings-button" aria-expanded={open} onClick={() => setOpen(!open)}>Play settings · {PLAY_LEVELS.find((level) => level.id === dice.automation)?.name}{!dice.classic ? ` · ${dice.mode === "digital" ? "Digital dice" : "Physical dice"}` : ""}</button>
+    {open && <section className="play-settings-panel" aria-label="Play settings"><h3>How much should the app handle?</h3><p>Bonuses stay calculated in every level. Moving between levels keeps your character and current resources.</p><fieldset><legend>Automation level</legend>{PLAY_LEVELS.map((level) => <label className={`play-level-option ${dice.automation === level.id ? "selected" : ""}`} key={level.id}><input type="radio" name={groupId} value={level.id} checked={dice.automation === level.id} onChange={() => dice.setAutomation(level.id)} /><span><strong>{level.name}</strong><small>{level.description}</small></span></label>)}</fieldset><label className="play-dice-choice">Dice source<select aria-label="Dice source" value={dice.mode} disabled={dice.classic} onChange={(event) => dice.setMode(event.target.value as DiceSource)}><option value="physical">Physical dice · enter faces, app adds bonuses</option><option value="digital">Digital dice · app rolls and adds bonuses</option></select></label><p>{dice.classic ? "Roll at the table without entering dice. Your dice preference is remembered for Assisted play." : "Physical and digital dice have the same supported calculations. You can also switch dice for an individual roll."}</p><p>Assisted play automates supported rules, not every ability. Check each ability’s automation label. This setting controls this device; incoming campaign updates still sync.</p><button type="button" className="primary-button" onClick={() => setOpen(false)}>Done</button></section>}
+  </div>;
 }
