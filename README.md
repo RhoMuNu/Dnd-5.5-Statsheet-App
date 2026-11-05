@@ -79,6 +79,20 @@ Character sections include class features and custom traits, a quantity and weig
 
 ## Calculated stats
 
+### Table play controls
+
+The abilities page includes damage and healing amounts, temporary HP absorption, death saves (including natural 1/20, stabilization, and massive damage), concentration reminders and Constitution saves, and skill/save/initiative rolls with advantage or disadvantage. Apply resistance, vulnerability, damage reduction, and other situational adjustments before entering damage. Resolve each concentration check before entering the next damage event. Roll controls include the bonuses shown on the sheet; conditional feature effects still require DM adjudication.
+
+After completing a Short Rest, use **Short Rest · spend Hit Dice** to spend a class Hit Die and restore HP. The rest recovery buttons restore eligible class resources and spell slots. A 2024 Long Rest restores all spent Hit Dice, HP, and eligible resources and clears temporary HP. Rest benefits require at least 1 HP; the DM remains responsible for duration and interruptions.
+
+Campaign players can switch between abilities, features, inventory, spells, and journal inside the LAN room. These tabs edit the campaign copy and use the same offline retry/conflict flow. In the spellbook, select a slot level and pool explicitly to cast or upcast, including Pact Magic. Casting a concentration spell replaces the previous concentration tracker; cantrips spend no slot.
+
+### Verification and remaining scope
+
+Run `npm test` using Node.js 24 LTS or newer for rules regressions and a real local HTTP/SSE campaign integration test. Tests use disposable temporary campaign data, independent of your saved campaigns. Run `npm run build` for TypeScript and production compilation.
+
+This is a playable sheet and LAN sharing foundation, not yet a complete rules engine. Weapon attacks and damage formulas, initiative/turn order, condition and exhaustion effects, spell targeting/durations/effects, full feat/subclass automation, and level-up choice enforcement remain future work. Inventory equipment toggles do not automatically select the armor formula, and starting equipment weights require entry. Use custom feature trackers and notes for exceptions. The DM dashboard currently displays shared abilities and resources; other players' sheets remain private.
+
 The Abilities & Skills page derives ability modifiers, proficiency bonus, saving throws, skill bonuses (including expertise), passive Perception, initiative, armor class, fixed-average hit point maximum, speed, carrying limits, spell save DC, spell attack bonus, class resources, and multiclass spell slots. Inputs are saved with the character, and derived values recalculate from the current inputs.
 
 The formulas follow the [2024 Basic Rules: Playing the Game](https://www.dndbeyond.com/sources/dnd/br-2024/playing-the-game), [Creating a Character](https://www.dndbeyond.com/sources/dnd/br-2024/creating-a-character), and [Character Classes](https://www.dndbeyond.com/sources/dnd/br-2024/character-classes). The creator offers Standard Array, Point Buy, manual scores, and 4d6 rolls, with class-based Standard Array suggestions and background boosts. Species size and speed, class equipment armor, and AC features are editable. Class and species resources update with level; specific spell, feat, and subclass choices can be recorded in the character sections. Local saves, versioned JSON backups, and LAN campaign sharing are implemented.

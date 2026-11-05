@@ -11,6 +11,7 @@ export type Character = {
   customResources: CustomResource[];
   currentHitPoints: number | null;
   temporaryHitPoints: number;
+  combat?: CombatState;
   unarmoredDefenseChoice: "Barbarian" | "Monk" | "";
   background: string;
   level: number;
@@ -39,6 +40,20 @@ export type Character = {
 
 export type CustomResource = { id: string; name: string; maxUses: number; used: number; recovery: "short-one" | "short-all" | "long" | "manual" };
 
+export type CombatState = {
+  deathSuccesses: number;
+  deathFailures: number;
+  stable: boolean;
+  dead: boolean;
+  hitDiceUsed: Record<string, number>;
+  concentration: string;
+  concentrationDC: number | null;
+};
+
+export function defaultCombatState(): CombatState {
+  return { deathSuccesses: 0, deathFailures: 0, stable: false, dead: false, hitDiceUsed: {}, concentration: "", concentrationDC: null };
+}
+
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
 export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string };
 export type InventoryCurrency = { cp: number; sp: number; ep: number; gp: number; pp: number };
@@ -60,6 +75,7 @@ export type CharacterCreationDetails = {
   classChoices: string;
   appearance: string;
   abilityScoreOverrides?: Partial<Record<AbilityName, number>>;
+  speciesSkillProficiency?: SkillName;
 };
 export type AbilityName = "Strength" | "Dexterity" | "Constitution" | "Intelligence" | "Wisdom" | "Charisma";
 export type SkillName =
@@ -161,6 +177,7 @@ export function normalizeCharacter(value: unknown): Character | null {
     customResources: Array.isArray(character.customResources) ? character.customResources.filter(isCustomResource).map((resource) => ({ ...resource, used: Math.min(Math.trunc(resource.maxUses), Math.max(0, Math.trunc(resource.used))) })) : [],
     currentHitPoints: Number.isFinite(character.currentHitPoints) ? Math.max(0, Math.trunc(character.currentHitPoints!)) : null,
     temporaryHitPoints: Number.isFinite(character.temporaryHitPoints) ? Math.max(0, Math.trunc(character.temporaryHitPoints!)) : 0,
+    combat: normalizeCombatState(character.combat),
     subclass: character.subclass ?? "",
     classLevels: character.classLevels && Object.keys(character.classLevels).length
       ? character.classLevels
@@ -178,6 +195,18 @@ export function normalizeCharacter(value: unknown): Character | null {
     inventory: normalizeInventory(character.inventory),
     spells: Array.isArray(character.spells) ? character.spells.filter(isCharacterSpell) : [],
     notes: normalizeNotes(character.notes),
+  };
+}
+
+function normalizeCombatState(value: unknown): CombatState {
+  const state = value && typeof value === "object" ? value as Partial<CombatState> : {};
+  const count = (value: unknown, max: number) => typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(0, Math.trunc(value))) : 0;
+  return {
+    deathSuccesses: count(state.deathSuccesses, 3), deathFailures: count(state.deathFailures, 3),
+    stable: state.stable === true, dead: state.dead === true,
+    hitDiceUsed: Object.fromEntries(Object.entries(state.hitDiceUsed && typeof state.hitDiceUsed === "object" ? state.hitDiceUsed : {}).map(([key, used]) => [key, count(used, 20)])),
+    concentration: typeof state.concentration === "string" ? state.concentration.slice(0, 100) : "",
+    concentrationDC: typeof state.concentrationDC === "number" && Number.isFinite(state.concentrationDC) ? Math.max(10, Math.min(30, Math.trunc(state.concentrationDC))) : null,
   };
 }
 

@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { calculateCharacterStats } from "../data/calculations";
 import type { Character, CharacterFeature, CharacterInventory, CharacterNotes, CharacterSpell, InventoryCurrency, InventoryItem } from "../data/characters";
+import { castCharacterSpell, combatState, spellSlotKey } from "../data/gameplay";
 import { BACKGROUNDS } from "../data/creationOptions";
 
 type SectionProps = { character: Character; onChange: (updates: Partial<Character>) => void };
@@ -105,6 +106,7 @@ export function SpellbookPage({ character, onChange }: SectionProps) {
   const [description, setDescription] = useState("");
   const [ready, setReady] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [slotSelections, setSlotSelections] = useState<Record<string, string>>({});
   const visibleSpells = spells.filter((spell) => filter === "all" || (filter === "ready" ? spell.prepared : !spell.prepared));
 
   function updateSpell(id: string, updates: Partial<CharacterSpell>) {
@@ -117,25 +119,25 @@ export function SpellbookPage({ character, onChange }: SectionProps) {
     onChange({ spells: [...spells, spell] });
     setName(""); setRange(""); setDescription(""); setConcentration(false); setReady(true);
   }
-  function castSpell(spell: CharacterSpell) {
-    if (!spell.prepared || spell.level === 0) return;
-    const options = stats.spellSlots.filter((slot) => slot.spellLevel >= spell.level).map((slot) => ({ ...slot, key: `spell-slot:${slot.pool}:${slot.spellLevel}` }))
-      .filter((slot) => (character.resourceUses[slot.key] ?? 0) < slot.total)
+  function availableSlots(spell: CharacterSpell) {
+    return stats.spellSlots.filter((slot) => slot.spellLevel >= spell.level && (character.resourceUses[spellSlotKey(slot.pool, slot.spellLevel)] ?? 0) < slot.total)
       .sort((a, b) => a.spellLevel - b.spellLevel);
-    const slot = options[0];
-    if (!slot) return;
-    onChange({ resourceUses: { ...character.resourceUses, [slot.key]: (character.resourceUses[slot.key] ?? 0) + 1 } });
   }
-  function availableSlot(spell: CharacterSpell) {
-    if (spell.level === 0) return true;
-    return stats.spellSlots.some((slot) => slot.spellLevel >= spell.level && (character.resourceUses[`spell-slot:${slot.pool}:${slot.spellLevel}`] ?? 0) < slot.total);
+  function selectedSlot(spell: CharacterSpell) {
+    const slots = availableSlots(spell);
+    return slots.find((slot) => spellSlotKey(slot.pool, slot.spellLevel) === slotSelections[spell.id]) ?? slots[0];
+  }
+  function castSpell(spell: CharacterSpell) {
+    const slot = selectedSlot(spell);
+    onChange(castCharacterSpell(character, spell.id, slot ? spellSlotKey(slot.pool, slot.spellLevel) : undefined));
   }
 
   return <section className="collection-page" aria-label={`Spellbook for ${character.name}`}>
-    <div className="collection-page-heading"><div><p className="eyebrow">A SPELL FOR EVERY MOMENT</p><h2>Spellbook</h2><p>Add the spells your character knows. Mark ready spells; casting one spends the lowest available slot that can cast it.</p></div></div>
+    <div className="collection-page-heading"><div><p className="eyebrow">A SPELL FOR EVERY MOMENT</p><h2>Spellbook</h2><p>Add the spells your character knows. Mark ready spells and choose a slot to cast or upcast. Concentration spells replace your previous concentration.</p></div></div>
+    {combatState(character).concentration && <div className="collection-panel"><strong>Concentrating: {combatState(character).concentration}</strong><button type="button" className="text-button" onClick={() => onChange({ combat: { ...combatState(character), concentration: "", concentrationDC: null } })}>End concentration</button></div>}
     <div className="spellbook-summary"><span>{spells.length} spell{spells.length === 1 ? "" : "s"}</span><span>{spells.filter((spell) => spell.prepared).length} ready</span><span>{stats.spellSlots.reduce((sum, slot) => sum + slot.total - Math.min(slot.total, character.resourceUses[`spell-slot:${slot.pool}:${slot.spellLevel}`] ?? 0), 0)} spell slots left</span></div>
     <div className="spell-filter-row"><label><span>Show</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All spells</option><option value="ready">Ready to cast</option><option value="unready">Not ready</option></select></label></div>
-    <section className="spellbook-list">{visibleSpells.length ? visibleSpells.map((spell) => <article className="spell-card" key={spell.id}><div className="spell-card-heading"><div><small>{spell.level === 0 ? "CANTRIP" : `LEVEL ${spell.level}`} · {spell.school}</small><h3>{spell.name}</h3></div><label className="spell-ready-toggle"><input type="checkbox" checked={spell.prepared} onChange={(event) => updateSpell(spell.id, { prepared: event.target.checked })} /><span>Ready</span></label></div><div className="spell-meta"><span>{spell.castingTime || "Casting time not set"}</span><span>{spell.range || "Range not set"}</span><span>{spell.components || "Components not set"}</span>{spell.concentration && <span>Concentration</span>}</div>{spell.description && <details><summary>Description</summary><p>{spell.description}</p></details>}<div className="spell-card-actions">{spell.level > 0 ? <button type="button" className="backup-button" disabled={!spell.prepared || !availableSlot(spell)} onClick={() => castSpell(spell)}>{availableSlot(spell) ? "Cast · spend lowest slot" : "No suitable spell slot"}</button> : <span className="cantrip-note">Cantrips don’t spend spell slots</span>}<button type="button" className="text-button" onClick={() => onChange({ spells: spells.filter((entry) => entry.id !== spell.id) })}>Remove</button></div></article>) : <p className="collection-empty-copy">{spells.length ? "No spells match that filter." : "Your spellbook is empty. Add a spell below."}</p>}</section>
+    <section className="spellbook-list">{visibleSpells.length ? visibleSpells.map((spell) => <article className="spell-card" key={spell.id}><div className="spell-card-heading"><div><small>{spell.level === 0 ? "CANTRIP" : `LEVEL ${spell.level}`} · {spell.school}</small><h3>{spell.name}</h3></div><label className="spell-ready-toggle"><input type="checkbox" checked={spell.prepared} onChange={(event) => updateSpell(spell.id, { prepared: event.target.checked })} /><span>Ready</span></label></div><div className="spell-meta"><span>{spell.castingTime || "Casting time not set"}</span><span>{spell.range || "Range not set"}</span><span>{spell.components || "Components not set"}</span>{spell.concentration && <span>Concentration</span>}</div>{spell.description && <details><summary>Description</summary><p>{spell.description}</p></details>}<div className="spell-card-actions">{spell.level > 0 && <label>Spell slot<select aria-label={`Slot for ${spell.name}`} value={selectedSlot(spell) ? spellSlotKey(selectedSlot(spell)!.pool, selectedSlot(spell)!.spellLevel) : ""} onChange={(event) => setSlotSelections({ ...slotSelections, [spell.id]: event.target.value })}>{availableSlots(spell).length ? availableSlots(spell).map((slot) => <option key={spellSlotKey(slot.pool, slot.spellLevel)} value={spellSlotKey(slot.pool, slot.spellLevel)}>Level {slot.spellLevel} · {slot.pool}</option>) : <option value="">No suitable slot</option>}</select></label>}<button type="button" className="backup-button" disabled={!spell.prepared || character.currentHitPoints === 0 || combatState(character).dead || (spell.level > 0 && !selectedSlot(spell))} onClick={() => castSpell(spell)}>{spell.level === 0 ? "Cast cantrip" : "Cast · spend selected slot"}</button><button type="button" className="text-button" onClick={() => onChange({ spells: spells.filter((entry) => entry.id !== spell.id) })}>Remove</button></div></article>) : <p className="collection-empty-copy">{spells.length ? "No spells match that filter." : "Your spellbook is empty. Add a spell below."}</p>}</section>
     <form className="collection-panel collection-entry-form" onSubmit={addSpell}><h3>Add a spell</h3><div className="collection-form-grid"><label><span>Name</span><input maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Cure Wounds" required /></label><label><span>Level</span><select value={level} onChange={(event) => setLevel(event.target.value)}>{Array.from({ length: 10 }, (_, index) => <option key={index} value={index}>{index === 0 ? "Cantrip" : `Level ${index}`}</option>)}</select></label><label><span>School</span><select value={school} onChange={(event) => setSchool(event.target.value)}>{spellSchools.map((entry) => <option key={entry}>{entry}</option>)}</select></label><label><span>Casting time</span><input maxLength={50} value={castingTime} onChange={(event) => setCastingTime(event.target.value)} placeholder="1 action" /></label><label><span>Range</span><input maxLength={50} value={range} onChange={(event) => setRange(event.target.value)} placeholder="60 feet" /></label><label><span>Components</span><input maxLength={50} value={components} onChange={(event) => setComponents(event.target.value)} placeholder="V, S, M" /></label><label className="inventory-equipped"><input type="checkbox" checked={concentration} onChange={(event) => setConcentration(event.target.checked)} /><span>Requires concentration</span></label><label className="inventory-equipped"><input type="checkbox" checked={ready} onChange={(event) => setReady(event.target.checked)} /><span>Ready to cast</span></label><label className="collection-field-wide"><span>Description / reminder</span><textarea rows={3} maxLength={3000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Add a quick rules reminder." /></label></div><button className="primary-button" type="submit">Add spell <span>＋</span></button></form>
   </section>;
 }

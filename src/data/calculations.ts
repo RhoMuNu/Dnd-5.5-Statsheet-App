@@ -145,17 +145,17 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const speed = Math.max(0, character.speedFeet + character.otherSpeedBonus + classSpeedBonus - (armorReducesSpeed ? 10 : 0));
   const spellcastingAbility = character.spellcastingAbility || CLASS_SPELLCASTING_ABILITIES[character.characterClass.trim().toLowerCase()] || "";
   const spellModifier = spellcastingAbility ? abilityModifiers[spellcastingAbility] : null;
-  const spellSlots = spellSlotsForClasses(classes, character.classSubclasses ?? { [capitalize(className)]: character.subclass });
+  const spellSlots = spellSlotsForClasses(classes, { [capitalize(className)]: character.subclass, ...character.classSubclasses });
   const classResources = classes.flatMap(({ name, level: classLevel }) => classResourcesFor({ ...character, characterClass: capitalize(name) }, classLevel, abilityModifiers).map((resource) => {
     const key = resource.key ? `${name}.${resource.key}` : undefined;
     return { ...resource, key, used: key && resource.maxUses !== undefined ? Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[key] ?? 0)) : undefined, label: classes.length > 1 ? `${capitalize(name)} · ${resource.label}` : resource.label };
   })).concat(speciesResources(character, proficiencyBonus), originFeatResources(character));
-  const preparedSpellCount = spellCountFor(className, classes.find((entry) => entry.name === className)?.level ?? level, abilityModifiers);
+  const preparedSpellCount = spellCountFor(className, classes.find((entry) => entry.name === className)?.level ?? level);
   const spellcastingProgressions = classes.flatMap(({ name, level: classLevel }) => {
     const classProgression = classProgressionAtLevel(name, classLevel);
     const ability = spellAbilityFor(name, character.classSubclasses?.[capitalize(name)] ?? (name === className ? character.subclass : ""), name === className ? character.spellcastingAbility : "");
     if (!ability) return [];
-    const count = spellCountFor(name, classLevel, abilityModifiers);
+    const count = spellCountFor(name, classLevel);
     return [{ className: capitalize(name), cantrips: classProgression.cantrips, count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus, attackBonus: abilityModifiers[ability] + proficiencyBonus }];
   });
   const multiclassWarnings = multiclassPrerequisiteWarnings(classes, character.abilityScores);
@@ -248,17 +248,9 @@ function multiclassPrerequisiteWarnings(classes: { name: string; level: number }
   });
 }
 
-function spellCountFor(className: string, level: number, modifiers: Record<AbilityName, number>) {
-  if (["cleric", "druid", "wizard"].includes(className)) {
-    const actualModifier = className === "cleric" || className === "druid" ? modifiers.Wisdom : modifiers.Intelligence;
-    return { value: Math.max(1, level + actualModifier), label: "Prepared spells" };
-  }
-  if (["paladin", "ranger"].includes(className)) {
-    const actualModifier = className === "paladin" ? modifiers.Charisma : modifiers.Wisdom;
-    return { value: Math.max(1, Math.floor(level / 2) + actualModifier), label: "Prepared spells" };
-  }
+function spellCountFor(className: string, level: number) {
   const known = classProgressionAtLevel(className, level).preparedSpells;
-  return known === null ? { value: null, label: null } : { value: known, label: "Spells known" };
+  return known === null ? { value: null, label: null } : { value: known, label: "Prepared spells" };
 }
 
 export function isClassSavingThrowProficient(character: Character, ability: AbilityName): boolean {
@@ -270,15 +262,31 @@ export function isSavingThrowProficient(character: Character, ability: AbilityNa
 }
 
 function spellSlotsForClasses(classes: { name: string; level: number }[], subclasses: Record<string, string>): { spellLevel: number; total: number; pool: string }[] {
+  // A lone half caster uses its own class table, not the multiclass table.
+  const spellcasters = classes.filter(({ name }) => ["bard", "cleric", "druid", "sorcerer", "wizard", "paladin", "ranger"].includes(name)
+    || (name === "fighter" && (subclasses.Fighter ?? "").toLowerCase().includes("eldritch knight"))
+    || (name === "rogue" && (subclasses.Rogue ?? "").toLowerCase().includes("arcane trickster")));
   const casterLevel = classes.reduce((total, { name, level }) => {
     if (["bard", "cleric", "druid", "sorcerer", "wizard"].includes(name)) return total + level;
-    if (["paladin", "ranger"].includes(name)) return total + Math.ceil(level / 2);
+    if (["paladin", "ranger"].includes(name)) return total + (spellcasters.length === 1 ? (level === 1 ? 1 : Math.floor(level / 2)) : Math.ceil(level / 2));
     const subclass = subclasses[capitalize(name)]?.toLowerCase() ?? "";
     if ((name === "fighter" && subclass.includes("eldritch knight"))
       || (name === "rogue" && subclass.includes("arcane trickster"))) return total + Math.floor(level / 3);
     return total;
   }, 0);
-  const regular = casterLevel > 0 ? slotsFromRow(FULL_CASTER_SLOTS[clamp(casterLevel, 1, 20) - 1]).map((slot) => ({ ...slot, pool: "Spellcasting · Long Rest" })) : [];
+  let row = casterLevel > 0 ? FULL_CASTER_SLOTS[clamp(casterLevel, 1, 20) - 1] : [];
+  if (spellcasters.length === 1) {
+    const { name, level } = spellcasters[0];
+    if (["paladin", "ranger"].includes(name)) {
+      row = [[2], [2], [3], [3], [4, 2], [4, 2], [4, 3], [4, 3], [4, 3, 2], [4, 3, 2],
+        [4, 3, 3], [4, 3, 3], [4, 3, 3, 1], [4, 3, 3, 1], [4, 3, 3, 2], [4, 3, 3, 2],
+        [4, 3, 3, 3, 1], [4, 3, 3, 3, 1], [4, 3, 3, 3, 2], [4, 3, 3, 3, 2]][level - 1];
+    } else if (["fighter", "rogue"].includes(name)) {
+      row = level < 3 ? [] : level === 3 ? [2] : level < 7 ? [3] : level < 10 ? [4, 2]
+        : level < 13 ? [4, 3] : level < 16 ? [4, 3, 2] : level < 19 ? [4, 3, 3] : [4, 3, 3, 1];
+    }
+  }
+  const regular = slotsFromRow(row).map((slot) => ({ ...slot, pool: "Spellcasting · Long Rest" }));
   const warlock = classes.find(({ name }) => name === "warlock");
   const pact = warlock ? [{ spellLevel: WARLOCK_SLOT_LEVELS[warlock.level - 1], total: WARLOCK_SLOT_COUNTS[warlock.level - 1], pool: "Pact Magic · Short or Long Rest" }] : [];
   return [...regular, ...pact];
@@ -326,7 +334,7 @@ function classResourcesFor(character: Character, level: number, modifiers: Recor
     case "fighter":
       return [
         { key: "second-wind", label: "Second Wind", value: "", maxUses: level >= 10 ? 4 : level >= 4 ? 3 : 2, recovery: "Short Rest", shortRestRecovery: "one" },
-        { key: "action-surge", label: "Action Surge", value: "", maxUses: level >= 17 ? 2 : 1, recovery: "Short Rest", shortRestRecovery: "all" },
+        ...(level >= 2 ? [{ key: "action-surge", label: "Action Surge", value: "", maxUses: level >= 17 ? 2 : 1, recovery: "Short Rest" as const, shortRestRecovery: "all" as const }] : []),
         ...(level >= 9 ? [{ key: "indomitable", label: "Indomitable", value: "", maxUses: level >= 17 ? 3 : level >= 13 ? 2 : 1, recovery: "Long Rest" as const }] : []),
         { label: "Weapon Mastery", value: `${level >= 16 ? 6 : level >= 10 ? 5 : level >= 4 ? 4 : 3} weapons` },
       ];

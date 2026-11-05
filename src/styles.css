@@ -625,3 +625,17 @@ button:focus-visible, a:focus-visible { outline: 2px solid #f4cf8e; outline-offs
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* Campaign play controls */
+.campaign-sheet-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.campaign-sheet-tabs button, .gameplay-panel button { border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; background: var(--panel); color: var(--cream); cursor: pointer; }
+.campaign-sheet-tabs button[aria-current] { background: #29251f; color: var(--gold); border-color: #80633e; }
+.gameplay-panel fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.play-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 12px 0; }
+.play-controls label, .spell-card-actions label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; flex: 1; min-width: 110px; }
+.play-controls input, .play-controls select, .spell-card-actions select { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--cream); }
+.gameplay-panel button:disabled { opacity: .45; cursor: default; }
+.gameplay-panel details { margin: 16px 0; }
+.gameplay-panel summary { cursor: pointer; }
+.death-tracker { padding: 12px 0; border-top: 1px solid var(--line); margin-top: 12px; }
+.gameplay-panel [role="status"] { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
