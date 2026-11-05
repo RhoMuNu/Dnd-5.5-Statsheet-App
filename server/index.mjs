@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { homedir, networkInterfaces } from "node:os";
 import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { changeEncounter, emptyEncounter } from "./encounters.mjs";
 
 const isProduction = process.env.NODE_ENV === "production" || process.argv.includes("--production");
 const port = Number(process.env.TALEFORGE_PORT ?? (isProduction ? 4173 : 4174));
@@ -64,7 +65,7 @@ function snapshotFor(auth) {
   const characters = role === "dm"
     ? campaign.characters.filter((entry) => entry.shared).map((entry) => ({ character: entry.character, ownerId: entry.ownerId, ownerName: campaign.players.find((person) => person.id === entry.ownerId)?.name ?? "Player" }))
     : campaign.characters.filter((entry) => entry.ownerId === player.id).map((entry) => ({ character: entry.character, shared: entry.shared }));
-  return { campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters };
+  return { campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters, encounter: campaign.encounter ?? emptyEncounter() };
 }
 function pushSnapshot(token) {
   const connections = clients.get(token);
@@ -100,8 +101,30 @@ function validCharacter(character) {
     .every((skill) => [0, 1, 2].includes(character.skillProficiencies[skill]));
   const classLevels = Object.entries(character.classLevels);
   const totalLevels = classLevels.reduce((sum, [, level]) => sum + (Number.isInteger(level) ? level : 0), 0);
-  return abilityScoresValid && savesValid && skillsValid && totalLevels <= 20
+  return abilityScoresValid && savesValid && skillsValid && totalLevels <= 20 && validCombatData(character)
     && classLevels.every(([name, level]) => typeof name === "string" && Number.isInteger(level) && level >= 1 && level <= 20);
+}
+
+function validCombatData(character) {
+  const integer = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
+  if (character.attacks !== undefined && (!Array.isArray(character.attacks) || character.attacks.length > 100 || !character.attacks.every((entry) => entry && typeof entry.id === "string" && typeof entry.name === "string"
+    && ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"].includes(entry.ability)
+    && integer(entry.diceCount, 0, 30) && [4, 6, 8, 10, 12, 20].includes(entry.dieSize)
+    && integer(entry.attackBonus, -100, 100) && integer(entry.damageBonus, -100, 100)
+    && typeof entry.proficient === "boolean" && typeof entry.addAbilityToDamage === "boolean" && typeof entry.damageType === "string" && typeof entry.notes === "string"))) return false;
+  const combat = character.combat;
+  if (combat === undefined) return true;
+  if (!combat || typeof combat !== "object" || Array.isArray(combat)) return false;
+  if (combat.exhaustion !== undefined && !integer(combat.exhaustion, 0, 6)) return false;
+  const conditions = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
+  if (combat.conditions !== undefined && (!Array.isArray(combat.conditions) || combat.conditions.length > 14 || !combat.conditions.every((entry) => conditions.includes(entry)))) return false;
+  if (combat.effects !== undefined && (!Array.isArray(combat.effects) || combat.effects.length > 50 || !combat.effects.every((entry) => entry && typeof entry.id === "string" && typeof entry.name === "string"
+    && (entry.rounds === null || integer(entry.rounds, 1, 10000))
+    && ["ac", "attack", "damage", "save", "check", "initiative"].every((key) => integer(entry[key], -100, 100))
+    && integer(entry.speed, -500, 500) && integer(entry.hpPerLevel, -10, 10)
+    && ["attackDie", "saveDie"].every((key) => [0, 4, 6, 8, 10, 12, -4, -6, -8, -10, -12].includes(entry[key]))
+    && typeof entry.concentrationAdvantage === "boolean" && typeof entry.initiativeProficiency === "boolean"))) return false;
+  return true;
 }
 
 const apiServer = createServer(async (request, response) => {
@@ -166,6 +189,22 @@ const apiServer = createServer(async (request, response) => {
       const auth = authorizedCampaign(request, campaignMatch[1]);
       if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
       return sendJson(response, 200, snapshotFor(auth));
+    }
+
+    const encounterMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/encounter$/i);
+    if (request.method === "POST" && encounterMatch) {
+      const auth = authorizedCampaign(request, encounterMatch[1]);
+      if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
+      if (auth.role !== "dm") return sendJson(response, 403, { error: "Only the DM can change turn order." });
+      const body = await readJson(request);
+      const previous = auth.campaign.encounter ?? emptyEncounter();
+      if (body.revision !== previous.revision) return sendJson(response, 409, { error: "Turn order changed on another device. Review the current encounter and try again." });
+      // Re-read after awaiting the body so simultaneous DM requests cannot overwrite each other.
+      const next = changeEncounter(previous, body.action, auth.campaign.characters.filter((entry) => entry.shared), randomToken(12));
+      auth.campaign.encounter = next;
+      persist();
+      broadcastCampaign(auth.campaign);
+      return sendJson(response, 200, { encounter: next });
     }
 
     const shareMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/characters\/([^/]+)\/share$/i);

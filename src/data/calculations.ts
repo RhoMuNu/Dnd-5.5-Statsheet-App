@@ -1,6 +1,8 @@
 import type { AbilityName, Character, CreatureSize, SkillName } from "./characters";
 import { SKILLS } from "./characters";
 import { classProgressionAtLevel } from "./classProgression";
+import { activeEffects, effectTotal } from "./effects";
+import { activeConditions, exhaustionLevel } from "./conditions";
 
 const HIT_DICE: Record<string, number> = {
   barbarian: 12,
@@ -86,6 +88,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const classes = getClassLevels(character);
   const level = clamp(classes.reduce((sum, entry) => sum + entry.level, 0) || Math.trunc(character.level), 1, 20);
   const primaryClass = character.characterClass.trim().toLowerCase();
+  const exhaustion = exhaustionLevel(character);
   const proficiencyBonus = Math.floor((level - 1) / 4) + 2;
   const abilityModifiers = Object.fromEntries(
     Object.entries(character.abilityScores).map(([ability, score]) => [ability, Math.floor((score - 10) / 2)]),
@@ -94,13 +97,14 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const savingThrows = Object.fromEntries(
     Object.entries(abilityModifiers).map(([ability, modifier]) => [
       ability,
-      modifier + (isSavingThrowProficient(character, ability as AbilityName) ? proficiencyBonus : 0),
+      modifier + (isSavingThrowProficient(character, ability as AbilityName) ? proficiencyBonus : 0) + effectTotal(character, "save") - 2 * exhaustion,
     ]),
   ) as Record<AbilityName, number>;
 
   const skillBonuses = Object.fromEntries(SKILLS.map(({ name, ability }) => {
     const rank = character.skillProficiencies[name] ?? 0;
-    return [name, abilityModifiers[ability] + proficiencyBonus * rank];
+    const jack = rank === 0 && classLevelOf(classes, "bard") >= 2 ? Math.floor(proficiencyBonus / 2) : 0;
+    return [name, abilityModifiers[ability] + proficiencyBonus * rank + jack + effectTotal(character, "check") - 2 * exhaustion];
   })) as Record<SkillName, number>;
 
   const className = primaryClass;
@@ -118,7 +122,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     armorBase = 10 + dexterityModifier + abilityModifiers.Wisdom;
     appliedClassFeatures.push("Monk Unarmored Defense");
   }
-  const armorClass = armorBase + (character.hasShield ? 2 : 0) + character.otherAcBonus;
+  const armorClass = armorBase + (character.hasShield ? 2 : 0) + character.otherAcBonus + effectTotal(character, "ac");
   const hitDie = HIT_DICE[className] ?? null;
   const constitutionModifier = abilityModifiers.Constitution;
   const calculatedHitPoints = classes.length === 0 ? null : classes.reduce((total, entry) => {
@@ -127,7 +131,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     return total + levels * Math.max(1, average + constitutionModifier);
   }, Math.max(1, (HIT_DICE[className] ?? 0) + constitutionModifier));
   // Dwarven Toughness grants 1 additional HP per character level in the 2024 rules.
-  const maxHitPoints = calculatedHitPoints === null ? null : calculatedHitPoints + (character.species.toLowerCase().startsWith("dwarf") ? level : 0);
+  const maxHitPoints = calculatedHitPoints === null ? null : calculatedHitPoints + (character.species.toLowerCase().startsWith("dwarf") ? level : 0) + effectTotal(character, "hpPerLevel") * level;
 
   const effectiveSize = character.powerfulBuild ? increaseSize(character.size) : character.size;
   const carryingCapacity = character.abilityScores.Strength * SIZE_MULTIPLIER[effectiveSize];
@@ -142,7 +146,8 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const armorReducesSpeed = character.armorMode === "heavy"
     && character.armorStrengthRequirement > 0
     && character.abilityScores.Strength < character.armorStrengthRequirement;
-  const speed = Math.max(0, character.speedFeet + character.otherSpeedBonus + classSpeedBonus - (armorReducesSpeed ? 10 : 0));
+  const immobile = activeConditions(character).some((condition) => ["Grappled", "Restrained", "Paralyzed", "Petrified", "Unconscious"].includes(condition)) || character.combat?.dead;
+  const speed = immobile ? 0 : Math.max(0, character.speedFeet + character.otherSpeedBonus + classSpeedBonus - (armorReducesSpeed ? 10 : 0) - exhaustion * 5 + effectTotal(character, "speed"));
   const spellcastingAbility = character.spellcastingAbility || CLASS_SPELLCASTING_ABILITIES[character.characterClass.trim().toLowerCase()] || "";
   const spellModifier = spellcastingAbility ? abilityModifiers[spellcastingAbility] : null;
   const spellSlots = spellSlotsForClasses(classes, { [capitalize(className)]: character.subclass, ...character.classSubclasses });
@@ -156,7 +161,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     const ability = spellAbilityFor(name, character.classSubclasses?.[capitalize(name)] ?? (name === className ? character.subclass : ""), name === className ? character.spellcastingAbility : "");
     if (!ability) return [];
     const count = spellCountFor(name, classLevel);
-    return [{ className: capitalize(name), cantrips: classProgression.cantrips, count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus, attackBonus: abilityModifiers[ability] + proficiencyBonus }];
+    return [{ className: capitalize(name), cantrips: classProgression.cantrips, count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus, attackBonus: abilityModifiers[ability] + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack") }];
   });
   const multiclassWarnings = multiclassPrerequisiteWarnings(classes, character.abilityScores);
   const extraAttackClasses = classes.filter(({ name, level: classLevel }) => classProgressionAtLevel(name, classLevel).gainedFeatures.some(({ name: feature }) => feature === "Extra Attack"));
@@ -170,7 +175,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     savingThrows,
     skillBonuses,
     passivePerception: 10 + skillBonuses.Perception,
-    initiative: dexterityModifier,
+    initiative: dexterityModifier - 2 * exhaustion + effectTotal(character, "check") + effectTotal(character, "initiative") + (activeEffects(character).some((effect) => effect.initiativeProficiency) ? proficiencyBonus : 0),
     armorClass,
     maxHitPoints,
     hitDie,
@@ -179,7 +184,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     pushDragLift: carryingCapacity * 2,
     effectiveSize,
     spellSaveDC: spellModifier === null ? null : 8 + spellModifier + proficiencyBonus,
-    spellAttackBonus: spellModifier === null ? null : spellModifier + proficiencyBonus,
+    spellAttackBonus: spellModifier === null ? null : spellModifier + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack"),
     spellSlots,
     spellSlotRecovery: classes.length === 1 && className === "warlock" ? "Short or Long Rest" : "Long Rest",
     appliedClassFeatures,

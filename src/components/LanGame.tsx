@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AbilitiesPage } from "./AbilitiesPage";
+import { EncounterPanel } from "./EncounterPanel";
 import { CampaignSheet } from "./CampaignSheet";
 import { CharacterBuilder } from "./CharacterBuilder";
 import { createLanCharacter, LanRequestError, lanRequest } from "../data/lan";
@@ -285,6 +286,7 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
     <div className="lan-room-bar"><div><p className="eyebrow">{session.role === "dm" ? "DUNGEON MASTER HOST" : "PLAYER CONNECTION"}</p><h2>{snapshot?.campaign.name ?? "Connecting to campaign…"}</h2><span>ROOM CODE <strong>{session.code}</strong> · {connectedCount} player{connectedCount === 1 ? "" : "s"} online</span></div><div className="lan-status-stack"><span className={`lan-connection ${connection === "connected" ? "online" : "offline"}`}>{connection === "connected" ? "CONNECTED" : connection === "connecting" ? "CONNECTING" : "RECONNECTING"}</span><span className="lan-save-status">{session.role === "player" ? saveStatus : connection === "connected" ? "Live party view" : "Waiting for host connection"}</span></div></div>
     {error && <p className="lan-error" role="status">{error}</p>}
 
+    {snapshot && <EncounterPanel session={session} snapshot={snapshot} connected={connection === "connected"} onRefresh={refreshSnapshot} />}
     {session.role === "dm" ? <div className="lan-dashboard-grid">
       <aside className="lan-party-panel"><div className="lan-panel-heading"><div><p className="eyebrow">THE PARTY</p><h3>Players</h3></div><span>{snapshot?.players.length ?? 0}</span></div>
         {snapshot?.players.length ? snapshot.players.map((player) => <div className="lan-player-row" key={player.id}><i className={player.connected ? "connected" : ""} /><span>{player.name}</span><small>{player.connected ? "ONLINE" : "OFFLINE"}</small></div>) : <p className="lan-empty">Share the room code to invite players.</p>}

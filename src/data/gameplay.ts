@@ -1,9 +1,12 @@
+import { activeEffects, effectTotal } from "./effects";
 import { defaultCombatState, type Character } from "./characters";
 import { calculateCharacterStats } from "./calculations";
+import { activeConditions, exhaustionLevel, isIncapacitated, type Condition, effectiveRollMode, type RollMode } from "./conditions";
 
 export const combatState = (character: Character) => ({ ...defaultCombatState(), ...character.combat });
 export const spellSlotKey = (pool: string, level: number) => `spell-slot:${pool}:${level}`;
 export function rollDie(sides: number): number {
+  if (!Number.isInteger(sides) || sides < 2 || sides > 1000) throw new Error("Unsupported die size.");
   // Rejection sampling also works in LAN browsers without a secure context.
   const limit = Math.floor(0x100000000 / sides) * sides;
   const buffer = new Uint32Array(1);
@@ -19,6 +22,7 @@ export function applyDamage(character: Character, amount: number, critical = fal
   const combat = combatState(character);
   const remaining = Math.max(0, amount - character.temporaryHitPoints);
   const nextHp = Math.max(0, hp - remaining);
+  if (nextHp === 0) combat.conditions = [...new Set([...combat.conditions, "Prone" as const])];
   if (hp === 0) {
     combat.stable = false;
     combat.deathFailures = Math.min(3, combat.deathFailures + (critical ? 2 : 1));
@@ -39,11 +43,11 @@ export function healCharacter(character: Character, amount: number): Partial<Cha
     combat: { ...combat, deathSuccesses: 0, deathFailures: 0, stable: false } };
 }
 
-export function deathSave(character: Character, roll: number): Partial<Character> {
+export function deathSave(character: Character, roll: number, extraBonus = 0): Partial<Character> {
   const combat = combatState(character);
   if (character.currentHitPoints !== 0 || combat.stable || combat.dead || !Number.isInteger(roll) || roll < 1 || roll > 20) return {};
   if (roll === 20) return healCharacter(character, 1);
-  if (roll >= 10) combat.deathSuccesses += 1;
+  if (roll - 2 * exhaustionLevel(character) + effectTotal(character, "save") + extraBonus >= 10 && roll !== 1) combat.deathSuccesses += 1;
   else combat.deathFailures = Math.min(3, combat.deathFailures + (roll === 1 ? 2 : 1));
   if (combat.deathFailures >= 3) combat.dead = true;
   if (combat.deathSuccesses >= 3) { combat.stable = true; combat.deathSuccesses = 0; combat.deathFailures = 0; }
@@ -55,6 +59,8 @@ export function restCharacter(character: Character, kind: "Short Rest" | "Long R
   const combat = combatState(character);
   if ((character.currentHitPoints ?? stats.maxHitPoints ?? 0) <= 0 || combat.dead) return {};
   const resourceUses = { ...character.resourceUses };
+  const elapsedRounds = kind === "Long Rest" ? 4800 : 600;
+  const effects = activeEffects(character).map((effect) => effect.rounds === null ? effect : { ...effect, rounds: effect.rounds - elapsedRounds }).filter((effect) => effect.rounds === null || effect.rounds > 0);
   for (const resource of stats.classResources) {
     if (!resource.key || resource.maxUses === undefined) continue;
     if (kind === "Long Rest") resourceUses[resource.key] = 0;
@@ -66,9 +72,11 @@ export function restCharacter(character: Character, kind: "Short Rest" | "Long R
     if (kind === "Short Rest" && resource.recovery === "short-one") return { ...resource, used: Math.max(0, resource.used - 1) };
     return resource;
   });
-  return { resourceUses, customResources, ...(kind === "Long Rest" ? {
-    currentHitPoints: stats.maxHitPoints, temporaryHitPoints: 0,
-    combat: { ...combat, hitDiceUsed: {}, deathSuccesses: 0, deathFailures: 0, stable: false },
+  const restedCombat = kind === "Long Rest"
+    ? { ...combat, effects, exhaustion: Math.max(0, combat.exhaustion - 1), hitDiceUsed: {}, deathSuccesses: 0, deathFailures: 0, stable: false, concentration: "", concentrationDC: null }
+    : { ...combat, effects };
+  return { resourceUses, customResources, combat: restedCombat, ...(kind === "Long Rest" ? {
+    currentHitPoints: calculateCharacterStats({ ...character, combat: restedCombat }).maxHitPoints, temporaryHitPoints: 0,
   } : {}) };
 }
 
@@ -85,7 +93,7 @@ export function spendHitDie(character: Character, className: string, roll: numbe
 
 export function castCharacterSpell(character: Character, id: string, slotKey?: string): Partial<Character> {
   const spell = character.spells.find((spell) => spell.id === id);
-  if (!spell?.prepared || combatState(character).dead || character.currentHitPoints === 0) return {};
+  if (!spell?.prepared || isIncapacitated(character)) return {};
   const updates: Partial<Character> = {};
   if (spell.level > 0) {
     const slot = calculateCharacterStats(character).spellSlots.find((slot) => spellSlotKey(slot.pool, slot.spellLevel) === slotKey);
@@ -94,4 +102,34 @@ export function castCharacterSpell(character: Character, id: string, slotKey?: s
   }
   if (spell.concentration) updates.combat = { ...combatState(character), concentration: spell.name, concentrationDC: null };
   return updates;
+}
+
+export function setCondition(character: Character, condition: Condition, enabled: boolean): Partial<Character> {
+  const combat = combatState(character);
+  combat.conditions = enabled ? [...new Set([...combat.conditions, condition])] : combat.conditions.filter((entry) => entry !== condition);
+  if (enabled && condition === "Unconscious") combat.conditions = [...new Set([...combat.conditions, "Prone" as const])];
+  if (isIncapacitated({ ...character, combat })) { combat.concentration = ""; combat.concentrationDC = null; }
+  return { combat };
+}
+
+export function setExhaustion(character: Character, level: number): Partial<Character> {
+  if (!Number.isInteger(level)) return {};
+  const combat = combatState(character);
+  combat.exhaustion = Math.min(6, Math.max(0, Math.trunc(level)));
+  if (combat.exhaustion >= 6) { combat.dead = true; combat.concentration = ""; combat.concentrationDC = null; }
+  return { combat };
+}
+
+export function rollD20(character: Character, kind: "attack" | "check" | "initiative" | "save", requested: RollMode = "normal", ability = "", extraAdvantage = false, extraDisadvantage = false, die = rollDie) {
+  const mode = effectiveRollMode(character, kind, requested, ability, extraAdvantage, extraDisadvantage);
+  const rolls = mode === "normal" ? [die(20)] : [die(20), die(20)];
+  const natural = mode === "advantage" ? Math.max(...rolls) : mode === "disadvantage" ? Math.min(...rolls) : rolls[0];
+  return { rolls, natural, mode };
+}
+
+export function adjustedDamage(character: Character, damage: number, defense: "normal" | "resistant" | "vulnerable" | "immune"): number {
+  if (!Number.isInteger(damage) || damage < 0) return 0;
+  if (defense === "immune") return 0;
+  const resistant = defense === "resistant" || activeConditions(character).includes("Petrified");
+  return Math.floor(damage * (resistant ? 0.5 : 1) * (defense === "vulnerable" ? 2 : 1));
 }
