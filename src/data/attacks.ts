@@ -32,16 +32,31 @@ export const WEAPON_PRESETS = [
   { name: "Maul", count: 2, die: 6, type: "Bludgeoning" },
   { name: "Glaive", count: 1, die: 10, type: "Slashing" },
   { name: "Halberd", count: 1, die: 10, type: "Slashing" },
+  { name: "Greatclub", count: 1, die: 8, type: "Bludgeoning" },
+  { name: "Light Hammer", count: 1, die: 4, type: "Bludgeoning" },
+  { name: "Sickle", count: 1, die: 4, type: "Slashing" },
+  { name: "Dart", count: 1, die: 4, type: "Piercing", ranged: true, finesse: true },
+  { name: "Sling", count: 1, die: 4, type: "Bludgeoning", ranged: true },
+  { name: "Flail", count: 1, die: 8, type: "Bludgeoning" },
+  { name: "Lance", count: 1, die: 10, type: "Piercing", notes: "Two-Handed unless mounted; edit the two-handed setting when mounted." },
+  { name: "Morningstar", count: 1, die: 8, type: "Piercing" },
+  { name: "Pike", count: 1, die: 10, type: "Piercing" },
+  { name: "Trident", count: 1, die: 8, type: "Piercing", notes: "Two hands: change damage die to d10." },
+  { name: "War Pick", count: 1, die: 8, type: "Piercing", notes: "Two hands: change damage die to d10." },
+  { name: "Whip", count: 1, die: 4, type: "Slashing", finesse: true },
+  { name: "Blowgun", count: 0, die: 4, type: "Piercing", ranged: true },
+  { name: "Musket", count: 1, die: 12, type: "Piercing", ranged: true },
+  { name: "Pistol", count: 1, die: 10, type: "Piercing", ranged: true },
   { name: "Unarmed Strike", count: 0, die: 4, type: "Bludgeoning", notes: "Base damage is 1 + Strength. Edit for Martial Arts or other features." },
 ] as const;
 
 export function makeWeaponAttack(character: Character, name: string, id: string): CharacterAttack {
   const preset = WEAPON_PRESETS.find((item) => item.name === name) ?? WEAPON_PRESETS[0];
   const dex = character.abilityScores.Dexterity > character.abilityScores.Strength;
-  return { id, name: preset.name, ability: ("ranged" in preset || ("finesse" in preset && dex)) ? "Dexterity" : "Strength",
+  return { id, name: preset.name, ability: ("finesse" in preset ? dex : "ranged" in preset) ? "Dexterity" : "Strength",
     proficient: true, diceCount: preset.count, dieSize: preset.die, damageType: preset.type, attackBonus: 0,
-    damageBonus: preset.name === "Unarmed Strike" ? 1 : 0, addAbilityToDamage: true,
-    ranged: "ranged" in preset, twoHanded: ["Greatsword", "Greataxe", "Maul", "Glaive", "Halberd", "Longbow", "Shortbow", "Light Crossbow", "Heavy Crossbow"].includes(preset.name),
+    damageBonus: preset.count === 0 ? 1 : 0, addAbilityToDamage: true,
+    ranged: "ranged" in preset, twoHanded: ["Greatsword", "Greataxe", "Maul", "Glaive", "Halberd", "Longbow", "Shortbow", "Light Crossbow", "Heavy Crossbow", "Greatclub", "Lance", "Pike", "Musket"].includes(preset.name),
     notes: "notes" in preset ? preset.notes : "" };
 }
 export function attackNumbers(character: Character, attack: CharacterAttack) {

@@ -430,6 +430,19 @@ summary { padding-block: 8px; line-height: 1.5; }
 .classic-skill small { color: var(--muted); margin-left: 8px; }
 .classic-resource-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 18px; }
 .classic-resource-grid input { display: block; width: 100%; margin-top: 8px; }
+.spellbook-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.spellbook-tools label { flex: 1 1 220px; display: grid; gap: 6px; }
+.spellbook-tools > span { align-self: center; color: var(--muted); font-size: 13px; }
+.app-shell .spell-card-collapsible { padding: 0; }
+.spell-card-summary { display: list-item; cursor: pointer; padding: 14px 18px; }
+.spell-card-summary::marker { color: var(--gold); }
+.spell-summary-name { display: inline-grid; gap: 3px; vertical-align: middle; max-width: calc(100% - 120px); }
+.spell-summary-name strong { color: var(--cream); font-size: 16px; }
+.spell-summary-name small { color: var(--muted); font-size: 12px; }
+.spell-summary-ready { float: right; color: var(--gold); font-size: 12px; padding: 6px 0 6px 12px; }
+.spell-card-body { padding: 18px; border-top: 1px solid var(--line); }
+.spell-card-body > .spell-ready-toggle { justify-content: flex-start; margin-bottom: 14px; }
+@media (max-width: 480px) { .spell-summary-name { max-width: calc(100% - 25px); } .spell-summary-ready { float: none; display: block; padding-left: 18px; } }
 @media (max-width: 800px) { .classic-grid { grid-template-columns: minmax(0,1fr); } }
 @container sheet (max-width: 600px) {
   .skill-row { grid-template-columns: 18px minmax(0,1fr) 34px 38px; gap: 8px; padding-block: 12px; }
