@@ -1,3 +1,4 @@
+import type { DiceSource, DieFace } from "./physicalDice";
 import type { AbilityName, Character } from "./characters";
 import { activeConditions, automaticSaveFailure, isIncapacitated, type RollMode } from "./conditions";
 import { calculateCharacterStats } from "./calculations";
@@ -8,7 +9,7 @@ import { subclassIs } from "./rulesCatalog";
 
 export const TARGETED_SPELLS = ["Cure Wounds", "Healing Word", "Fire Bolt", "Sacred Flame", "Guiding Bolt", "Thunderwave", "Shatter", "Fireball", "Bless", "Bane", "Shield"];
 export type TargetChoice = { id: string; mode?: RollMode; defense?: "normal" | "resistant" | "vulnerable" | "immune" };
-export type TargetCast = { casterId: string; spellId: string; slotKey?: string; className: string; targets: TargetChoice[]; mode?: RollMode };
+export type TargetCast = { diceMode?: DiceSource; diceFaces?: DieFace[]; targetVersions?: Record<string, string>; casterId: string; spellId: string; slotKey?: string; className: string; targets: TargetChoice[]; mode?: RollMode };
 const SAVE_ABILITIES: Record<string, AbilityName> = { "Sacred Flame": "Dexterity", Thunderwave: "Constitution", Shatter: "Constitution", Fireball: "Dexterity", Bane: "Charisma" };
 
 export function resolveTargetedSpell(caster: Character, targets: Character[], request: TargetCast, id: string, die = rollDie) {
@@ -63,8 +64,8 @@ export function resolveTargetedSpell(caster: Character, targets: Character[], re
       const saveAbility = SAVE_ABILITIES[automation];
       if (saveAbility) {
         const autoFail = automaticSaveFailure(target, saveAbility);
-        const roll = rollD20(target, "save", choice.mode ?? "normal", saveAbility, false, false, die);
-        const total = roll.natural + calculateCharacterStats(target).savingThrows[saveAbility] + effectDice(target, "save", die).total;
+        const roll = autoFail ? null : rollD20(target, "save", choice.mode ?? "normal", saveAbility, false, false, die);
+        const total = roll ? roll.natural + calculateCharacterStats(target).savingThrows[saveAbility] + effectDice(target, "save", die).total : 0;
         const success = !autoFail && total >= progression.saveDC;
         summaries.push(`${target.name}: ${saveAbility} save ${autoFail ? "automatic failure" : `${total} vs DC ${progression.saveDC}`} · ${success ? "saved" : "failed"}`);
         const evasion = saveAbility === "Dexterity" && ["Thunderwave", "Shatter", "Fireball"].includes(automation) && !activeConditions(target).includes("Incapacitated") && ((target.classLevels.Rogue ?? 0) >= 7 || (target.classLevels.Monk ?? 0) >= 7);
@@ -80,7 +81,7 @@ export function resolveTargetedSpell(caster: Character, targets: Character[], re
       if (amount > 0 && target.combat?.concentration && typeof target.combat.concentrationDC === "number") throw new Error(`${target.name} must resolve the outstanding concentration check before taking more spell damage.`);
       target = { ...target, ...applyDamage(target, amount, result.attack?.critical ?? false) };
       summaries.push(`${target.name}: ${amount} ${formula?.type ?? ""} damage after save/defenses`);
-      if (target.combat?.concentration && target.combat.concentrationDC !== null) {
+      if (target.combat?.concentration && typeof target.combat.concentrationDC === "number") {
         const dc = target.combat.concentrationDC;
         const roll = rollD20(target, "save", "normal", "Constitution", activeEffects(target).some((effect) => effect.concentrationAdvantage), false, die);
         const total = roll.natural + calculateCharacterStats(target).savingThrows.Constitution + effectDice(target, "save", die).total;

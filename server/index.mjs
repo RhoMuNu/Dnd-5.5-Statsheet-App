@@ -27,6 +27,13 @@ try {
   process.exit(1);
 }
 
+function diceForRequest(body) {
+  if (body.diceMode !== undefined && !["digital", "physical"].includes(body.diceMode)) throw new Error("Choose digital or physical dice.");
+  if (body.diceFaces !== undefined && body.diceMode !== "physical") throw new Error("Physical faces require physical dice mode.");
+  const physical = body.diceMode === "physical" ? rules.physicalDice(body.diceFaces ?? []) : null;
+  return { roll: physical?.roll ?? ((sides) => randomInt(1, sides + 1)), finish: () => physical?.finish() };
+}
+
 function stamp(character) { return { ...character, updatedAt: new Date(Math.max(Date.now(), Date.parse(character.updatedAt) + 1 || 0)).toISOString() }; }
 function cleanEffects(campaign) {
   const cleaned = rules.cleanConcentrationEffects(campaign.characters.map((entry) => entry.character));
@@ -222,7 +229,13 @@ const apiServer = createServer(async (request, response) => {
       const auth = authorizedCampaign(request, activityMatch[1]);
       if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
       const body = await readJson(request);
-      const entry = makeActivity(auth, body, randomToken(12), (sides) => randomInt(1, sides + 1));
+      const actorId = auth.role === "dm" ? "dm" : auth.player.id;
+      const existing = (auth.campaign.activity ?? []).find((entry) => entry.actorId === actorId && entry.requestId === body.requestId);
+      if (existing) return sendJson(response, 200, { entry: existing });
+      const dice = diceForRequest(body);
+      let entry;
+      try { entry = makeActivity(auth, body, randomToken(12), dice.roll); dice.finish(); }
+      catch (error) { if (error instanceof rules.PhysicalDiceRequired) return sendJson(response, 200, { diceRequest: error.request }); throw error; }
       const activity = auth.campaign.activity ?? [];
       if (!activity.some((item) => item.id === entry.id)) {
         auth.campaign.activity = [...activity, entry].slice(-100);
@@ -279,13 +292,19 @@ const apiServer = createServer(async (request, response) => {
       if (caster.character.updatedAt !== body.baseUpdatedAt) return sendJson(response, 409, { error: "Wait for sheet sync, then cast again.", current: caster.character });
       const publicIds = new Set((auth.campaign.encounter?.entries ?? []).map((entry) => entry.characterId));
       const targets = auth.campaign.characters.filter((entry) => entry.shared && (entry.character.id === caster.character.id || publicIds.has(entry.character.id))).map((entry) => entry.character);
-      const result = rules.resolveTargetedSpell(caster.character, targets, body, randomToken(12), (sides) => randomInt(1, sides + 1));
+      const targetVersions = Object.fromEntries(targets.filter((target) => Array.isArray(body.targets) && body.targets.some((choice) => choice.id === target.id)).map((target) => [target.id, target.updatedAt]));
+      if (body.targetVersions && Object.entries(targetVersions).some(([id, version]) => body.targetVersions[id] !== version)) return sendJson(response, 409, { error: "A target changed during physical dice entry. Review the sheets and start the cast again." });
+      const dice = diceForRequest(body);
+      let result;
+      try { result = rules.resolveTargetedSpell(caster.character, targets, body, randomToken(12), dice.roll); dice.finish(); }
+      catch (error) { if (error instanceof rules.PhysicalDiceRequired) return sendJson(response, 200, { diceRequest: error.request, targetVersions }); throw error; }
+      if (body.diceMode === "physical") result.summary = "Physical dice · " + result.summary;
       for (const character of result.characters) {
         const record = auth.campaign.characters.find((entry) => entry.character.id === character.id);
         record.character = stamp(character);
       }
       cleanEffects(auth.campaign);
-      const receipt = { actorId: auth.player.id, requestId: body.requestId, summary: result.summary };
+      const receipt = { diceSource: body.diceMode === "physical" ? "physical" : "digital", actorId: auth.player.id, requestId: body.requestId, summary: result.summary };
       auth.campaign.castReceipts = [...(auth.campaign.castReceipts ?? []), receipt].slice(-1000);
       auth.campaign.activity = [...(auth.campaign.activity ?? []), { id: randomToken(12), ...receipt, actor: auth.player.name, kind: "sheet", characterName: caster.character.name, createdAt: new Date().toISOString() }].slice(-100);
       persist(); broadcastCampaign(auth.campaign);

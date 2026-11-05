@@ -95,7 +95,17 @@ After completing a Short Rest, use **Short Rest · spend Hit Dice** to spend a c
 
 Campaign players can switch between abilities, features, inventory, spells, and journal inside the LAN room. These tabs edit the campaign copy and use the same offline retry/conflict flow. In the spellbook, select a slot level and pool explicitly to cast or upcast, including Pact Magic. Casting a concentration spell replaces the previous concentration tracker; cantrips spend no slot.
 
-In each spell card, **Effect automation** opts into a 2024 formula. Supported formulas are Cure Wounds, Healing Word, Fire Bolt, Sacred Flame, Guiding Bolt, Thunderwave, Shatter, and Fireball. Casting rolls the chosen formula, applies upcasting or cantrip scaling, and spends a slot once. Select the casting class for multiclass spell ability; healing can optionally apply to your own HP. Fire Bolt/Guiding Bolt also roll attacks and critical damage; other target saves, targeting, range, ongoing effects, and damage application are resolved by the recipients and DM. Other spells keep manual effects with automated slot/concentration tracking.
+In each spell card, **Effect automation** opts into a 2024 formula. Dice may be digital or physically entered. Supported formulas are Cure Wounds, Healing Word, Fire Bolt, Sacred Flame, Guiding Bolt, Thunderwave, Shatter, and Fireball. Casting rolls the chosen formula, applies upcasting or cantrip scaling, and spends a slot once. Select the casting class for multiclass spell ability; healing can optionally apply to your own HP. Fire Bolt/Guiding Bolt also roll attacks and critical damage; other target saves, targeting, range, ongoing effects, and damage application are resolved by the recipients and DM. Other spells keep manual effects with automated slot/concentration tracking.
+
+### Physical dice at the table
+
+Use the **Dice** selector in the top bar to choose **Physical dice** or **Digital dice** at any time. The preference is saved in this browser. The level-up dialog also includes this selector. Physical mode asks for each natural die face, without modifiers; the app applies bonuses, penalties, advantage/disadvantage, critical rules, and resource costs using the same rules as digital rolls. You can switch an individual pending roll to digital dice without changing the saved preference.
+
+Physical entry is available for skill checks, saves, initiative, attacks, weapon/spell damage and healing, death saves, concentration saves, Second Wind, Short Rest Hit Dice, character-creation 4d6 rolls, level-up HP, and shared dice expressions. For 4d6 creation, the app drops the lowest die of each group and sorts the resulting scores. Automatic rule outcomes (such as maximum healing or an automatic failed save) do not require rolling a die.
+
+LAN spell cards have a **Dice for this cast** override. Physical mode covers the entire cast: the caster’s attack/damage dice and each target’s saves, bonus dice, and concentration checks. Players can roll their own physical dice and provide their natural faces through the casting screen. The host requests the next required die and validates the final calculation. No action, slot, HP change, or effect is committed until all requested dice are entered. If a sheet changes during entry, review it and start again; previously entered faces may be reused where appropriate.
+
+Canceling an unfinished entry leaves the sheet unchanged. If a network failure makes the final cast status uncertain, use **Retry the same cast**: the original request receipt prevents spending twice. Pending physical cast entries survive refreshes. Shared history labels entered results as **Physical dice**; digital results stay available. Manual damage/healing fields and NPC initiative entry remain available for effects resolved outside the app.
 
 ### Guided level-ups
 
@@ -131,7 +141,7 @@ Confirm the worn armor and shield training checkboxes against your classes and f
 
 ### Shared table rolls
 
-DMs and players can use **Shared rolls** for host-generated dice such as `1d20+5` or `8d6`. Dice expressions support 1–50 dice with d4/d6/d8/d10/d12/d20/d100 and an optional integer modifier. The host persists and streams the latest 100 public results to everyone.
+DMs and players can use **Shared rolls** for host-generated or physically entered dice such as `1d20+5` or `8d6`. Dice expressions support 1–50 dice with d4/d6/d8/d10/d12/d20/d100 and an optional integer modifier. The host persists and streams the latest 100 public results to everyone.
 
 Players can opt into publishing play results from their shared sheets: checks, saves, weapon attacks/damage, healing features, Hit Dice, and spell casts. These are labeled **Sheet result**, since character calculations run in the player's browser. Private characters do not publish. Published character names and results remain in the public history even after unsharing the sheet. Pending requests survive refreshes and can be retried or discarded; retries within retained history reuse the original roll. Sheet saving and result publishing are separate operations. Turning off publishing affects future results; pending results can be discarded separately.
 

@@ -43,7 +43,7 @@ export function resolveSpellCast(character: Character, id: string, slotKey: stri
   const critical = attack?.natural === 20;
   const missed = attack?.natural === 1 || (attack !== null && !critical && targetAC !== null && attackTotal! < targetAC);
   const supremeHealing = formula.kind === "healing" && spell.level > 0 && subclassIs(character, "Cleric", "Life", 17);
-  const rolls = Array.from({ length: count * (critical ? 2 : 1) }, () => supremeHealing ? formula.die : die(formula.die));
+  const rolls = Array.from({ length: count * (critical ? 2 : 1) }, () => supremeHealing ? formula.die : die(formula.die, `${character.name}: ${spell.name} ${formula.kind}${critical ? " · critical" : ""}`));
   const lifeBonus = formula.kind === "healing" && spell.level > 0 && subclassIs(character, "Cleric", "Life") ? 2 + (slot?.spellLevel ?? spell.level) : 0;
   const evocationBonus = formula.kind === "damage" && spell.school === "Evocation" && subclassIs(character, "Wizard", "Evok", 10) ? stats.abilityModifiers.Intelligence : 0;
   const bonus = (formula.ability ? ability : 0) + lifeBonus + evocationBonus;

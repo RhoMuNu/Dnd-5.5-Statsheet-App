@@ -1,3 +1,5 @@
+import { useDiceRoll } from "./DiceProvider";
+import type { DieRoller } from "../data/physicalDice";
 import { useMemo, useState, type FormEvent } from "react";
 import { ABILITIES, CLASSES, defaultCharacterStats, type AbilityName, type Character, type CharacterCreationDetails, type CharacterDraft, type SkillName } from "../data/characters";
 import { BACKGROUNDS, CLASS_ARMOR, CLASS_EQUIPMENT, CLASS_SKILLS, CLASS_TOOLS, LANGUAGES, SPECIES, SPECIES_SKILL_CHOICES, STANDARD_ARRAY, STANDARD_ARRAY_BY_CLASS, pointBuyCost } from "../data/creationOptions";
@@ -7,12 +9,13 @@ type CharacterBuilderProps = { character?: Character; onSave: (draft: CharacterD
 type AbilityScores = Record<AbilityName, number>;
 const emptyScores = (value = 10): AbilityScores => Object.fromEntries(ABILITIES.map((ability) => [ability, value])) as AbilityScores;
 const standardScoresFor = (characterClass: string): AbilityScores => STANDARD_ARRAY_BY_CLASS[characterClass] ?? Object.fromEntries(ABILITIES.map((ability, index) => [ability, STANDARD_ARRAY[index]])) as AbilityScores;
-const rollScores = (): number[] => Array.from({ length: 6 }, () => {
-  const dice = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => b - a);
+const rollScores = (die: DieRoller): number[] => Array.from({ length: 6 }, (_, score) => {
+  const dice = Array.from({ length: 4 }, () => die(6, `Ability score ${score + 1}: 4d6, drop the lowest`)).sort((a, b) => b - a);
   return dice.slice(0, 3).reduce((sum, die) => sum + die, 0);
 }).sort((a, b) => b - a);
 
 export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuilderProps) {
+  const diceSource = useDiceRoll(character?.updatedAt);
   const saved = character?.creationDetails;
   const [step, setStep] = useState(1);
   const [name, setName] = useState(character?.name ?? "");
@@ -34,7 +37,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   const [baseScores, setBaseScores] = useState<AbilityScores>(() => saved?.baseAbilityScores ?? character?.abilityScores ?? { ...emptyScores(), Strength: 15, Dexterity: 14, Constitution: 13, Intelligence: 12, Wisdom: 10, Charisma: 8 });
   const [scoreDistributionTouched, setScoreDistributionTouched] = useState(Boolean(character || saved));
   const [abilityScoreOverrides, setAbilityScoreOverrides] = useState(character?.abilityScoreOverrides ?? {});
-  const [rolledScores, setRolledScores] = useState<number[]>(() => rollScores());
+  const [rolledScores, setRolledScores] = useState<number[]>(() => Object.values(saved?.baseAbilityScores ?? character?.abilityScores ?? standardScoresFor(characterClass)).sort((a, b) => b - a));
   const [boosts, setBoosts] = useState<Partial<Record<AbilityName, 0 | 1 | 2>>>(saved?.backgroundAbilityBoosts ?? {});
   const [classSkills, setClassSkills] = useState<SkillName[]>(saved?.classSkills ?? []);
   const [languages, setLanguages] = useState<string[]>(saved?.languages?.length ? saved.languages : ["Common"]);
@@ -71,6 +74,14 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   }) as Character, [character, name, concept, species, speciesSkillProficiency, characterClass, subclass, classLevels, classSubclasses, background, level, abilityScores, backgroundData, classSkills, speciesData, customSize, customSpeed, gearSelectionChanged, selectedClassArmor]);
   const calculated = calculateCharacterStats(previewCharacter);
 
+  async function rollAbilities() {
+    try {
+      const rolled = await diceSource.run("Ability scores · 4d6 drop lowest", rollScores);
+      if (!rolled) return;
+      setAbilityMethod("rolled"); setAbilityScoreOverrides({}); setScoreDistributionTouched(true);
+      setRolledScores(rolled.result); setBaseScores(Object.fromEntries(ABILITIES.map((ability, index) => [ability, rolled.result[index]])) as AbilityScores);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not enter ability dice."); }
+  }
   function setBaseScore(ability: AbilityName, value: number) {
     setBaseScores((current) => ({ ...current, [ability]: value }));
     setScoreDistributionTouched(true);
@@ -187,8 +198,8 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       </div>}
 
       {step === 2 && <>
-        <div className="creator-section"><h3>Ability scores</h3><p>Choose a method, then place your scores. Your background adds the final boosts.</p><div className="ability-methods">{([["standard", "Standard Array"], ["point-buy", "Point Buy"], ["manual", "Manual"], ["rolled", "Roll 4d6"]] as const).map(([method, label]) => <button type="button" key={method} className={abilityMethod === method ? "method-selected" : ""} onClick={() => { setAbilityMethod(method); setAbilityScoreOverrides({}); setScoreDistributionTouched(method !== "standard"); if (method === "standard") setBaseScores(standardScoresFor(characterClass)); if (method === "point-buy") setBaseScores(emptyScores(8)); if (method === "rolled") { const rolls = rollScores(); setRolledScores(rolls); setBaseScores(Object.fromEntries(ABILITIES.map((ability, index) => [ability, rolls[index]])) as AbilityScores); } }}>{label}</button>)}</div>
-          {abilityMethod === "rolled" && <button className="text-button" type="button" onClick={() => { const rolls = rollScores(); setRolledScores(rolls); setBaseScores(Object.fromEntries(ABILITIES.map((ability, index) => [ability, rolls[index]])) as AbilityScores); }}>Roll again: {rolledScores.join(" · ")}</button>}
+        <div className="creator-section"><h3>Ability scores</h3><p>Choose a method, then place your scores. Your background adds the final boosts.</p><div className="ability-methods">{([["standard", "Standard Array"], ["point-buy", "Point Buy"], ["manual", "Manual"], ["rolled", "Roll 4d6"]] as const).map(([method, label]) => <button type="button" key={method} className={abilityMethod === method ? "method-selected" : ""} onClick={() => { if (method === "rolled") { void rollAbilities(); return; } setAbilityMethod(method); setAbilityScoreOverrides({}); setScoreDistributionTouched(method !== "standard"); if (method === "standard") setBaseScores(standardScoresFor(characterClass)); if (method === "point-buy") setBaseScores(emptyScores(8)); }}>{label}</button>)}</div>
+          {abilityMethod === "rolled" && <button className="text-button" type="button" onClick={() => void rollAbilities()}>Roll again: {rolledScores.join(" · ")}</button>}
           {abilityMethod === "point-buy" && <p className={scoreTotal === 27 ? "point-buy-total" : "form-hint"}>Points spent: {scoreTotal} / 27</p>}
           <div className="creator-ability-grid">{ABILITIES.map((ability) => <label className="creator-ability" key={ability}><span>{ability}</span>{abilityMethod === "manual" || abilityMethod === "point-buy" ? <input type="number" min={abilityMethod === "point-buy" ? 8 : 3} max={abilityMethod === "point-buy" ? 15 : 20} value={baseScores[ability]} onChange={(event) => setBaseScore(ability, Number(event.target.value))} /> : <select value={baseScores[ability]} onChange={(event) => setBaseScore(ability, Number(event.target.value))}>{Array.from(new Set(abilityMethod === "standard" ? STANDARD_ARRAY : rolledScores)).filter((score) => { const allScores = abilityMethod === "standard" ? STANDARD_ARRAY : rolledScores; const allowed = allScores.filter((entry) => entry === score).length; const usedElsewhere = ABILITIES.filter((other) => other !== ability && baseScores[other] === score).length; return score === baseScores[ability] || usedElsewhere < allowed; }).map((score) => <option key={score} value={score}>{score}</option>)}</select>}<small>Final {abilityScores[ability]} ({abilityScores[ability] >= 10 ? "+" : ""}{Math.floor((abilityScores[ability] - 10) / 2)})</small></label>)}</div>
         </div>

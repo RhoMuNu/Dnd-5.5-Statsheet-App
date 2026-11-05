@@ -1,3 +1,4 @@
+import type { DieRoller } from "./physicalDice";
 import { hasFeat } from "./advancement";
 import type { Character } from "./characters";
 
@@ -27,10 +28,10 @@ export function activeEffects(character: Character): ActiveEffect[] {
 export function effectTotal(character: Character, key: "ac" | "attack" | "damage" | "save" | "check" | "speed" | "initiative" | "hpPerLevel") {
   return activeEffects(character).reduce((sum, effect) => sum + effect[key], 0);
 }
-export function effectDice(character: Character, kind: "attack" | "save", die: (sides: number) => number) {
+export function effectDice(character: Character, kind: "attack" | "save", die: DieRoller) {
   const rolls = activeEffects(character).flatMap((effect) => {
     const sides = kind === "attack" ? effect.attackDie : effect.saveDie;
-    return sides ? [die(Math.abs(sides)) * Math.sign(sides)] : [];
+    return sides ? [die(Math.abs(sides), `${character.name}: ${effect.name} ${kind} bonus die`) * Math.sign(sides)] : [];
   });
   return { rolls, total: rolls.reduce((sum, value) => sum + value, 0) };
 }

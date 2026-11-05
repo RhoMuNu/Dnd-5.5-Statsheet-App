@@ -1,3 +1,4 @@
+import { useDiceRoll } from "./DiceProvider";
 import { useTableActivity } from "../data/tableActivity";
 import { useState } from "react";
 import { ABILITIES, makeCharacterId, type Character, type CharacterAttack } from "../data/characters";
@@ -6,6 +7,7 @@ import { isIncapacitated, type RollMode } from "../data/conditions";
 import { calculateCharacterStats } from "../data/calculations";
 
 export function AttacksPanel({ character, onChange, readOnly = false }: { character: Character; onChange?: (updates: Partial<Character>) => void; readOnly?: boolean }) {
+  const dice = useDiceRoll(character.updatedAt);
   const attacks = character.attacks ?? [];
   const publish = useTableActivity(character.id);
   function report(summary: string) { setMessage(summary); publish(summary); }
@@ -24,17 +26,19 @@ export function AttacksPanel({ character, onChange, readOnly = false }: { charac
   const modifier = (value: number) => `${value >= 0 ? "+" : ""}${value}`;
   const canAct = !readOnly && !isIncapacitated(character);
   const targetAC = ac.trim() && Number.isInteger(Number(ac)) && Number(ac) >= 0 ? Number(ac) : null;
-  function attack(entry: CharacterAttack) {
+  async function attack(entry: CharacterAttack) {
     try {
-    const result = rollWeaponAttack(character, entry, mode, targetAC, advantage, disadvantage, undefined, reactionAttack ? "reaction" : undefined);
+    const rolled = await dice.run(`${entry.name} attack`, (die) => rollWeaponAttack(character, entry, mode, targetAC, advantage, disadvantage, die, reactionAttack ? "reaction" : undefined));
+    if (!rolled) return; const result = rolled.result;
     onChange?.(result.updates);
     setCritical(result.critical);
-    report(`${entry.name}: d20 [${result.rolls.join(", ")}] ${modifier(result.bonus)}${result.effectRolls.length ? ` + effects [${result.effectRolls.join(", ")}]` : ""} = ${result.total} (${result.mode}) · ${result.critical ? "critical hit" : result.hit === false ? "miss" : result.hit ? "hit" : "compare to target AC"}`);
+    report(`${rolled.physical ? "Physical dice · " : ""}${entry.name}: d20 [${result.rolls.join(", ")}] ${modifier(result.bonus)}${result.effectRolls.length ? ` + effects [${result.effectRolls.join(", ")}]` : ""} = ${result.total} (${result.mode}) · ${result.critical ? "critical hit" : result.hit === false ? "miss" : result.hit ? "hit" : "compare to target AC"}`);
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Cannot attack now."); }
   }
-  function damage(entry: CharacterAttack) {
+  async function damage(entry: CharacterAttack) {
     try {
-    const result = rollWeaponDamage(character, entry, critical, sneak, rage);
+    const rolled = await dice.run(`${entry.name} damage`, (die) => rollWeaponDamage(character, entry, critical, sneak, rage, die));
+    if (!rolled) return; const result = rolled.result;
     onChange?.(result.updates);
     report(`${entry.name}: [${result.rolls.join(", ") || "no dice"}]${result.sneak.length ? ` + Sneak Attack [${result.sneak.join(", ")}]` : ""} ${modifier(result.bonus)} = ${result.total} ${entry.damageType} damage${critical ? " (critical dice doubled)" : ""}. Apply to the target after a hit.`);
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Cannot apply damage now."); }

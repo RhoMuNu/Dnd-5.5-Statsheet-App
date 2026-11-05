@@ -1,3 +1,4 @@
+import { useDiceRoll } from "./DiceProvider";
 import { LanSpellTargets } from "./LanSpellTargets";
 import { EquipmentSettings } from "./EquipmentSettings";
 import { ARMOR_PRESETS, armorForItem, equipInventoryItem } from "../data/equipment";
@@ -104,6 +105,7 @@ export function InventoryPage({ character, onChange }: SectionProps) {
 }
 
 export function SpellbookPage({ character, onChange }: SectionProps) {
+  const dice = useDiceRoll(character.updatedAt);
   const publish = useTableActivity(character.id);
   const stats = calculateCharacterStats(character);
   const spells = character.spells ?? [];
@@ -143,10 +145,12 @@ export function SpellbookPage({ character, onChange }: SectionProps) {
     const slots = availableSlots(spell);
     return slots.find((slot) => spellSlotKey(slot.pool, slot.spellLevel) === slotSelections[spell.id]) ?? slots[0];
   }
-  function castSpell(spell: CharacterSpell) {
+  async function castSpell(spell: CharacterSpell) {
     const slot = selectedSlot(spell);
     try {
-      const result = resolveSpellCast(character, spell.id, slot ? spellSlotKey(slot.pool, slot.spellLevel) : undefined, spell.className || castingClass || stats.spellcastingProgressions[0]?.className || "", healSelf, undefined, spellMode, spellAC.trim() && Number.isInteger(Number(spellAC)) ? Number(spellAC) : null);
+      const rolled = await dice.run(`${spell.name} cast`, (die) => resolveSpellCast(character, spell.id, slot ? spellSlotKey(slot.pool, slot.spellLevel) : undefined, spell.className || castingClass || stats.spellcastingProgressions[0]?.className || "", healSelf, die, spellMode, spellAC.trim() && Number.isInteger(Number(spellAC)) ? Number(spellAC) : null));
+      if (!rolled) return; const result = rolled.result;
+      if (rolled.physical) result.summary = `Physical dice · ${result.summary}`;
       onChange(result.updates); setCastMessage(result.summary); publish(result.summary);
     } catch (reason) { setCastMessage(reason instanceof Error ? reason.message : "Could not cast spell."); }
   }
