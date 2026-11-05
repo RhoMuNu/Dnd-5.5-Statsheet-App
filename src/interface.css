@@ -414,6 +414,19 @@ summary { padding-block: 8px; line-height: 1.5; }
 .featured-info .feature-heading { margin-top: 0; }
 .page-footer { justify-content: flex-end; }
 .rule-description { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.rules-description { color: var(--cream); font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
+.rules-description p { margin: 14px 0; }
+.rules-description li { margin-block: 8px; }
+.rules-description .rule-subheading { color: var(--gold); }
+.rule-table-scroll { width: 100%; overflow-x: auto; margin-block: 16px; }
+.rule-table-scroll table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.rule-table-scroll th, .rule-table-scroll td { min-width: 130px; padding: 12px; border: 1px solid var(--line); vertical-align: top; }
+.rule-table-scroll th { background: var(--panel-raised); color: var(--gold); }
+.rule-linked-references { padding: 12px 16px; margin-block: 16px; border: 1px solid var(--line); border-radius: 8px; background: #15131c; }
+.rule-linked-references summary { color: var(--gold); cursor: pointer; }
+.level-feature .feature-source { display: inline-block; color: var(--muted); margin-left: 12px; font-size: 12px; }
+.feature-search { display: grid; gap: 8px; max-width: 600px; }
+.feature-history > summary { font-weight: 650; cursor: pointer; }
 .starting-spells .level-spell-list { max-height: 520px; overflow-y: auto; padding: 4px; }
 .starting-spells .level-spell-card label { cursor: pointer; }
 .classic-sheet { display: grid; gap: 20px; }
@@ -431,17 +444,17 @@ summary { padding-block: 8px; line-height: 1.5; }
 .classic-skill small { color: var(--muted); margin-left: 8px; }
 .classic-resource-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 18px; }
 .classic-resource-grid input { display: block; width: 100%; margin-top: 8px; }
-.classic-health-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-.classic-health-heading h3 { margin: 0; }
-.classic-health-heading > strong { font-size: 20px; color: var(--cream); }
-.classic-health-heading strong span { color: #b5e5ef; font-size: 14px; }
-.classic-health-controls { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 14px; margin-block: 20px 12px; }
-.classic-health-controls button { width: 44px; min-height: 44px; font-size: 22px; }
-.app-shell input.classic-health-range { appearance: none; width: 100%; height: 26px; min-height: 26px; padding: 0; margin: 0; border: 1px solid #aa7d8c; border-radius: 14px; cursor: pointer; }
-.classic-health-range::-webkit-slider-thumb { appearance: none; width: 32px; height: 32px; border: 2px solid #f9dda4; border-radius: 50%; background: #f5efe6; box-shadow: 0 2px 5px #0008; }
-.classic-health-range::-moz-range-thumb { width: 28px; height: 28px; border: 2px solid #f9dda4; border-radius: 50%; background: #f5efe6; box-shadow: 0 2px 5px #0008; }
-.app-shell input.classic-health-range:disabled { cursor: default; opacity: .7; }
-.classic-health-panel .collection-helper { margin-bottom: 16px; }
+.sheet-health-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.sheet-health-heading h3 { margin: 0; }
+.sheet-health-heading > strong { font-size: 20px; color: var(--cream); }
+.sheet-health-heading strong span { color: #b5e5ef; font-size: 14px; }
+.sheet-health-controls { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 14px; margin-block: 20px 12px; }
+.sheet-health-controls button { width: 44px; min-height: 44px; font-size: 22px; }
+.app-shell input.sheet-health-range { appearance: none; width: 100%; height: 26px; min-height: 26px; padding: 0; margin: 0; border: 1px solid #aa7d8c; border-radius: 14px; cursor: pointer; }
+.sheet-health-range::-webkit-slider-thumb { appearance: none; width: 32px; height: 32px; border: 2px solid #f9dda4; border-radius: 50%; background: #f5efe6; box-shadow: 0 2px 5px #0008; }
+.sheet-health-range::-moz-range-thumb { width: 28px; height: 28px; border: 2px solid #f9dda4; border-radius: 50%; background: #f5efe6; box-shadow: 0 2px 5px #0008; }
+.app-shell input.sheet-health-range:disabled { cursor: default; opacity: .7; }
+.sheet-health-panel .collection-helper { margin-bottom: 16px; }
 .classic-mode-banner { display: flex; gap: 14px; align-items: center; padding: 16px 20px; margin-bottom: 20px; border: 1px solid #89724d; border-radius: 10px; background: linear-gradient(110deg,#332a20,#211d29); color: var(--gold); }
 .classic-mode-banner div { display: grid; gap: 4px; }
 .classic-mode-banner span { font-size: 13px; color: var(--muted); }

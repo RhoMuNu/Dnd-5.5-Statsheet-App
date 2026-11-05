@@ -79,6 +79,8 @@ Characters autosave to this browser's local storage. The collection supports sel
 
 Character sections include class features and custom traits, a quantity and weight inventory with coin tracking, a spellbook with ready-state and spell-slot spending, and a backstory with a dated journal. These fields are included in character backups.
 
+**Features & traits:** Search offline descriptions of class, subclass, species, background feats, and recorded build choices. Each supported species has individual trait descriptions, including lineage tables and level-based unlocks. Expand spell references and rules reminders directly inside a trait. Existing characters receive these references automatically. Unknown homebrew abilities can be described under **Your features**. See [source attribution](docs/SRD-ATTRIBUTION.md).
+
 ## Calculated stats
 
 ### Table play controls
