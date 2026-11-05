@@ -3,6 +3,7 @@ import type { TurnState } from "./economy";
 import type { AdvancementRecord } from "./advancement";
 import { CONDITIONS, type Condition } from "./conditions";
 import { normalizeEffects, type ActiveEffect } from "./effects";
+import { validCustomSubclassMap, type CustomSubclass } from "./customSubclasses";
 
 export type Character = {
   id: string;
@@ -13,6 +14,7 @@ export type Character = {
   subclass: string;
   classLevels: Record<string, number>;
   classSubclasses: Record<string, string>;
+  customSubclasses?: Record<string, CustomSubclass>;
   resourceUses: Record<string, number>;
   customResources: CustomResource[];
   customModifiers?: CustomModifier[];
@@ -76,7 +78,7 @@ export function defaultCombatState(): CombatState {
 export type CharacterAttack = { id: string; inventoryItemId?: string; inventoryWeaponKey?: string; name: string; ability: AbilityName; proficient: boolean; diceCount: number; dieSize: number; damageType: string; attackBonus: number; damageBonus: number; addAbilityToDamage: boolean; notes: string; ranged?: boolean; twoHanded?: boolean; offHand?: boolean };
 
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
-export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string };
+export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string; manualOnly?: boolean; source?: string };
 export type InventoryCurrency = { cp: number; sp: number; ep: number; gp: number; pp: number };
 export type InventoryItem = { id: string; name: string; quantity: number; weight: number; category: string; equipped: boolean; notes: string };
 export type CharacterInventory = { items: InventoryItem[]; currency: InventoryCurrency; startingKitsAdded: boolean };
@@ -229,6 +231,7 @@ export function normalizeCharacter(value: unknown): Character | null {
     advancement: Array.isArray(character.advancement) ? character.advancement.filter((entry) => entry && typeof entry.id === "string" && Number.isInteger(entry.level) && entry.level >= 2 && entry.level <= 20).slice(0, 19) : [],
     attacks: Array.isArray(character.attacks) ? character.attacks.filter(isCharacterAttack).slice(0, 100) : [],
     subclass: character.subclass ?? "",
+    customSubclasses: character.customSubclasses ?? {},
     classLevels: character.classLevels && Object.keys(character.classLevels).length
       ? character.classLevels
       : character.characterClass ? { [character.characterClass]: character.level } : {},
@@ -414,6 +417,7 @@ function isBaseCharacter(value: unknown): value is Omit<Character, keyof ReturnT
     && typeof character.species === "string"
     && typeof character.characterClass === "string"
     && (character.subclass === undefined || typeof character.subclass === "string")
+    && (character.customSubclasses === undefined || validCustomSubclassMap(character.customSubclasses))
     && (character.classLevels === undefined || (typeof character.classLevels === "object" && character.classLevels !== null && !Array.isArray(character.classLevels)
       && Object.values(character.classLevels).every((level) => Number.isInteger(level) && level >= 1 && level <= 20)
       && (!Object.keys(character.classLevels).length || Object.values(character.classLevels).reduce((sum, level) => sum + level, 0) === character.level)))

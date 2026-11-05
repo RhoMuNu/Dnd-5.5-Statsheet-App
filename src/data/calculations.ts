@@ -1,6 +1,6 @@
 import { customModifierTotal } from "./customModifiers";
 import { hasFeat } from "./advancement";
-import { classLevel, subclassIs } from "./rulesCatalog";
+import { classLevel, subclassIs, rulesSubclass } from "./rulesCatalog";
 import { inventoryArmor } from "./equipment";
 import type { AbilityName, Character, CreatureSize, SkillName } from "./characters";
 import { SKILLS } from "./characters";
@@ -115,7 +115,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   })) as Record<SkillName, number>;
 
   const className = primaryClass;
-  const progression = classes.flatMap(({ name, level: classLevel }) => classProgressionAtLevel(name, classLevel, character.classSubclasses?.[capitalize(name)] ?? (name === primaryClass ? character.subclass : "")).gainedFeatures.map((feature) => ({ ...feature, name: `${capitalize(name)} ${feature.name}` })));
+  const progression = classes.flatMap(({ name, level: classLevel }) => classProgressionAtLevel(name, classLevel, rulesSubclass(character, capitalize(name))).gainedFeatures.map((feature) => ({ ...feature, name: `${capitalize(name)} ${feature.name}` })));
   const dexterityModifier = abilityModifiers.Dexterity;
   let armorBase = character.armorMode === "unarmored" ? 10 + dexterityModifier : character.armorBaseAC + armorDexterity(character, dexterityModifier);
   const appliedClassFeatures: string[] = [];
@@ -158,7 +158,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const speed = immobile ? 0 : Math.max(0, character.speedFeet + character.otherSpeedBonus + classSpeedBonus - (armorReducesSpeed ? 10 : 0) - exhaustion * 5 + effectTotal(character, "speed") + (hasFeat(character, "Speedy") ? 10 : 0));
   const spellcastingAbility = character.spellcastingAbility || CLASS_SPELLCASTING_ABILITIES[character.characterClass.trim().toLowerCase()] || "";
   const spellModifier = spellcastingAbility ? abilityModifiers[spellcastingAbility] : null;
-  const spellSlots = spellSlotsForClasses(classes, { [capitalize(className)]: character.subclass, ...character.classSubclasses });
+  const spellSlots = spellSlotsForClasses(classes, Object.fromEntries(classes.map(({ name }) => [capitalize(name), rulesSubclass(character, capitalize(name))])));
   const classResources = classes.flatMap(({ name, level: classLevel }) => classResourcesFor({ ...character, characterClass: capitalize(name) }, classLevel, abilityModifiers).map((resource) => {
     const key = resource.key ? `${name}.${resource.key}` : undefined;
     return { ...resource, key, used: key && resource.maxUses !== undefined ? Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[key] ?? 0)) : undefined, label: classes.length > 1 ? `${capitalize(name)} · ${resource.label}` : resource.label };
@@ -166,7 +166,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const preparedSpellCount = spellCountFor(className, classes.find((entry) => entry.name === className)?.level ?? level);
   const spellcastingProgressions = classes.flatMap(({ name, level: classLevel }) => {
     const classProgression = classProgressionAtLevel(name, classLevel);
-    const ability = spellAbilityFor(name, character.classSubclasses?.[capitalize(name)] ?? (name === className ? character.subclass : ""), name === className ? character.spellcastingAbility : "");
+    const ability = spellAbilityFor(name, rulesSubclass(character, capitalize(name)), name === className ? character.spellcastingAbility : "");
     if (!ability) return [];
     const count = spellCountFor(name, classLevel);
     return [{ className: capitalize(name), cantrips: classProgression.cantrips, count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus + customModifierTotal(character, "spellDC"), attackBonus: abilityModifiers[ability] + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack") + customModifierTotal(character, "spellAttack") }];
@@ -198,7 +198,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     appliedClassFeatures,
     classResources,
     classFeatures: progression,
-    cantrips: classProgressionAtLevel(className, classes.find((entry) => entry.name === className)?.level ?? level, character.subclass).cantrips,
+    cantrips: classProgressionAtLevel(className, classes.find((entry) => entry.name === className)?.level ?? level, rulesSubclass(character, capitalize(className))).cantrips,
     preparedSpellCount: preparedSpellCount.value,
     spellCountLabel: preparedSpellCount.label,
     spellcastingProgressions,

@@ -140,6 +140,7 @@ function validCharacter(character) {
 }
 
 function validCombatData(character) {
+  if (character.customSubclasses !== undefined && !rules.validCustomSubclassMap(character.customSubclasses)) return false;
   const integer = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
   if (character.customModifiers !== undefined) {
     const targets = new Set(rules.modifierTargets().map((entry) => entry.key));

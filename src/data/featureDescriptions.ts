@@ -1,6 +1,6 @@
 import type { Character } from "./characters";
 import { BACKGROUNDS } from "./creationOptions";
-import { CLASS_CATALOG, FEAT_CATALOG, SPELL_CATALOG, classLevel, gainedRuleFeatures, subclassOf } from "./rulesCatalog";
+import { CLASS_CATALOG, FEAT_CATALOG, SPELL_CATALOG, classLevel, gainedRuleFeatures, rulesSubclass } from "./rulesCatalog";
 import speciesCatalog from "./speciesCatalog.json" with { type: "json" };
 import { ORIGIN_REFERENCES } from "./abilityReferences";
 
@@ -32,7 +32,7 @@ export function featureDescription(name: string, character?: Character): string 
   const species = character ? speciesReference(character) : undefined;
   const trait = species?.traits.find((entry) => normalize(entry.name) === normalize(name));
   if (trait) return speciesFeatureDescriptions(character!).find((entry) => entry.name === trait.name)?.description ?? trait.description;
-  const catalogs = character ? CLASS_CATALOG.filter((entry) => classLevel(character, entry.subclass_of?.name ?? entry.name) > 0 && (!entry.subclass_of || normalize(subclassOf(character, entry.subclass_of.name)) === normalize(entry.name))) : CLASS_CATALOG;
+  const catalogs = character ? CLASS_CATALOG.filter((entry) => classLevel(character, entry.subclass_of?.name ?? entry.name) > 0 && (!entry.subclass_of || normalize(rulesSubclass(character, entry.subclass_of.name)) === normalize(entry.name))) : CLASS_CATALOG;
   for (const catalog of catalogs) for (const feature of catalog.features) {
     if (normalize(feature.name) === normalize(name) && feature.desc.trim() !== "[Column data]") return feature.desc;
     for (const section of feature.desc.split(/(?=^#{2,4} )/m)) {
@@ -49,7 +49,7 @@ export function featureDescription(name: string, character?: Character): string 
 
 export function characterRuleFeatures(character: Character) {
   const levels = Object.keys(character.classLevels ?? {}).length ? character.classLevels : { [character.characterClass]: character.level };
-  const features = Object.entries(levels).flatMap(([name, level]) => Array.from({ length: level }, (_, index) => index + 1).flatMap((index) => gainedRuleFeatures(name, index, subclassOf(character, name)).map((feature) => ({ ...feature, level: index }))));
+  const features = Object.entries(levels).flatMap(([name, level]) => Array.from({ length: level }, (_, index) => index + 1).flatMap((index) => gainedRuleFeatures(name, index, rulesSubclass(character, name)).map((feature) => ({ ...feature, level: index }))));
   return [...new Map(features.filter((feature) => feature.description.trim() && feature.description !== "[Column data]").map((feature) => [feature.source + feature.level + feature.name, feature])).values()];
 }
 
