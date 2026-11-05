@@ -26,6 +26,11 @@ export function applyDamage(character: Character, amount: number, critical = fal
   if ((remaining >= hp && remaining - hp >= max) || combat.deathFailures >= 3) combat.dead = true;
   if (combat.concentration) {
     if (nextHp === 0 || combat.dead) { combat.concentration = ""; combat.concentrationDC = null; }
+    else combat.concentrationDC = Math.max(combat.concentrationDC ?? 0, Math.min(30, Math.max(10, Math.floor(amount / 2))));
+  }
+  return { currentHitPoints: nextHp, temporaryHitPoints: Math.max(0, character.temporaryHitPoints - amount), combat };
+}
+
 export function healCharacter(character: Character, amount: number): Partial<Character> {
   const max = calculateCharacterStats(character).maxHitPoints;
   const combat = combatState(character);
