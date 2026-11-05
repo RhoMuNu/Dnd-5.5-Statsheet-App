@@ -5,6 +5,7 @@ import type { Character, CharacterSpell } from "./characters";
 
 export const SPELL_CATALOG = spells;
 export const CLASS_CATALOG = classes;
+export const findSpellByName = (name: string) => SPELL_CATALOG.find((spell) => spell.name.toLowerCase() === name.trim().toLowerCase());
 export const FEAT_CATALOG = [...feats, ...[
   ["Tough", "Origin", "", "Gain 2 maximum HP per character level."],
   ["War Caster", "General", "Level 4+, Spellcasting or Pact Magic Feature", "+1 Intelligence, Wisdom, or Charisma. Advantage on saves to maintain concentration. Spell reactions and occupied hands still require their normal conditions."],
@@ -29,6 +30,6 @@ export function subclassIs(character: Character, name: string, part: string, min
   return classLevel(character, name) >= minimum && subclassOf(character, name).toLowerCase().includes(part.toLowerCase());
 }
 export function gainedRuleFeatures(className: string, level: number, subclass: string) {
-  return CLASS_CATALOG.filter((entry) => entry.name === className || (entry.name === subclass && entry.subclass_of?.name === className))
+  return CLASS_CATALOG.filter((entry) => entry.name.toLowerCase() === className.toLowerCase() || (entry.name.toLowerCase() === subclass.toLowerCase() && entry.subclass_of?.name.toLowerCase() === className.toLowerCase()))
     .flatMap((entry) => entry.features.filter((feature) => feature.feature_type === "CLASS_LEVEL_FEATURE" && feature.gained_at.some((gain) => gain.level === level)).map((feature) => ({ name: feature.name, description: feature.desc, source: entry.name })));
 }

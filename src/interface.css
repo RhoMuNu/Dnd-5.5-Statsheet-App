@@ -413,6 +413,9 @@ summary { padding-block: 8px; line-height: 1.5; }
 .help-dialog h2 { padding-right: 44px; }
 .featured-info .feature-heading { margin-top: 0; }
 .page-footer { justify-content: flex-end; }
+.rule-description { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.starting-spells .level-spell-list { max-height: 520px; overflow-y: auto; padding: 4px; }
+.starting-spells .level-spell-card label { cursor: pointer; }
 @container sheet (max-width: 600px) {
   .skill-row { grid-template-columns: 18px minmax(0,1fr) 34px 38px; gap: 8px; padding-block: 12px; }
   .app-shell .skill-row select { grid-column: 2 / -1; width: 100%; font-size: 14px; }
