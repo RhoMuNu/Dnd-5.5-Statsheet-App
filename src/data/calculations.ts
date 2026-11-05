@@ -121,11 +121,13 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const armorClass = armorBase + (character.hasShield ? 2 : 0) + character.otherAcBonus;
   const hitDie = HIT_DICE[className] ?? null;
   const constitutionModifier = abilityModifiers.Constitution;
-  const maxHitPoints = classes.length === 0 ? null : classes.reduce((total, entry) => {
+  const calculatedHitPoints = classes.length === 0 ? null : classes.reduce((total, entry) => {
     const average = Math.floor(HIT_DICE[entry.name] / 2) + 1;
     const levels = entry.level - (entry.name === className ? 1 : 0);
     return total + levels * Math.max(1, average + constitutionModifier);
   }, Math.max(1, (HIT_DICE[className] ?? 0) + constitutionModifier));
+  // Dwarven Toughness grants 1 additional HP per character level in the 2024 rules.
+  const maxHitPoints = calculatedHitPoints === null ? null : calculatedHitPoints + (character.species.toLowerCase().startsWith("dwarf") ? level : 0);
 
   const effectiveSize = character.powerfulBuild ? increaseSize(character.size) : character.size;
   const carryingCapacity = character.abilityScores.Strength * SIZE_MULTIPLIER[effectiveSize];
@@ -147,7 +149,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const classResources = classes.flatMap(({ name, level: classLevel }) => classResourcesFor({ ...character, characterClass: capitalize(name) }, classLevel, abilityModifiers).map((resource) => {
     const key = resource.key ? `${name}.${resource.key}` : undefined;
     return { ...resource, key, used: key && resource.maxUses !== undefined ? Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[key] ?? 0)) : undefined, label: classes.length > 1 ? `${capitalize(name)} · ${resource.label}` : resource.label };
-  }));
+  })).concat(speciesResources(character, proficiencyBonus), originFeatResources(character));
   const preparedSpellCount = spellCountFor(className, classes.find((entry) => entry.name === className)?.level ?? level, abilityModifiers);
   const spellcastingProgressions = classes.flatMap(({ name, level: classLevel }) => {
     const classProgression = classProgressionAtLevel(name, classLevel);
@@ -198,6 +200,37 @@ function spellAbilityFor(className: string, subclass: string, override: AbilityN
   if (className === "fighter" && subclassName.includes("eldritch knight")) return "Intelligence";
   if (className === "rogue" && subclassName.includes("arcane trickster")) return "Intelligence";
   return null;
+}
+
+function speciesResources(character: Character, proficiencyBonus: number) {
+  const species = character.species.toLowerCase().split(" (")[0].trim();
+  const source = species === "aasimar" ? [
+    { key: "species.healing-hands", label: "Healing Hands", value: `1d4 × ${proficiencyBonus} HP`, maxUses: proficiencyBonus },
+    { key: "species.celestial-revelation", label: "Celestial Revelation", value: "", maxUses: 1 },
+  ] : species === "dragonborn" ? [
+    { key: "species.breath-weapon", label: "Breath Weapon", value: "", maxUses: proficiencyBonus },
+  ] : species === "dwarf" ? [
+    { key: "species.stonecunning", label: "Stonecunning", value: "", maxUses: proficiencyBonus },
+  ] : species === "goliath" ? [
+    { key: "species.large-form", label: "Large Form", value: "", maxUses: proficiencyBonus },
+  ] : species === "orc" ? [
+    { key: "species.adrenaline-rush", label: "Adrenaline Rush", value: "", maxUses: proficiencyBonus },
+  ] : species === "human" ? [
+    { key: "species.resourceful", label: "Heroic Inspiration · Resourceful", value: "", maxUses: 1 },
+  ] : [];
+  return source.map((resource) => ({
+    ...resource,
+    recovery: "Long Rest" as const,
+    used: Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[resource.key] ?? 0)),
+    label: resource.label,
+  }));
+}
+
+function originFeatResources(character: Character) {
+  const background = character.background.toLowerCase();
+  if (background !== "acolyte" && background !== "sage") return [];
+  const key = "origin.magic-initiate";
+  return [{ key, label: "Magic Initiate · Free Level 1 Spell", value: "Once per Long Rest", maxUses: 1, used: Math.min(1, Math.max(0, character.resourceUses?.[key] ?? 0)), recovery: "Long Rest" as const }];
 }
 
 function multiclassPrerequisiteWarnings(classes: { name: string; level: number }[], scores: Record<AbilityName, number>): string[] {

@@ -27,6 +27,7 @@ export type Character = {
   otherAcBonus: number;
   armorStrengthRequirement: number;
   spellcastingAbility: AbilityName | "";
+  creationDetails?: CharacterCreationDetails;
   createdAt: string;
   updatedAt: string;
 };
@@ -34,6 +35,20 @@ export type Character = {
 export type CustomResource = { id: string; name: string; maxUses: number; used: number; recovery: "short-one" | "short-all" | "long" | "manual" };
 
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
+export type CharacterCreationDetails = {
+  abilityMethod: "standard" | "point-buy" | "manual" | "rolled";
+  baseAbilityScores: Record<AbilityName, number>;
+  backgroundAbilityBoosts: Partial<Record<AbilityName, 0 | 1 | 2>>;
+  classSkills: SkillName[];
+  languages: string[];
+  toolProficiency: string;
+  classToolProficiency: string;
+  equipmentChoice: "A" | "B" | "gold";
+  classEquipment: string;
+  classEquipmentOption: "A" | "B" | "C" | "custom";
+  classChoices: string;
+  appearance: string;
+};
 export type AbilityName = "Strength" | "Dexterity" | "Constitution" | "Intelligence" | "Wisdom" | "Charisma";
 export type SkillName =
   | "Acrobatics" | "Animal Handling" | "Arcana" | "Athletics" | "Deception" | "History"
