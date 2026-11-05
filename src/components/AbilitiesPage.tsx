@@ -1,3 +1,6 @@
+import { TurnPanel } from "./TurnPanel";
+import { LevelUpWizard } from "./LevelUpWizard";
+import { EquipmentSettings } from "./EquipmentSettings";
 import { ABILITIES, SKILLS, type AbilityName, type Character, type SkillName } from "../data/characters";
 import { calculateCharacterStats, isClassSavingThrowProficient } from "../data/calculations";
 import { useEffect, useId, useState } from "react";
@@ -20,6 +23,7 @@ const ARMOR_MODES = [
 ] as const;
 
 export function AbilitiesPage({ character, onChange, readOnly = false }: AbilitiesPageProps) {
+  const [levelingUp, setLevelingUp] = useState(false);
   const stats = calculateCharacterStats(character);
   const maximumHp = stats.maxHitPoints ?? 0;
   const currentHp = Math.min(maximumHp, character.currentHitPoints ?? maximumHp);
@@ -111,10 +115,11 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
 
   return (
     <section className="abilities-page" aria-label={`Character sheet for ${character.name}`}>
+      {levelingUp && onChange && <LevelUpWizard character={character} onApply={onChange} onClose={() => setLevelingUp(false)} />}
       <header className="sheet-hero">
         <div className="sheet-hero-emblem"><Icon name="dice" /></div>
         <div className="sheet-hero-copy"><p className="eyebrow">{readOnly ? "SHARED CHARACTER" : "READY FOR ADVENTURE"}</p><h2>{character.name}</h2><p>{[character.species, character.background].filter(Boolean).join(" · ")}</p><div className="hero-class-chips">{stats.classBreakdown.map(({ name, level }) => <span key={name}>{name} <b>{level}</b></span>)}{readOnly && <span>View only</span>}</div></div>
-        <div className="hero-level"><span>LEVEL</span><strong>{stats.totalLevel.toString().padStart(2, "0")}</strong><small>2024 rules</small></div>
+        <div className="hero-level"><span>LEVEL</span><strong>{stats.totalLevel.toString().padStart(2, "0")}</strong><small>2024 rules</small>{!readOnly && onChange && <button type="button" className="level-up-button" disabled={stats.totalLevel >= 20} onClick={() => setLevelingUp(true)}>{stats.totalLevel >= 20 ? "Maximum level" : "Level up ✦"}</button>}</div>
       </header>
       <div className="vitals-strip" aria-label="Character vital statistics">
         <div className="vital-stat hp-vital"><span><Icon name="heart" />Hit points</span><strong>{currentHp}<small> / {stats.maxHitPoints ?? "—"}</small></strong><div className="vital-meter"><i style={{ width: `${hpPercent}%` }} /></div></div>
@@ -141,7 +146,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               <div className="hp-controls"><button type="button" aria-label="Take one damage" disabled={readOnly || (currentHp <= 0 && character.temporaryHitPoints <= 0) || maximumHp === 0 || combatState(character).dead} onClick={() => changeHitPoints(-1)}>− Damage</button><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><button type="button" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label></div>
             </div>
             {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
-          </section><GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} /></div><div className="sheet-stack"><AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /><EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /></div></div>
+          </section><TurnPanel character={character} onChange={onChange} readOnly={readOnly} /><GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} /></div><div className="sheet-stack"><AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /><EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /></div></div>
       </div>
       <div className="sheet-tab-panel ability-view" role="tabpanel" id={`${tabId}-panel-abilities`} aria-labelledby={`${tabId}-tab-abilities`} hidden={view !== "abilities"}>          <section className="sheet-panel" aria-labelledby="ability-scores-title">
             <div className="panel-heading"><div><p className="eyebrow">THE SIX ABILITIES</p><h2 id="ability-scores-title">Ability scores</h2></div><span className="panel-hint">Modifiers update live</span></div>
@@ -217,16 +222,17 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
 </div></div>
       <div className="sheet-tab-panel setup-view" role="tabpanel" id={`${tabId}-panel-setup`} aria-labelledby={`${tabId}-tab-setup`} hidden={view !== "setup"}>          <section className="sheet-panel setup-panel">
             <div className="panel-heading"><div><p className="eyebrow">CHARACTER CONFIGURATION</p><h2>Armor, movement &amp; spellcasting</h2></div></div>
+            <EquipmentSettings character={character} onChange={onChange} readOnly={readOnly} />
             <fieldset className="setup-fields" disabled={readOnly}>
               <label className="compact-field"><span>Size</span><select value={character.size} onChange={(event) => onChange?.({ size: event.target.value as Character["size"] })}>{SIZES.map((size) => <option key={size}>{size}</option>)}</select></label>
               <label className="compact-field"><span>Base speed (feet)</span><input type="number" min={0} max={500} value={character.speedFeet} onChange={(event) => onChange?.({ speedFeet: numberOr(event.target.value, character.speedFeet, 0, 500) })} /></label>
               <label className="compact-field"><span>Other speed bonus (feet)</span><input type="number" min={-500} max={500} value={character.otherSpeedBonus} onChange={(event) => onChange?.({ otherSpeedBonus: numberOr(event.target.value, character.otherSpeedBonus, -500, 500) })} /></label>
               <label className="toggle-row"><input type="checkbox" checked={character.powerfulBuild} onChange={(event) => onChange?.({ powerfulBuild: event.target.checked })} /><span>Counts as one size larger for carrying</span></label>
-              <label className="compact-field"><span>Armor formula</span><select value={character.armorMode} onChange={(event) => onChange?.({ armorMode: event.target.value as Character["armorMode"] })}>{ARMOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
+              <label className="compact-field"><span>Armor formula</span><select disabled={character.armorSource === "inventory"} value={character.armorMode} onChange={(event) => onChange?.({ armorMode: event.target.value as Character["armorMode"] })}>{ARMOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
               {stats.classBreakdown.some(({ name }) => name === "Barbarian") && stats.classBreakdown.some(({ name }) => name === "Monk") && <label className="compact-field"><span>Unarmored Defense choice</span><select value={character.unarmoredDefenseChoice} onChange={(event) => onChange?.({ unarmoredDefenseChoice: event.target.value as Character["unarmoredDefenseChoice"] })}><option value="">Use starting class</option><option value="Barbarian">Barbarian · Dex + Con</option><option value="Monk">Monk · Dex + Wis (no shield)</option></select></label>}
-              {character.armorMode !== "unarmored" && <label className="compact-field"><span>Armor base AC</span><input type="number" min={1} max={40} value={character.armorBaseAC} onChange={(event) => onChange?.({ armorBaseAC: numberOr(event.target.value, character.armorBaseAC, 1, 40) })} /></label>}
-              {character.armorMode === "heavy" && <label className="compact-field"><span>Armor Strength requirement</span><input type="number" min={0} max={30} value={character.armorStrengthRequirement} onChange={(event) => onChange?.({ armorStrengthRequirement: numberOr(event.target.value, character.armorStrengthRequirement, 0, 30) })} /></label>}
-              <label className="toggle-row"><input type="checkbox" checked={character.hasShield} onChange={(event) => onChange?.({ hasShield: event.target.checked })} /><span>Shield AC bonus (+2 when trained)</span></label>
+              {character.armorMode !== "unarmored" && <label className="compact-field"><span>Armor base AC</span><input type="number" min={1} max={40} disabled={character.armorSource === "inventory"} value={character.armorBaseAC} onChange={(event) => onChange?.({ armorBaseAC: numberOr(event.target.value, character.armorBaseAC, 1, 40) })} /></label>}
+              {character.armorMode === "heavy" && <label className="compact-field"><span>Armor Strength requirement</span><input type="number" min={0} max={30} disabled={character.armorSource === "inventory"} value={character.armorStrengthRequirement} onChange={(event) => onChange?.({ armorStrengthRequirement: numberOr(event.target.value, character.armorStrengthRequirement, 0, 30) })} /></label>}
+              <label className="toggle-row"><input disabled={character.armorSource === "inventory"} type="checkbox" checked={character.hasShield} onChange={(event) => onChange?.({ hasShield: event.target.checked })} /><span>Shield AC bonus (+2 when trained)</span></label>
               <label className="compact-field"><span>Other AC bonus</span><input type="number" min={-20} max={20} value={character.otherAcBonus} onChange={(event) => onChange?.({ otherAcBonus: numberOr(event.target.value, character.otherAcBonus, -20, 20) })} /></label>
               <label className="compact-field"><span>Spellcasting ability override</span><select value={character.spellcastingAbility} onChange={(event) => onChange?.({ spellcastingAbility: event.target.value as AbilityName | "" })}><option value="">Use class default</option>{ABILITIES.map((ability) => <option key={ability}>{ability}</option>)}</select></label>
               <p className="setup-note">Class saving throw proficiencies and spell ability are applied automatically. For features that grant extras, use the save checkboxes or spell ability override. Choose Custom AC for an alternate class AC formula. Enter species speed and any armor Strength requirement here.</p>

@@ -1,5 +1,7 @@
+import { spellTurnCost } from "./economy";
+import { inventoryArmor } from "./equipment";
 import { activeEffects, effectTotal } from "./effects";
-import { defaultCombatState, type Character } from "./characters";
+import { defaultCombatState, makeCharacterId, type Character } from "./characters";
 import { calculateCharacterStats } from "./calculations";
 import { activeConditions, exhaustionLevel, isIncapacitated, type Condition, effectiveRollMode, type RollMode } from "./conditions";
 
@@ -60,7 +62,7 @@ export function restCharacter(character: Character, kind: "Short Rest" | "Long R
   if ((character.currentHitPoints ?? stats.maxHitPoints ?? 0) <= 0 || combat.dead) return {};
   const resourceUses = { ...character.resourceUses };
   const elapsedRounds = kind === "Long Rest" ? 4800 : 600;
-  const effects = activeEffects(character).map((effect) => effect.rounds === null ? effect : { ...effect, rounds: effect.rounds - elapsedRounds }).filter((effect) => effect.rounds === null || effect.rounds > 0);
+  const effects = activeEffects(character).filter((effect) => !effect.id.startsWith("automatic-") && effect.id !== "eldritch-mind").map((effect) => effect.rounds === null ? effect : { ...effect, rounds: effect.rounds - elapsedRounds }).filter((effect) => effect.rounds === null || effect.rounds > 0);
   for (const resource of stats.classResources) {
     if (!resource.key || resource.maxUses === undefined) continue;
     if (kind === "Long Rest") resourceUses[resource.key] = 0;
@@ -93,14 +95,15 @@ export function spendHitDie(character: Character, className: string, roll: numbe
 
 export function castCharacterSpell(character: Character, id: string, slotKey?: string): Partial<Character> {
   const spell = character.spells.find((spell) => spell.id === id);
-  if (!spell?.prepared || isIncapacitated(character)) return {};
+  if (!spell?.prepared || isIncapacitated(character) || (character.armorSource === "inventory" && inventoryArmor(character).untrained)) return {};
   const updates: Partial<Character> = {};
   if (spell.level > 0) {
     const slot = calculateCharacterStats(character).spellSlots.find((slot) => spellSlotKey(slot.pool, slot.spellLevel) === slotKey);
     if (!slot || slot.spellLevel < spell.level || (character.resourceUses[slotKey!] ?? 0) >= slot.total) return {};
     updates.resourceUses = { ...character.resourceUses, [slotKey!]: (character.resourceUses[slotKey!] ?? 0) + 1 };
   }
-  if (spell.concentration) updates.combat = { ...combatState(character), concentration: spell.name, concentrationDC: null };
+  Object.assign(updates, spellTurnCost(character, spell.castingTime, spell.level > 0));
+  if (spell.concentration) updates.combat = { ...(updates.combat ?? combatState(character)), concentration: spell.name, concentrationId: makeCharacterId(), concentrationDC: null };
   return updates;
 }
 

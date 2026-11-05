@@ -122,9 +122,11 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       ...defaultCharacterStats(),
       ...(character ? {
         abilityScores: character.abilityScores, savingThrowProficiencies: character.savingThrowProficiencies, skillProficiencies: character.skillProficiencies,
+        advancement: character.advancement, rulesChoices: character.rulesChoices, hitPointAdjustment: character.hitPointAdjustment,
         attacks: character.attacks, combat: character.combat, resourceUses: character.resourceUses, customResources: character.customResources, currentHitPoints: character.currentHitPoints,
         temporaryHitPoints: character.temporaryHitPoints, size: character.size, speedFeet: character.speedFeet,
         otherSpeedBonus: character.otherSpeedBonus, powerfulBuild: character.powerfulBuild, armorMode: character.armorMode,
+        armorSource: character.armorSource, inventoryArmorTrained: character.inventoryArmorTrained, inventoryShieldTrained: character.inventoryShieldTrained,
         armorBaseAC: character.armorBaseAC, hasShield: character.hasShield, otherAcBonus: character.otherAcBonus,
         armorStrengthRequirement: character.armorStrengthRequirement, unarmoredDefenseChoice: character.unarmoredDefenseChoice,
         spellcastingAbility: character.spellcastingAbility,

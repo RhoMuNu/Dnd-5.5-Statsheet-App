@@ -1,3 +1,7 @@
+import { AdvancementContext } from "../data/advancementTransport";
+import { LanSpellProvider } from "./LanSpellTargets";
+import { rememberLanSession, savedLanSessions } from "../data/lanSessions";
+import { TableRoom } from "./TableRoom";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AbilitiesPage } from "./AbilitiesPage";
 import { EncounterPanel } from "./EncounterPanel";
@@ -24,6 +28,7 @@ function loadPending(key: string | null): Record<string, PendingLanSave> {
 }
 
 export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
+  const [savedRooms, setSavedRooms] = useState(savedLanSessions);
   const [session, setSession] = useState<LanSession | null>(loadSession);
   const [snapshot, setSnapshot] = useState<LanSnapshot | null>(null);
   const [connection, setConnection] = useState<"checking" | "connecting" | "connected" | "offline">("checking");
@@ -126,6 +131,7 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
       if (!active) return;
       setSnapshot(JSON.parse((event as MessageEvent<string>).data) as LanSnapshot);
       setConnection("connected");
+      if (!Object.keys(pendingRef.current).length) setSaveStatus("Saved to DM host");
       setError("");
     });
     events.onopen = () => {
@@ -161,6 +167,7 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
   const selectedCharacter = ownCharacters.find((entry) => entry.character.id === selectedId)?.character ?? ownCharacters[0]?.character ?? null;
 
   function activateSession(next: LanSession) {
+    setSavedRooms(rememberLanSession(next));
     localStorage.setItem(SESSION_KEY, JSON.stringify(next));
     setSession(next);
     setSnapshot(null);
@@ -260,6 +267,12 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
     }
   }
 
+  useEffect(() => {
+    if (!session) return;
+    try { setSavedRooms(rememberLanSession({ ...session, campaignName: snapshot?.campaign.name ?? session.campaignName })); }
+    catch { setError("Browser storage is full. Room access could not be saved on this device."); }
+  }, [session, snapshot?.campaign.name]);
+
   function forgetSession() {
     localStorage.removeItem(SESSION_KEY);
     setSession(null); setSnapshot(null); setPending({}); pendingRef.current = {};
@@ -269,7 +282,7 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
   if (!session) return <section className="lan-screen">
     <div className="lan-intro-card"><div className="section-symbol" aria-hidden="true">⌁</div><div><p className="eyebrow">PLAY TOGETHER · LOCAL NETWORK</p><h2>Bring the party to one table.</h2><p>One player starts the host on their PC. Everyone else joins with the room code while connected to the same Wi-Fi.</p></div><span className={`lan-connection ${hostAvailable ? "online" : "offline"}`}>{hostAvailable ? "HOST SERVICE READY" : "HOST SERVICE OFFLINE"}</span></div>
     {!hostAvailable && <div className="lan-help-note"><strong>Start the LAN host first</strong><span>On Windows, double-click <code>Start TaleForge Host.bat</code> in the project folder. Keep its window open, then refresh this page.</span></div>}
-    {loadSession() && <button className="lan-resume-button" onClick={() => { const saved = loadSession(); if (saved) activateSession(saved); }}>Resume last room · {loadSession()?.code}</button>}
+    {savedRooms.length > 0 && <section className="collection-panel"><h3>Saved rooms on this device</h3><p>Resume your existing DM or player identity, including your characters. Use the same host address and browser each session.</p><div className="play-controls">{savedRooms.map((room) => <button className="backup-button" key={room.token} onClick={() => activateSession(room)}>{room.campaignName ?? room.code} · {room.role === "dm" ? "DM" : room.name} · {room.code}</button>)}</div></section>}
     <div className="lan-setup-grid">
       <form className="lan-form-card" onSubmit={hostCampaign}><p className="eyebrow">DUNGEON MASTER</p><h3>Host a campaign</h3><label><span>Campaign name</span><input value={campaignName} onChange={(event) => setCampaignName(event.target.value)} placeholder="The Sunken Crown" maxLength={80} required /></label><label><span>Your display name</span><input value={playerName} onChange={(event) => setPlayerName(event.target.value)} placeholder="Dungeon Master" maxLength={40} /></label><button className="primary-button" disabled={!hostAvailable}>Create room <span>→</span></button></form>
       <form className="lan-form-card" onSubmit={joinCampaign}><p className="eyebrow">PLAYER</p><h3>Join a campaign</h3><label><span>Room code</span><input className="room-code-input" value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase())} placeholder="6 LETTERS / NUMBERS" maxLength={6} required /></label><label><span>Your display name</span><input value={playerName} onChange={(event) => setPlayerName(event.target.value)} placeholder="Your name" maxLength={40} required /></label><button className="primary-button" disabled={!hostAvailable}>Join room <span>→</span></button></form>
@@ -286,6 +299,15 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
     <div className="lan-room-bar"><div><p className="eyebrow">{session.role === "dm" ? "DUNGEON MASTER HOST" : "PLAYER CONNECTION"}</p><h2>{snapshot?.campaign.name ?? "Connecting to campaign…"}</h2><span>ROOM CODE <strong>{session.code}</strong> · {connectedCount} player{connectedCount === 1 ? "" : "s"} online</span></div><div className="lan-status-stack"><span className={`lan-connection ${connection === "connected" ? "online" : "offline"}`}>{connection === "connected" ? "CONNECTED" : connection === "connecting" ? "CONNECTING" : "RECONNECTING"}</span><span className="lan-save-status">{session.role === "player" ? saveStatus : connection === "connected" ? "Live party view" : "Waiting for host connection"}</span></div></div>
     {error && <p className="lan-error" role="status">{error}</p>}
 
+    <AdvancementContext.Provider value={async (characterId, plan, requestId) => {
+      if (pendingRef.current[characterId]) throw new Error("Wait for this sheet to finish syncing before leveling up.");
+      const source = snapshot?.characters.find((entry) => entry.character.id === characterId)?.character;
+      if (!source) throw new Error("Character is not connected to this room.");
+      await lanRequest(`/api/campaigns/${session.code}/level-up`, { method: "POST", body: JSON.stringify({ characterId, plan, requestId, baseUpdatedAt: source.updatedAt }) }, session.token);
+      await refreshSnapshot();
+    }}>
+    <LanSpellProvider key={session.token} session={session} snapshot={snapshot} connected={connection === "connected"} pendingIds={Object.keys(pending)} onRefresh={refreshSnapshot}>
+    <TableRoom key={session.token} session={session} snapshot={snapshot} connected={connection === "connected"}>
     {snapshot && <EncounterPanel session={session} snapshot={snapshot} connected={connection === "connected"} onRefresh={refreshSnapshot} />}
     {session.role === "dm" ? <div className="lan-dashboard-grid">
       <aside className="lan-party-panel"><div className="lan-panel-heading"><div><p className="eyebrow">THE PARTY</p><h3>Players</h3></div><span>{snapshot?.players.length ?? 0}</span></div>
@@ -302,6 +324,9 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
       </aside>
       <div className="lan-sheet-view">{showBuilder ? <CharacterBuilder key={editingId ?? "lan-new"} character={ownCharacters.find((entry) => entry.character.id === editingId)?.character} onSave={savePlayerCharacter} onCancel={() => { setShowBuilder(false); setEditingId(null); }} /> : selectedCharacter ? <><div className="lan-view-only player-sheet-heading"><span>{selectedCharacter.name} · Your sheet</span>{pending[selectedCharacter.id] && <button className="lan-retry-button" onClick={() => void retrySync()}>Retry sync</button>}<strong>{saveStatus}</strong></div><CampaignSheet key={selectedCharacter.id} character={selectedCharacter} onChange={(updates) => updatePlayerCharacter(selectedCharacter.id, updates)} /></> : <div className="lan-empty-sheet"><span>✧</span><h3>Your character sheet</h3><p>Create a hero to start. You control your sheet; sharing it with the DM is always your choice.</p><button className="primary-button" onClick={() => { setEditingId(null); setShowBuilder(true); }}>Create your character <span>→</span></button></div>}</div>
     </div>}
+    </TableRoom>
+    </LanSpellProvider>
+    </AdvancementContext.Provider>
     {session.role === "dm" && <div className="lan-host-address"><strong>Invite your players</strong><span>Open this address on devices using the same Wi-Fi, then enter room code <b>{session.code}</b>.</span>{lanAddresses.length ? lanAddresses.map((address) => <code key={address}>http://{address}:{window.location.port || "80"}</code>) : <code>http://{window.location.hostname}:{window.location.port || "80"}</code>}</div>}
     {session.role === "dm" && <button className="lan-leave-button dm-end-note" onClick={forgetSession}>Return to campaign menu on this device</button>}
   </section>;

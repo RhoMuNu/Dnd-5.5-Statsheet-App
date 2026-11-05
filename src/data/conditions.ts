@@ -1,3 +1,6 @@
+import { subclassIs } from "./rulesCatalog";
+import { inventoryArmor } from "./equipment";
+import { SKILLS } from "./characters";
 import type { Character } from "./characters";
 
 export const CONDITIONS = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"] as const;
@@ -38,8 +41,12 @@ export function automaticSaveFailure(character: Character, ability: string): boo
 }
 export function effectiveRollMode(character: Character, kind: "attack" | "check" | "initiative" | "save", requested: RollMode, ability = "", extraAdvantage = false, extraDisadvantage = false): RollMode {
   const conditions = activeConditions(character);
-  const advantage = requested === "advantage" || extraAdvantage || (kind === "initiative" && conditions.includes("Invisible"));
-  const disadvantage = requested === "disadvantage" || extraDisadvantage
+  const advantage = (subclassIs(character, "Fighter", "Champion") && (kind === "initiative" || (kind === "check" && ability === "Athletics"))) || requested === "advantage" || extraAdvantage || (kind === "initiative" && conditions.includes("Invisible"));
+  const equipment = character.armorSource === "inventory" ? inventoryArmor(character) : null;
+  const testAbility = SKILLS.find((skill) => skill.name === ability)?.ability ?? (kind === "initiative" ? "Dexterity" : ability);
+  const disadvantage = (kind === "check" && ability === "Stealth" && equipment?.stealth === true)
+    || (equipment?.untrained === true && ["Strength", "Dexterity"].includes(testAbility))
+    || requested === "disadvantage" || extraDisadvantage
     || (["attack", "check", "initiative"].includes(kind) && conditions.includes("Poisoned"))
     || (kind === "attack" && conditions.some((condition) => ["Blinded", "Prone", "Restrained"].includes(condition)))
     || (kind === "initiative" && conditions.includes("Incapacitated"))

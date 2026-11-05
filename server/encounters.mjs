@@ -39,6 +39,7 @@ export function changeEncounter(previous, action, sharedCharacters, id) {
   else if (action.type === "clear") { next.activeId = null; next.round = 0; next.entries = []; }
   else throw new Error("Unknown encounter action.");
   next.entries.sort((a, b) => b.initiative - a.initiative || b.tieOrder - a.tieOrder);
+  next.turnSerial = (previous.turnSerial ?? 0) + (["start", "next", "stop", "clear"].includes(action.type) || next.activeId !== previous.activeId ? 1 : 0);
   next.revision = previous.revision + 1;
   return next;
 }

@@ -53,6 +53,21 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
     const started = await request(`${route}/encounter`, "POST", { revision: 1, action: { type: "start" } }, dm.token);
     assert.equal(started.data.encounter.round, 1);
     assert.equal((await request(route, "GET", undefined, other.token)).data.encounter.activeId, added.data.encounter.entries[0].id);
+    assert.equal((await request(route + '/activity', 'POST', { kind: 'dice', expression: '1d20', requestId: 'unauthorized' })).status, 401);
+    const rollBody = { kind: 'dice', expression: '2d6+3', requestId: 'public-roll' };
+    const publicRoll = await request(route + '/activity', 'POST', rollBody, dm.token);
+    assert.equal(publicRoll.status, 200);
+    assert.match(publicRoll.data.entry.summary, /^2d6\+3:/);
+    const duplicateRoll = await request(route + '/activity', 'POST', rollBody, dm.token);
+    assert.equal(duplicateRoll.data.entry.id, publicRoll.data.entry.id);
+    assert.equal((await request(route, 'GET', undefined, other.token)).data.activity.length, 1);
+    const sheetBody = { kind: 'sheet', characterId: character.id, summary: 'Longsword attack = 21', requestId: 'sheet-roll' };
+    assert.equal((await request(route + '/activity', 'POST', sheetBody, other.token)).status, 400);
+    assert.equal((await request(route + '/activity', 'POST', sheetBody, player.token)).status, 200);
+    assert.equal((await request(route, 'GET', undefined, other.token)).data.activity[1].characterName, 'LAN hero');
+    await request(route + '/characters/lan-hero/share', 'POST', { shared: false }, player.token);
+    assert.equal((await request(route + '/activity', 'POST', { ...sheetBody, requestId: 'private' }, player.token)).status, 400);
+    await request(route + '/characters/lan-hero/share', 'POST', { shared: true }, player.token);
     const controller = new AbortController();
     const events = await fetch(`${base}${route}/events?token=${dm.token}`, { signal: controller.signal });
     const reader = events.body.getReader();
@@ -61,6 +76,9 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
       assert.equal((await request(`${route}/encounter`, "POST", { revision: 2, action: { type: "next" } }, dm.token)).status, 200);
       let encounterStream = "";
       while (!encounterStream.includes('"round":2')) encounterStream += new TextDecoder().decode((await reader.read()).value);
+      await request(route + '/activity', 'POST', { kind: 'dice', expression: '1d4', requestId: 'sse-roll' }, other.token);
+      let activityStream = '';
+      while (!activityStream.includes('sse-roll')) activityStream += new TextDecoder().decode((await reader.read()).value);
       const next = { ...character, currentHitPoints: 4, updatedAt: "2026-11-05T00:01:00Z", notes: { backstory: "Synced journal", entries: [] } };
       assert.equal((await request(`${route}/characters`, "POST", { character: next, shared: true, baseUpdatedAt: character.updatedAt }, player.token)).status, 200);
       let stream = "";
@@ -71,6 +89,8 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
       const saved = JSON.parse(await readFile(join(directory, "lan-campaigns.json"), "utf8"));
       assert.equal(saved.campaigns[0].characters[0].character.notes.backstory, "Synced journal");
       assert.equal(saved.campaigns[0].encounter.round, 2);
+      assert.equal(saved.campaigns[0].activity.length, 3);
+      assert.equal(saved.campaigns[0].activity[1].summary, "Longsword attack = 21");
       assert.equal(saved.campaigns[0].characters[0].character.combat.effects[0].name, "Bless");
       assert.equal(saved.campaigns[0].characters[0].character.attacks[0].name, "Dagger");
     } finally { controller.abort(); await reader.cancel().catch(() => {}); }

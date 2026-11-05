@@ -5,9 +5,11 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { homedir, networkInterfaces } from "node:os";
 import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { makeActivity } from "./activity.mjs";
 import { changeEncounter, emptyEncounter } from "./encounters.mjs";
 
 const isProduction = process.env.NODE_ENV === "production" || process.argv.includes("--production");
+const rules = isProduction ? await import("../dist/rules.mjs") : (await import("./rules-dev.mjs")).rules;
 const port = Number(process.env.TALEFORGE_PORT ?? (isProduction ? 4173 : 4174));
 const appRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distRoot = join(appRoot, "dist");
@@ -23,6 +25,28 @@ try {
 } catch (error) {
   console.error(`Could not read the campaign store at ${dataFile}:`, error.message);
   process.exit(1);
+}
+
+function stamp(character) { return { ...character, updatedAt: new Date(Math.max(Date.now(), Date.parse(character.updatedAt) + 1 || 0)).toISOString() }; }
+function cleanEffects(campaign) {
+  const cleaned = rules.cleanConcentrationEffects(campaign.characters.map((entry) => entry.character));
+  campaign.characters.forEach((entry, index) => { if (cleaned[index] !== entry.character) entry.character = stamp(cleaned[index]); });
+}
+function synchronizeTurns(campaign, previous, next) {
+  const key = 'lan-' + (next.turnSerial ?? next.revision);
+  const activeCharacterId = next.entries.find((entry) => entry.id === next.activeId)?.characterId;
+  const previousActiveId = previous.entries.find((entry) => entry.id === previous.activeId)?.characterId;
+  const newTurn = !!next.activeId && (previous.activeId !== next.activeId || previous.turnSerial !== next.turnSerial);
+  for (const record of campaign.characters) {
+    const character = record.character;
+    const inEncounter = next.entries.some((entry) => entry.characterId === character.id);
+    const old = rules.turnState(character);
+    if (!inEncounter && !old.key.startsWith('lan-')) continue;
+    let turn = { ...old, enabled: inEncounter && next.round > 0, key, active: activeCharacterId === character.id };
+    if (turn.enabled && turn.active && (!old.enabled || previousActiveId !== character.id || previous.turnSerial !== next.turnSerial)) turn = { ...rules.freshTurn(key), active: true };
+    const effects = (character.combat?.effects ?? []).map((effect) => newTurn && effect.durationOwnerId === activeCharacterId && effect.rounds !== null ? { ...effect, rounds: effect.rounds - 1 } : effect).filter((effect) => effect.rounds === null || effect.rounds > 0);
+    if (JSON.stringify(old) !== JSON.stringify(turn) || JSON.stringify(effects) !== JSON.stringify(character.combat?.effects ?? [])) record.character = stamp({ ...character, combat: { ...character.combat, effects, turn } });
+  }
 }
 
 function persist() {
@@ -65,7 +89,9 @@ function snapshotFor(auth) {
   const characters = role === "dm"
     ? campaign.characters.filter((entry) => entry.shared).map((entry) => ({ character: entry.character, ownerId: entry.ownerId, ownerName: campaign.players.find((person) => person.id === entry.ownerId)?.name ?? "Player" }))
     : campaign.characters.filter((entry) => entry.ownerId === player.id).map((entry) => ({ character: entry.character, shared: entry.shared }));
-  return { campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters, encounter: campaign.encounter ?? emptyEncounter() };
+  const publicIds = new Set((campaign.encounter?.entries ?? []).map((entry) => entry.characterId));
+  const targets = campaign.characters.filter((entry) => entry.shared && publicIds.has(entry.character.id)).map((entry) => ({ id: entry.character.id, name: entry.character.name }));
+  return { targets, campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters, activity: campaign.activity ?? [], encounter: campaign.encounter ?? emptyEncounter() };
 }
 function pushSnapshot(token) {
   const connections = clients.get(token);
@@ -191,6 +217,21 @@ const apiServer = createServer(async (request, response) => {
       return sendJson(response, 200, snapshotFor(auth));
     }
 
+    const activityMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/activity$/i);
+    if (request.method === "POST" && activityMatch) {
+      const auth = authorizedCampaign(request, activityMatch[1]);
+      if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
+      const body = await readJson(request);
+      const entry = makeActivity(auth, body, randomToken(12), (sides) => randomInt(1, sides + 1));
+      const activity = auth.campaign.activity ?? [];
+      if (!activity.some((item) => item.id === entry.id)) {
+        auth.campaign.activity = [...activity, entry].slice(-100);
+        persist();
+        broadcastCampaign(auth.campaign);
+      }
+      return sendJson(response, 200, { entry });
+    }
+
     const encounterMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/encounter$/i);
     if (request.method === "POST" && encounterMatch) {
       const auth = authorizedCampaign(request, encounterMatch[1]);
@@ -201,10 +242,54 @@ const apiServer = createServer(async (request, response) => {
       if (body.revision !== previous.revision) return sendJson(response, 409, { error: "Turn order changed on another device. Review the current encounter and try again." });
       // Re-read after awaiting the body so simultaneous DM requests cannot overwrite each other.
       const next = changeEncounter(previous, body.action, auth.campaign.characters.filter((entry) => entry.shared), randomToken(12));
+      synchronizeTurns(auth.campaign, previous, next);
       auth.campaign.encounter = next;
       persist();
       broadcastCampaign(auth.campaign);
       return sendJson(response, 200, { encounter: next });
+    }
+
+    const advanceMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/level-up$/i);
+    if (request.method === "POST" && advanceMatch) {
+      const auth = authorizedCampaign(request, advanceMatch[1]);
+      if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
+      if (auth.role !== "player") return sendJson(response, 403, { error: "Only a character’s player can level it up." });
+      const body = await readJson(request);
+      if (typeof body.requestId !== "string" || !/^[\w-]{1,100}$/.test(body.requestId)) return sendJson(response, 400, { error: "A level-up request ID is required." });
+      const record = auth.campaign.characters.find((entry) => entry.ownerId === auth.player.id && entry.character.id === body.characterId);
+      if (!record) return sendJson(response, 404, { error: "Character is not owned by this player." });
+      if (record.character.advancement?.some((entry) => entry.id === body.requestId)) return sendJson(response, 200, { character: record.character });
+      if (record.character.updatedAt !== body.baseUpdatedAt) return sendJson(response, 409, { error: "The sheet changed. Reopen Level up to review the current character.", current: record.character });
+      record.character = stamp({ ...record.character, ...rules.applyLevelUp(record.character, body.plan, body.requestId, new Date().toISOString()) });
+      persist(); broadcastCampaign(auth.campaign);
+      return sendJson(response, 200, { character: record.character });
+    }
+
+    const castMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/cast$/i);
+    if (request.method === "POST" && castMatch) {
+      const auth = authorizedCampaign(request, castMatch[1]);
+      if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
+      if (auth.role !== "player") return sendJson(response, 403, { error: "Choose a player-owned caster." });
+      const body = await readJson(request);
+      if (typeof body.requestId !== "string" || !/^[\w-]{1,100}$/.test(body.requestId)) return sendJson(response, 400, { error: "A cast request ID is required." });
+      const prior = (auth.campaign.castReceipts ?? []).find((entry) => entry.actorId === auth.player.id && entry.requestId === body.requestId);
+      if (prior) return sendJson(response, 200, prior);
+      const caster = auth.campaign.characters.find((entry) => entry.ownerId === auth.player.id && entry.character.id === body.casterId && entry.shared);
+      if (!caster) return sendJson(response, 403, { error: "Share your own caster with the DM before using LAN targeting." });
+      if (caster.character.updatedAt !== body.baseUpdatedAt) return sendJson(response, 409, { error: "Wait for sheet sync, then cast again.", current: caster.character });
+      const publicIds = new Set((auth.campaign.encounter?.entries ?? []).map((entry) => entry.characterId));
+      const targets = auth.campaign.characters.filter((entry) => entry.shared && (entry.character.id === caster.character.id || publicIds.has(entry.character.id))).map((entry) => entry.character);
+      const result = rules.resolveTargetedSpell(caster.character, targets, body, randomToken(12), (sides) => randomInt(1, sides + 1));
+      for (const character of result.characters) {
+        const record = auth.campaign.characters.find((entry) => entry.character.id === character.id);
+        record.character = stamp(character);
+      }
+      cleanEffects(auth.campaign);
+      const receipt = { actorId: auth.player.id, requestId: body.requestId, summary: result.summary };
+      auth.campaign.castReceipts = [...(auth.campaign.castReceipts ?? []), receipt].slice(-1000);
+      auth.campaign.activity = [...(auth.campaign.activity ?? []), { id: randomToken(12), ...receipt, actor: auth.player.name, kind: "sheet", characterName: caster.character.name, createdAt: new Date().toISOString() }].slice(-100);
+      persist(); broadcastCampaign(auth.campaign);
+      return sendJson(response, 200, receipt);
     }
 
     const shareMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/characters\/([^/]+)\/share$/i);
@@ -242,6 +327,7 @@ const apiServer = createServer(async (request, response) => {
           record.character = body.character;
           record.shared = Boolean(body.shared);
         }
+        cleanEffects(auth.campaign);
         persist();
         broadcastCampaign(auth.campaign);
         return sendJson(response, 200, { ok: true, updatedAt: record.character.updatedAt, shared: record.shared });
