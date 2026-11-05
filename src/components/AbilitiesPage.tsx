@@ -1,3 +1,5 @@
+import { ClassicSheet } from "./ClassicSheet";
+import { useDiceRoll } from "./DiceProvider";
 import { TurnPanel } from "./TurnPanel";
 import { LevelUpWizard } from "./LevelUpWizard";
 import { EquipmentSettings } from "./EquipmentSettings";
@@ -23,6 +25,7 @@ const ARMOR_MODES = [
 ] as const;
 
 export function AbilitiesPage({ character, onChange, readOnly = false }: AbilitiesPageProps) {
+  const dice = useDiceRoll();
   const [levelingUp, setLevelingUp] = useState(false);
   const stats = calculateCharacterStats(character);
   const maximumHp = stats.maxHitPoints ?? 0;
@@ -112,6 +115,8 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
   function recoverResources(recovery: "Short Rest" | "Long Rest") {
     onChange?.(restCharacter(character, recovery));
   }
+
+  if (dice.classic) return <ClassicSheet character={character} onChange={onChange} readOnly={readOnly} />;
 
   return (
     <section className="abilities-page" aria-label={`Character sheet for ${character.name}`}>

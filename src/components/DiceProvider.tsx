@@ -5,7 +5,9 @@ import { physicalDice, PhysicalDiceRequired, type DiceSource, type DieFace, type
 type Outcome<T> = { result: T; physical: boolean };
 type DiceContextValue = {
   mode: DiceSource;
+  classic: boolean;
   setMode: (mode: DiceSource) => void;
+  setClassic: (classic: boolean) => void;
   run: <T>(title: string, operation: (die: DieRoller) => T, source?: DiceSource) => Promise<Outcome<T> | null>;
   remote: <T>(title: string, operation: (faces: DieFace[] | undefined) => Promise<T>, source?: DiceSource, initialFaces?: DieFace[]) => Promise<Outcome<T> | null>;
 };
@@ -15,6 +17,7 @@ const KEY = "taleforge.dice.source.v1";
 
 export function DiceProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<DiceSource>(() => { try { return localStorage.getItem(KEY) === "physical" ? "physical" : "digital"; } catch { return "digital"; } });
+  const [classic, setClassic] = useState(() => { try { return localStorage.getItem("taleforge.sheet.classic.v1") === "true"; } catch { return false; } });
   const pending = useRef<Pending | null>(null);
   const [request, setRequest] = useState<DieRequest | null>(null);
   const [title, setTitle] = useState("");
@@ -26,6 +29,7 @@ export function DiceProvider({ children }: { children: ReactNode }) {
   const modal = useRef<HTMLDivElement>(null);
   const inFlight = useRef(false);
   useEffect(() => { try { localStorage.setItem(KEY, mode); } catch { /* The preference works until closing this page. */ } }, [mode]);
+  useEffect(() => { try { localStorage.setItem("taleforge.sheet.classic.v1", String(classic)); } catch { /* Keep the preference for this session. */ } }, [classic]);
   useEffect(() => { if (request) input.current?.focus(); }, [request, busy]);
   function close(result: Outcome<unknown> | null) {
     const current = pending.current; pending.current = null; setRequest(null); setError(""); setText(""); setHistory([]); current?.resolve(result);
@@ -41,6 +45,7 @@ export function DiceProvider({ children }: { children: ReactNode }) {
     } finally { inFlight.current = false; setBusy(false); }
   }
   async function remote<T>(name: string, operation: (faces: DieFace[] | undefined) => Promise<T>, source = mode, initialFaces: DieFace[] = []): Promise<Outcome<T> | null> {
+    if (classic) return null;
     if (pending.current) throw new Error("Finish or cancel the current dice entry first.");
     if (source === "digital") return { result: await operation(undefined), physical: false };
     return new Promise((resolve) => {
@@ -60,7 +65,7 @@ export function DiceProvider({ children }: { children: ReactNode }) {
     current.faces = [...current.faces, { sides: request.sides, label: request.label, value }];
     void attempt(current.faces);
   }
-  return <Context.Provider value={{ mode, setMode, run, remote }}>{children}
+  return <Context.Provider value={{ mode, classic, setMode, setClassic, run, remote }}>{children}
     {request && <div className="physical-dice-overlay"><div className="physical-dice-dialog" ref={modal} role="dialog" aria-modal="true" aria-labelledby="physical-dice-title" onKeyDown={(event) => {
       if (event.key === "Escape" && !busy) close(null);
       if (event.key === "Tab") {
@@ -91,5 +96,5 @@ export function useDiceRoll(revision?: string) {
 export function DiceModeControl() {
   const dice = useContext(Context);
   if (!dice) return null;
-  return <label className="dice-source-control"><span>Dice</span><select aria-label="Dice source" value={dice.mode} onChange={(event) => dice.setMode(event.target.value as DiceSource)}><option value="digital">Digital dice</option><option value="physical">Physical dice</option></select></label>;
+  return <label className="dice-source-control"><span>Play mode</span><select aria-label="Dice source" value={dice.classic ? "classic" : dice.mode} onChange={(event) => { const classic = event.target.value === "classic"; dice.setClassic(classic); if (!classic) dice.setMode(event.target.value as DiceSource); }}><option value="digital">Digital dice</option><option value="physical">Physical dice</option><option value="classic">Classic sheet</option></select></label>;
 }

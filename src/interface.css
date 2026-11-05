@@ -416,6 +416,21 @@ summary { padding-block: 8px; line-height: 1.5; }
 .rule-description { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .starting-spells .level-spell-list { max-height: 520px; overflow-y: auto; padding: 4px; }
 .starting-spells .level-spell-card label { cursor: pointer; }
+.classic-sheet { display: grid; gap: 20px; }
+.classic-sheet .sheet-hero { margin: 0; }
+.classic-guidance { margin: 0; color: var(--muted); }
+.classic-summary { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 12px; }
+.classic-summary > div { display: grid; gap: 6px; padding: 18px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+.classic-summary strong { font-size: 24px; }
+.classic-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.classic-row { display: flex; flex-wrap: wrap; gap: 10px 20px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.classic-row > strong { width: 100%; color: var(--gold); }
+.classic-row p { width: 100%; margin: 0; }
+.classic-skill { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.classic-skill small { color: var(--muted); margin-left: 8px; }
+.classic-resource-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 18px; }
+.classic-resource-grid input { display: block; width: 100%; margin-top: 8px; }
+@media (max-width: 800px) { .classic-grid { grid-template-columns: minmax(0,1fr); } }
 @container sheet (max-width: 600px) {
   .skill-row { grid-template-columns: 18px minmax(0,1fr) 34px 38px; gap: 8px; padding-block: 12px; }
   .app-shell .skill-row select { grid-column: 2 / -1; width: 100%; font-size: 14px; }

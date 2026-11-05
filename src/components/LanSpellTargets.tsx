@@ -52,6 +52,7 @@ export function LanSpellProvider({ session, snapshot, connected, pendingIds, onR
     } finally { sending.current = false; setBusy(false); }
   }
   async function cast(request: TargetCast) {
+    if (diceSource.classic) throw new Error("Switch out of Classic sheet mode to resolve a targeted spell.");
     if (pending.current) throw new Error("Resolve the unconfirmed cast above before starting another spell.");
     if (pendingIds.includes(request.casterId)) throw new Error("Wait for this character’s edits to finish syncing before casting.");
     const caster = snapshot?.characters.find((entry) => entry.character.id === request.casterId);
@@ -74,6 +75,7 @@ export function LanSpellTargets({ character, spell, slotKey, className, mode }: 
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  if (diceSource.classic) return null;
   if (!context || !TARGETED_SPELLS.includes(spell.automation ?? "")) return null;
   const options = [{ id: character.id, name: `${character.name} (self)` }, ...context.targets.filter((target) => target.id !== character.id)];
   function update(id: string, patch: Partial<TargetChoice>) { setTargets(targets.map((target) => target.id === id ? { ...target, ...patch } : target)); }
