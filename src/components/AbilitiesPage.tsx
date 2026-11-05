@@ -1,5 +1,5 @@
 import { CustomModifiersPanel } from "./CustomModifiersPanel";
-import { ClassicHealthPanel } from "./ClassicSheet";
+import { HealthPanel } from "./HealthPanel";
 import { useDiceRoll } from "./DiceProvider";
 import { TurnPanel } from "./TurnPanel";
 import { LevelUpWizard } from "./LevelUpWizard";
@@ -12,7 +12,7 @@ import { activeConditions } from "../data/conditions";
 import { EffectsPanel } from "./EffectsPanel";
 import { AttacksPanel } from "./AttacksPanel";
 import { GameplayPanel } from "./GameplayPanel";
-import { applyDamage, combatState, healCharacter, restCharacter } from "../data/gameplay";
+import { combatState, restCharacter } from "../data/gameplay";
 
 type AbilitiesPageProps = { character: Character; onChange?: (updates: Partial<Character>) => void; readOnly?: boolean };
 
@@ -85,10 +85,6 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
     onChange?.({ customResources: character.customResources.map((resource) => resource.id === id ? { ...resource, used: Math.min(resource.maxUses, Math.max(0, resource.used + amount)) } : resource) });
   }
 
-  function changeHitPoints(amount: number) {
-    onChange?.(amount < 0 ? applyDamage(character, -amount) : healCharacter(character, amount));
-  }
-
   function setHitPoints(rawValue: string) {
     if (rawValue === "") return;
     const value = Number(rawValue);
@@ -96,12 +92,6 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
       const hp = Math.min(maximumHp, Math.max(0, value));
       onChange?.({ currentHitPoints: hp, ...(hp > 0 ? { combat: { ...combatState(character), dead: false, stable: false, deathSuccesses: 0, deathFailures: 0 } } : {}) });
     }
-  }
-
-  function setTemporaryHitPoints(rawValue: string) {
-    if (rawValue === "") return;
-    const value = Number(rawValue);
-    if (Number.isInteger(value)) onChange?.({ temporaryHitPoints: Math.max(0, Math.min(9999, value)) });
   }
 
   function addCustomResource() {
@@ -148,11 +138,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               <div><small>SPEED</small><strong>{stats.speed}<i> ft</i></strong></div>
               <div><small>HIT DIE</small><strong>{stats.hitDie ? `d${stats.hitDie}` : "—"}</strong></div>
             </div>
-            {dice.classic ? <ClassicHealthPanel character={character} onChange={onChange ? (updates) => { if (updates.currentHitPoints !== undefined && updates.currentHitPoints !== null) setHitPoints(String(updates.currentHitPoints)); else onChange(updates); } : undefined} readOnly={readOnly} /> : <div className="hp-tracker" aria-label="Hit points">
-              <div className="hp-tracker-heading"><strong>Hit points</strong><span>{stats.maxHitPoints === null ? "Choose a class to calculate maximum HP" : `${currentHp} / ${maximumHp} HP`}</span></div>
-              <div className="hp-bar" role="meter" aria-label="Hit points remaining" aria-valuemin={0} aria-valuemax={maximumHp} aria-valuenow={currentHp}><span style={{ width: `${hpPercent}%` }} /></div>
-              <div className="hp-controls"><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label><button type="button" className="button-danger" aria-label="Take one damage" disabled={readOnly || (currentHp <= 0 && character.temporaryHitPoints <= 0) || maximumHp === 0 || combatState(character).dead} onClick={() => changeHitPoints(-1)}>− Damage</button><button type="button" className="button-healing" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button></div>
-            </div>}
+            <HealthPanel character={character} onChange={onChange ? (updates) => { if (updates.currentHitPoints !== undefined && updates.currentHitPoints !== null) setHitPoints(String(updates.currentHitPoints)); else onChange(updates); } : undefined} readOnly={readOnly} />
             {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
           </section><TurnPanel character={character} onChange={onChange} readOnly={readOnly} /><GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} /></div><div className="sheet-stack"><AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /><EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /></div></div>
       </div>

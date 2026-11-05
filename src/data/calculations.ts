@@ -162,7 +162,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const classResources = classes.flatMap(({ name, level: classLevel }) => classResourcesFor({ ...character, characterClass: capitalize(name) }, classLevel, abilityModifiers).map((resource) => {
     const key = resource.key ? `${name}.${resource.key}` : undefined;
     return { ...resource, key, used: key && resource.maxUses !== undefined ? Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[key] ?? 0)) : undefined, label: classes.length > 1 ? `${capitalize(name)} · ${resource.label}` : resource.label };
-  })).concat(speciesResources(character, proficiencyBonus), originFeatResources(character));
+  })).concat(speciesResources(character, proficiencyBonus, level), originFeatResources(character));
   const preparedSpellCount = spellCountFor(className, classes.find((entry) => entry.name === className)?.level ?? level);
   const spellcastingProgressions = classes.flatMap(({ name, level: classLevel }) => {
     const classProgression = classProgressionAtLevel(name, classLevel);
@@ -215,17 +215,17 @@ function spellAbilityFor(className: string, subclass: string, override: AbilityN
   return null;
 }
 
-function speciesResources(character: Character, proficiencyBonus: number) {
+function speciesResources(character: Character, proficiencyBonus: number, level: number) {
   const species = character.species.toLowerCase().split(" (")[0].trim();
   const source = species === "aasimar" ? [
-    { key: "species.healing-hands", label: "Healing Hands", value: `1d4 × ${proficiencyBonus} HP`, maxUses: proficiencyBonus },
-    { key: "species.celestial-revelation", label: "Celestial Revelation", value: "", maxUses: 1 },
+    { key: "species.healing-hands", label: "Healing Hands", value: `${proficiencyBonus}d4 HP`, maxUses: 1 },
+    ...(level >= 3 ? [{ key: "species.celestial-revelation", label: "Celestial Revelation", value: "", maxUses: 1 }] : []),
   ] : species === "dragonborn" ? [
     { key: "species.breath-weapon", label: "Breath Weapon", value: "", maxUses: proficiencyBonus },
   ] : species === "dwarf" ? [
     { key: "species.stonecunning", label: "Stonecunning", value: "", maxUses: proficiencyBonus },
   ] : species === "goliath" ? [
-    { key: "species.large-form", label: "Large Form", value: "", maxUses: proficiencyBonus },
+    ...(level >= 5 ? [{ key: "species.large-form", label: "Large Form", value: "", maxUses: 1 }] : []),
   ] : species === "orc" ? [
     { key: "species.adrenaline-rush", label: "Adrenaline Rush", value: "", maxUses: proficiencyBonus },
   ] : species === "human" ? [
@@ -233,7 +233,8 @@ function speciesResources(character: Character, proficiencyBonus: number) {
   ] : [];
   return source.map((resource) => ({
     ...resource,
-    recovery: "Long Rest" as const,
+    recovery: (species === "orc" ? "Short Rest" : "Long Rest") as "Short Rest" | "Long Rest",
+    shortRestRecovery: species === "orc" ? "all" as const : undefined,
     used: Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[resource.key] ?? 0)),
     label: resource.label,
   }));
