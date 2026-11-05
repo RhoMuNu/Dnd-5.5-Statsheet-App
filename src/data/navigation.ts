@@ -1,25 +1,18 @@
 export const navigationGroups = [
-  {
-    label: "CHARACTER",
-    items: [
-      { id: "overview", label: "Overview", icon: "⌂" },
-      { id: "builder", label: "Character builder", icon: "✦" },
-      { id: "abilities", label: "Abilities & skills", icon: "◈" },
-      { id: "features", label: "Features & traits", icon: "❖" },
-    ],
-  },
-  {
-    label: "ADVENTURE",
-    items: [
-      { id: "inventory", label: "Inventory", icon: "▣" },
-      { id: "spells", label: "Spells", icon: "✧" },
-      { id: "notes", label: "Notes & journal", icon: "▤" },
-    ],
-  },
-  {
-    label: "PLAY TOGETHER",
-    items: [{ id: "lan", label: "LAN party", icon: "⌁" }],
-  },
+  { label: "WORKSPACE", items: [
+    { id: "overview", label: "My characters", icon: "⌂" },
+    { id: "builder", label: "Character builder", icon: "✦" },
+  ] },
+  { label: "CHARACTER", items: [
+    { id: "abilities", label: "Play sheet", icon: "◈" },
+    { id: "spells", label: "Spellbook", icon: "✧" },
+    { id: "inventory", label: "Inventory", icon: "▣" },
+    { id: "features", label: "Features & traits", icon: "❖" },
+    { id: "notes", label: "Journal", icon: "▤" },
+  ] },
+  { label: "CAMPAIGNS", items: [
+    { id: "lan", label: "LAN campaign", icon: "⌁" },
+  ] },
 ] as const;
 
 export type SectionId = (typeof navigationGroups)[number]["items"][number]["id"];
@@ -27,8 +20,8 @@ export type SectionId = (typeof navigationGroups)[number]["items"][number]["id"]
 export const sectionContent: Record<SectionId, { eyebrow: string; title: string; description: string }> = {
   overview: {
     eyebrow: "YOUR ADVENTURE",
-    title: "Welcome back, adventurer.",
-    description: "Pick up where you left off, or start a brand-new story.",
+    title: "Your next chapter.",
+    description: "Your heroes, your stories, your next great adventure.",
   },
   builder: {
     eyebrow: "CHARACTER BUILDER",
@@ -37,8 +30,8 @@ export const sectionContent: Record<SectionId, { eyebrow: string; title: string;
   },
   abilities: {
     eyebrow: "CHARACTER DETAILS",
-    title: "Abilities & skills",
-    description: "Ability scores, saving throws, skills, and proficiencies in one place.",
+    title: "Character sheet",
+    description: "Everything you need at the table, right where you need it.",
   },
   features: {
     eyebrow: "CHARACTER DETAILS",
@@ -68,7 +61,7 @@ export const sectionContent: Record<SectionId, { eyebrow: string; title: string;
 };
 
 export function sectionFromHash(hash: string): SectionId {
-  const candidate = hash.replace(/^#\/?/, "");
+  const candidate = hash.replace(/^#\/?/, "").split("?")[0];
   return navigationGroups.some((group) => group.items.some((item) => item.id === candidate))
     ? (candidate as SectionId)
     : "overview";

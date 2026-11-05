@@ -37,12 +37,11 @@ const sectionDetails: Record<Exclude<SectionId, "overview" | "builder" | "lan">,
 
 export function SectionPage({ section, character, onOpenBuilder, onEdit, onUpdate, onOpenAbilities }: SectionPageProps) {
   const content = sectionContent[section];
-  const navItem = navigationGroups[0].items.find((item) => item.id === section)
-    ?? navigationGroups[1].items.find((item) => item.id === section);
+  const navItem = navigationGroups.flatMap((group) => [...group.items]).find((item) => item.id === section);
   const detail = sectionDetails[section];
 
   if (section === "abilities" && character) {
-    return <AbilitiesPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
+    return <AbilitiesPage key={character.id} character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
   }
   if (character && section === "features") return <FeaturesPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;
   if (character && section === "inventory") return <InventoryPage character={character} onChange={(updates) => onUpdate(character.id, updates)} />;

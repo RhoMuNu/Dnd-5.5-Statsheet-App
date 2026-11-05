@@ -1,6 +1,8 @@
 import { ABILITIES, SKILLS, type AbilityName, type Character, type SkillName } from "../data/characters";
 import { calculateCharacterStats, isClassSavingThrowProficient } from "../data/calculations";
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { Icon } from "./Icon";
+import { activeConditions } from "../data/conditions";
 import { EffectsPanel } from "./EffectsPanel";
 import { AttacksPanel } from "./AttacksPanel";
 import { GameplayPanel } from "./GameplayPanel";
@@ -22,6 +24,23 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
   const maximumHp = stats.maxHitPoints ?? 0;
   const currentHp = Math.min(maximumHp, character.currentHitPoints ?? maximumHp);
   const hpPercent = maximumHp > 0 ? (currentHp / maximumHp) * 100 : 0;
+  const tabId = useId();
+  const tabs = [{ id: "combat", name: "Combat", icon: "abilities", description: "Hit points, attacks & effects" }, { id: "abilities", name: "Abilities & skills", icon: "dice", description: "Scores, saves & proficiencies" }, { id: "resources", name: "Resources & rest", icon: "spells", description: "Spell slots & feature uses" }, { id: "setup", name: "Setup", icon: "shield", description: "Armor, movement & class notes" }] as const;
+  type View = typeof tabs[number]["id"];
+  const readView = (): View => {
+    const requested = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("view");
+    return tabs.some((tab) => tab.id === requested) ? requested as View : "combat";
+  };
+  const [view, setView] = useState<View>(readView);
+  useEffect(() => {
+    const sync = () => { if (window.location.hash.startsWith("#abilities")) setView(readView()); };
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+  function chooseView(next: View) {
+    setView(next);
+    if (window.location.hash.startsWith("#abilities")) window.history.replaceState(null, "", `#abilities?view=${next}`);
+  }
   const [resourceName, setResourceName] = useState("");
   const [resourceMax, setResourceMax] = useState("1");
   const [resourceRecovery, setResourceRecovery] = useState<Character["customResources"][number]["recovery"]>("long");
@@ -91,16 +110,40 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
   }
 
   return (
-    <section className="abilities-page" aria-label={`Abilities and calculated stats for ${character.name}`}>
-      <div className="sheet-context-bar">
-        <div className="roster-avatar" aria-hidden="true">{character.name.charAt(0).toUpperCase()}</div>
-        <div><small>LIVE CHARACTER SHEET</small><strong>{character.name}</strong><span>{stats.classBreakdown.map(({ name, level }) => `${name} ${level}`).join(" / ") || "Class not chosen"} · Level {stats.totalLevel}</span></div>
-        <div className="proficiency-chip"><small>PROFICIENCY</small><strong>+{stats.proficiencyBonus}</strong></div>
+    <section className="abilities-page" aria-label={`Character sheet for ${character.name}`}>
+      <header className="sheet-hero">
+        <div className="sheet-hero-emblem"><Icon name="dice" /></div>
+        <div className="sheet-hero-copy"><p className="eyebrow">{readOnly ? "SHARED CHARACTER" : "READY FOR ADVENTURE"}</p><h2>{character.name}</h2><p>{[character.species, character.background].filter(Boolean).join(" · ")}</p><div className="hero-class-chips">{stats.classBreakdown.map(({ name, level }) => <span key={name}>{name} <b>{level}</b></span>)}{readOnly && <span>View only</span>}</div></div>
+        <div className="hero-level"><span>LEVEL</span><strong>{stats.totalLevel.toString().padStart(2, "0")}</strong><small>2024 rules</small></div>
+      </header>
+      <div className="vitals-strip" aria-label="Character vital statistics">
+        <div className="vital-stat hp-vital"><span><Icon name="heart" />Hit points</span><strong>{currentHp}<small> / {stats.maxHitPoints ?? "—"}</small></strong><div className="vital-meter"><i style={{ width: `${hpPercent}%` }} /></div></div>
+        {[{ label: "Armor class", value: stats.armorClass, icon: "shield" }, { label: "Initiative", value: formatModifier(stats.initiative), icon: "dice" }, { label: "Speed", value: `${stats.speed} ft`, icon: "arrow" }, { label: "Proficiency", value: formatModifier(stats.proficiencyBonus), icon: "spark" }, { label: "Perception", value: stats.passivePerception, icon: "features" }].map(({label,value,icon}) => <div className="vital-stat" key={label}><span><Icon name={icon} />{label}</span><strong>{value}</strong></div>)}
       </div>
-
-      <div className="abilities-layout">
-        <div className="ability-input-column">
-          <section className="sheet-panel" aria-labelledby="ability-scores-title">
+      {(activeConditions(character).length > 0 || (character.combat?.exhaustion ?? 0) > 0 || character.combat?.concentration) && <div className="sheet-status-chips">{activeConditions(character).map((condition) => <span key={condition}>{condition}</span>)}{(character.combat?.exhaustion ?? 0) > 0 && <span>Exhaustion {character.combat!.exhaustion}</span>}{character.combat?.concentration && <span className="concentration-chip">Concentrating · {character.combat.concentration}</span>}</div>}
+      <div className="sheet-view-tabs" role="tablist" aria-label="Character sheet views">{tabs.map((tab) => <button type="button" role="tab" key={tab.id} id={`${tabId}-tab-${tab.id}`} aria-selected={view === tab.id} aria-controls={`${tabId}-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => chooseView(tab.id)} onKeyDown={(event) => {
+        const index = tabs.findIndex((entry) => entry.id === tab.id);
+        const next = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+        if (next >= 0) { event.preventDefault(); chooseView(tabs[next].id); document.getElementById(`${tabId}-tab-${tabs[next].id}`)?.focus(); }
+      }}><Icon name={tab.icon} /><span><strong>{tab.name}</strong><small>{tab.description}</small></span></button>)}</div>
+      <div className="sheet-tab-panel" role="tabpanel" id={`${tabId}-panel-combat`} aria-labelledby={`${tabId}-tab-combat`} hidden={view !== "combat"}>
+        <div className="combat-layout"><div className="sheet-stack">          <section className="derived-panel">
+            <p className="eyebrow">DEFENSE &amp; MOVEMENT</p>
+            <div className="derived-stat-grid">
+              <div><small>ARMOR CLASS</small><strong>{stats.armorClass}</strong></div>
+              <div><small>MAX HIT POINTS</small><strong>{stats.maxHitPoints ?? "—"}</strong></div>
+              <div><small>SPEED</small><strong>{stats.speed}<i> ft</i></strong></div>
+              <div><small>HIT DIE</small><strong>{stats.hitDie ? `d${stats.hitDie}` : "—"}</strong></div>
+            </div>
+            <div className="hp-tracker" aria-label="Hit points">
+              <div className="hp-tracker-heading"><strong>Hit points</strong><span>{stats.maxHitPoints === null ? "Choose a class to calculate maximum HP" : `${currentHp} / ${maximumHp} HP`}</span></div>
+              <div className="hp-bar" role="meter" aria-label="Hit points remaining" aria-valuemin={0} aria-valuemax={maximumHp} aria-valuenow={currentHp}><span style={{ width: `${hpPercent}%` }} /></div>
+              <div className="hp-controls"><button type="button" aria-label="Take one damage" disabled={readOnly || (currentHp <= 0 && character.temporaryHitPoints <= 0) || maximumHp === 0 || combatState(character).dead} onClick={() => changeHitPoints(-1)}>− Damage</button><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><button type="button" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label></div>
+            </div>
+            {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
+          </section><GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} /></div><div className="sheet-stack"><AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /><EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} /></div></div>
+      </div>
+      <div className="sheet-tab-panel ability-view" role="tabpanel" id={`${tabId}-panel-abilities`} aria-labelledby={`${tabId}-tab-abilities`} hidden={view !== "abilities"}>          <section className="sheet-panel" aria-labelledby="ability-scores-title">
             <div className="panel-heading"><div><p className="eyebrow">THE SIX ABILITIES</p><h2 id="ability-scores-title">Ability scores</h2></div><span className="panel-hint">Modifiers update live</span></div>
             <div className="ability-score-grid">
               {ABILITIES.map((ability) => (
@@ -145,37 +188,8 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               ))}
             </div>
           </section>
-        </div>
-
-        <aside className="derived-column" aria-label="Calculated stats">
-
-          <section className="derived-panel highlight-panel">
-            <p className="eyebrow">AT A GLANCE</p>
-            <div className="headline-stat"><span>Proficiency bonus</span><strong>+{stats.proficiencyBonus}</strong><small>Based on total character level {stats.totalLevel}</small></div>
-            <div className="headline-stat"><span>Initiative</span><strong>{formatModifier(stats.initiative)}</strong><small>Dexterity modifier, including exhaustion</small></div>
-            <div className="headline-stat"><span>Passive Perception</span><strong>{stats.passivePerception}</strong><small>10 + Perception check modifier</small></div>
-          </section>
-
-          <section className="derived-panel">
-            <p className="eyebrow">DEFENSE &amp; MOVEMENT</p>
-            <div className="derived-stat-grid">
-              <div><small>ARMOR CLASS</small><strong>{stats.armorClass}</strong></div>
-              <div><small>MAX HIT POINTS</small><strong>{stats.maxHitPoints ?? "—"}</strong></div>
-              <div><small>SPEED</small><strong>{stats.speed}<i> ft</i></strong></div>
-              <div><small>HIT DIE</small><strong>{stats.hitDie ? `d${stats.hitDie}` : "—"}</strong></div>
-            </div>
-            <div className="hp-tracker" aria-label="Hit points">
-              <div className="hp-tracker-heading"><strong>Hit points</strong><span>{stats.maxHitPoints === null ? "Choose a class to calculate maximum HP" : `${currentHp} / ${maximumHp} HP`}</span></div>
-              <div className="hp-bar" role="meter" aria-label="Hit points remaining" aria-valuemin={0} aria-valuemax={maximumHp} aria-valuenow={currentHp}><span style={{ width: `${hpPercent}%` }} /></div>
-              <div className="hp-controls"><button type="button" aria-label="Take one damage" disabled={readOnly || (currentHp <= 0 && character.temporaryHitPoints <= 0) || maximumHp === 0 || combatState(character).dead} onClick={() => changeHitPoints(-1)}>− Damage</button><label><span>Current HP</span><input type="number" min={0} max={maximumHp} disabled={readOnly || maximumHp === 0} value={currentHp} onChange={(event) => setHitPoints(event.target.value)} /></label><button type="button" aria-label="Heal one hit point" disabled={readOnly || currentHp >= maximumHp || maximumHp === 0} onClick={() => changeHitPoints(1)}>+ Heal</button><label className="temp-hp-field"><span>Temp HP</span><input type="number" min={0} max={9999} disabled={readOnly} value={character.temporaryHitPoints} onChange={(event) => setTemporaryHitPoints(event.target.value)} /></label></div>
-            </div>
-            {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
-          </section>
-
-          <GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} />
-          <AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} />
-          <EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} />
-          <section className="derived-panel">
+</div>
+      <div className="sheet-tab-panel resource-view" role="tabpanel" id={`${tabId}-panel-resources`} aria-labelledby={`${tabId}-tab-resources`} hidden={view !== "resources"}><div className="view-intro"><h3>Ready for the next encounter.</h3><p>Manage spell slots and feature uses here. Rest when your party is ready.</p></div><div className="resource-view-grid">          <section className="derived-panel">
             <p className="eyebrow">STRENGTH &amp; MAGIC</p>
             <div className="derived-line"><span>Carry</span><strong>{formatWeight(stats.carryingCapacity)} lb.</strong></div>
             <div className="derived-line"><span>Drag, lift, or push</span><strong>{formatWeight(stats.pushDragLift)} lb.</strong></div>
@@ -186,9 +200,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · REMAINING / MAX</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => { const key = spellSlotKey(pool, spellLevel); const used = Math.min(total, character.resourceUses[key] ?? 0); return <div className="derived-line tracked-resource" key={key}><span>{pool} · Level {spellLevel}</span><div className="resource-controls"><button type="button" disabled={readOnly || used === total} aria-label={`Use level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, 1, total)}>−</button><strong>{total - used} / {total}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, -1, total)}>+</button></div></div>; })}</div>}
               {stats.spellcastingProgressions.length > 0 && <div className="spell-slot-list"><small>SPELLCASTING BY CLASS</small>{stats.spellcastingProgressions.map((entry) => <div className="derived-line" key={entry.className}><span>{entry.className}: {entry.cantrips === null ? "—" : `${entry.cantrips} cantrips`}{entry.count !== null ? ` · ${entry.count} ${entry.label?.toLowerCase()}` : ""} · DC {entry.saveDC} / {entry.attackBonus >= 0 ? "+" : ""}{entry.attackBonus}</span><strong>Lvl {stats.classBreakdown.find((item) => item.name === entry.className)?.level}</strong></div>)}</div>}
             </>}
-          </section>
-
-          {stats.classResources.length > 0 && <section className="derived-panel class-resource-panel">
+          </section>          {stats.classResources.length > 0 && <section className="derived-panel class-resource-panel">
             <p className="eyebrow">CLASS FEATURES &amp; RESOURCES</p>
             {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key ? <div className="resource-controls"><button type="button" disabled={readOnly || used === maxUses} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}{value ? ` ${value}` : ""}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
           </section>}
@@ -202,18 +214,9 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             {!readOnly && <div className="custom-resource-form"><label><span>Feature / feat name</span><input value={resourceName} maxLength={50} placeholder="e.g. Lucky" onChange={(event) => setResourceName(event.target.value)} /></label><label><span>Uses</span><input type="number" min={1} max={999} value={resourceMax} onChange={(event) => setResourceMax(event.target.value)} /></label><label><span>Recovery</span><select value={resourceRecovery} onChange={(event) => setResourceRecovery(event.target.value as typeof resourceRecovery)}><option value="long">Long rest · all</option><option value="short-one">Short rest · one</option><option value="short-all">Short rest · all</option><option value="manual">Manual only</option></select></label><button type="button" className="resource-add-button" disabled={!resourceName.trim() || !Number.isInteger(Number(resourceMax)) || Number(resourceMax) < 1 || Number(resourceMax) > 999} onClick={addCustomResource}>Add tracker</button></div>}
           </section>
 
-          {stats.classFeatures.length > 0 && <section className="derived-panel class-resource-panel">
-            <p className="eyebrow">UNLOCKED CLASS FEATURES</p>
-            <div className="feature-list">{stats.classFeatures.map(({ level, name }) => <div className="derived-line" key={`${level}-${name}`}><span>Level {level} · {name}</span>{name.includes("Choose ") && <strong>Choice</strong>}</div>)}</div>
-          </section>}
-
-          {stats.multiclassWarnings.length > 0 && <section className="derived-panel class-resource-panel">
-            <p className="eyebrow">MULTICLASS RULE NOTES</p>
-            {stats.multiclassWarnings.map((warning) => <p className="setup-note" key={warning}>{warning}</p>)}
-          </section>}
-
-          <details className="sheet-panel setup-panel">
-            <summary>Movement, armor &amp; spell setup</summary>
+</div></div>
+      <div className="sheet-tab-panel setup-view" role="tabpanel" id={`${tabId}-panel-setup`} aria-labelledby={`${tabId}-tab-setup`} hidden={view !== "setup"}>          <section className="sheet-panel setup-panel">
+            <div className="panel-heading"><div><p className="eyebrow">CHARACTER CONFIGURATION</p><h2>Armor, movement &amp; spellcasting</h2></div></div>
             <fieldset className="setup-fields" disabled={readOnly}>
               <label className="compact-field"><span>Size</span><select value={character.size} onChange={(event) => onChange?.({ size: event.target.value as Character["size"] })}>{SIZES.map((size) => <option key={size}>{size}</option>)}</select></label>
               <label className="compact-field"><span>Base speed (feet)</span><input type="number" min={0} max={500} value={character.speedFeet} onChange={(event) => onChange?.({ speedFeet: numberOr(event.target.value, character.speedFeet, 0, 500) })} /></label>
@@ -228,9 +231,17 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               <label className="compact-field"><span>Spellcasting ability override</span><select value={character.spellcastingAbility} onChange={(event) => onChange?.({ spellcastingAbility: event.target.value as AbilityName | "" })}><option value="">Use class default</option>{ABILITIES.map((ability) => <option key={ability}>{ability}</option>)}</select></label>
               <p className="setup-note">Class saving throw proficiencies and spell ability are applied automatically. For features that grant extras, use the save checkboxes or spell ability override. Choose Custom AC for an alternate class AC formula. Enter species speed and any armor Strength requirement here.</p>
             </fieldset>
-          </details>
-        </aside>
-      </div>
+          </section>          {stats.classFeatures.length > 0 && <section className="derived-panel class-resource-panel">
+            <p className="eyebrow">UNLOCKED CLASS FEATURES</p>
+            <div className="feature-list">{stats.classFeatures.map(({ level, name }) => <div className="derived-line" key={`${level}-${name}`}><span>Level {level} · {name}</span>{name.includes("Choose ") && <strong>Choice</strong>}</div>)}</div>
+          </section>}
+
+          {stats.multiclassWarnings.length > 0 && <section className="derived-panel class-resource-panel">
+            <p className="eyebrow">MULTICLASS RULE NOTES</p>
+            {stats.multiclassWarnings.map((warning) => <p className="setup-note" key={warning}>{warning}</p>)}
+          </section>}
+
+</div>
     </section>
   );
 }
