@@ -71,7 +71,7 @@ export function defaultCombatState(): CombatState {
   return { turn: undefined, concentrationId: undefined, effects: [], conditions: [], exhaustion: 0, deathSuccesses: 0, deathFailures: 0, stable: false, dead: false, hitDiceUsed: {}, concentration: "", concentrationDC: null };
 }
 
-export type CharacterAttack = { id: string; name: string; ability: AbilityName; proficient: boolean; diceCount: number; dieSize: number; damageType: string; attackBonus: number; damageBonus: number; addAbilityToDamage: boolean; notes: string; ranged?: boolean; twoHanded?: boolean; offHand?: boolean };
+export type CharacterAttack = { id: string; inventoryItemId?: string; inventoryWeaponKey?: string; name: string; ability: AbilityName; proficient: boolean; diceCount: number; dieSize: number; damageType: string; attackBonus: number; damageBonus: number; addAbilityToDamage: boolean; notes: string; ranged?: boolean; twoHanded?: boolean; offHand?: boolean };
 
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
 export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string };
