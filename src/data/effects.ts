@@ -18,7 +18,7 @@ export function makeEffect(name: string, id: string): ActiveEffect {
 }
 export function activeEffects(character: Character): ActiveEffect[] {
   const names = new Set<string>();
-  const invocationEffects = character.features.some((feature) => feature.name === "Eldritch Mind") ? [makeEffect("War Caster feat", "eldritch-mind")] : [];
+  const invocationEffects = character.features.some((feature) => !feature.manualOnly && feature.name === "Eldritch Mind") ? [makeEffect("War Caster feat", "eldritch-mind")] : [];
   const automatic = ["Tough", "Alert", "War Caster"].filter((name) => hasFeat(character, name)).map((name) => makeEffect(`${name} feat`, `automatic-${name}`));
   return [...automatic, ...invocationEffects, ...(character.combat?.effects ?? [])].filter((effect) => {
     const name = effect.name.trim().toLowerCase();

@@ -27,7 +27,11 @@ export function subclassOf(character: Character, name: string): string {
   return character.classSubclasses?.[name] ?? (character.characterClass === name ? character.subclass : "");
 }
 export function subclassIs(character: Character, name: string, part: string, minimum = 3) {
-  return classLevel(character, name) >= minimum && subclassOf(character, name).toLowerCase().includes(part.toLowerCase());
+  return classLevel(character, name) >= minimum && rulesSubclass(character, name).toLowerCase().includes(part.toLowerCase());
+}
+export function rulesSubclass(character: Character, name: string): string {
+  const selected = subclassOf(character, name);
+  return character.customSubclasses?.[name]?.name === selected ? "" : selected;
 }
 export function gainedRuleFeatures(className: string, level: number, subclass: string) {
   return CLASS_CATALOG.filter((entry) => entry.name.toLowerCase() === className.toLowerCase() || (entry.name.toLowerCase() === subclass.toLowerCase() && entry.subclass_of?.name.toLowerCase() === className.toLowerCase()))

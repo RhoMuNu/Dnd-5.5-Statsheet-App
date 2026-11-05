@@ -18,7 +18,7 @@ Outputs are `releases/TaleForge-<version>-windows-x64.zip` and its `.sha256` che
 The build reuses an installed runtime only if its version and SHA-256 match the pinned official binary. Otherwise it downloads the pinned binary from nodejs.org and checks its SHA-256 before packaging. The first build also downloads the runtime's license; verified runtime files are cached under `.release-cache`. Release users need no internet connection to launch. To verify an existing archive again:
 
 ```powershell
-node scripts/verify-release.mjs releases/TaleForge-0.1.0-windows-x64.zip
+node scripts/verify-release.mjs releases/TaleForge-0.2.0-windows-x64.zip
 ```
 
 ## Runtime and notices

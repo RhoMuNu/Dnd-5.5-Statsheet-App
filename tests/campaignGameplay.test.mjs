@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -53,5 +53,17 @@ test("LAN host validates level-ups, advances action economy, resolves targeted c
     assert.equal(healing.status, 200, JSON.stringify(healing.data)); assert.ok((await snapshot(bob.token)).characters[0].character.currentHitPoints > 5);
     current = await caster(); assert.equal(current.combat.turn.bonusUsed, true);
     assert.equal((await snapshot(bob.token)).activity.filter((entry) => entry.requestId === "bless-cast").length, 1);
+    const customHero = { ...hero("custom-fighter", "Fighter"), level: 2, classLevels: { Fighter: 2 } };
+    assert.equal((await request(`${route}/characters`, "POST", { character: { ...customHero, customSubclasses: { Fighter: { name: "Broken", description: "" } } } }, bob.token)).status, 400);
+    assert.equal((await request(`${route}/characters`, "POST", { character: customHero, shared: false }, bob.token)).status, 200);
+    const customAdvance = { characterId: customHero.id, requestId: "custom-level-three", baseUpdatedAt: customHero.updatedAt, plan: { ...newLevelUpPlan(customHero), subclass: "Champion", customSubclass: true, customDescription: "Our table’s custom Champion", customFeatures: [{ name: "Moon Guard", description: "Protect one ally; resolve the benefit at the table." }] } };
+    const customResult = await request(`${route}/level-up`, "POST", customAdvance, bob.token);
+    assert.equal(customResult.status, 200, JSON.stringify(customResult.data));
+    assert.equal(customResult.data.character.customSubclasses.Fighter.name, "Champion");
+    assert.ok(customResult.data.character.features.some((feature) => feature.name === "Moon Guard" && feature.manualOnly));
+    assert.ok(!customResult.data.character.features.some((feature) => feature.name === "Improved Critical"));
+    assert.equal((await request(`${route}/level-up`, "POST", customAdvance, bob.token)).data.character.level, 3);
+    const disk = JSON.parse(await readFile(join(directory, "lan-campaigns.json"), "utf8"));
+    assert.equal(disk.campaigns[0].characters.find((entry) => entry.character.id === customHero.id).character.customSubclasses.Fighter.description, "Our table’s custom Champion");
   } finally { const stopped = once(child, "exit"); child.kill(); await stopped; await rm(directory, { recursive: true, force: true }); }
 });

@@ -1,11 +1,11 @@
 import type { Character } from "./characters";
 import { calculateCharacterStats } from "./calculations";
 import { classProgressionAtLevel } from "./classProgression";
-import { SPELL_CATALOG, classLevel, spellFromCatalog, subclassOf } from "./rulesCatalog";
+import { SPELL_CATALOG, classLevel, spellFromCatalog, rulesSubclass } from "./rulesCatalog";
 import { subclassSpellGrants } from "./subclassSpells";
 
 export function startingSpellLimits(character: Character, name: string) {
-  const level = classLevel(character, name), subclass = subclassOf(character, name);
+  const level = classLevel(character, name), subclass = rulesSubclass(character, name);
   if (level < 1) return { cantrips: 0, spells: 0, prepared: 0, maxLevel: 0 };
   const progression = classProgressionAtLevel(name, level, subclass);
   const maxLevel = Math.max(0, ...calculateCharacterStats({ ...character, characterClass: name, subclass, classLevels: { [name]: level } }).spellSlots.map((slot) => slot.spellLevel));
@@ -19,7 +19,7 @@ export function startingSpellErrors(character: Character, selections: Record<str
   return [...missing, ...Object.entries(selections).flatMap(([name, keys]) => {
     const limits = startingSpellLimits(character, name);
     const spells = keys.map((key) => SPELL_CATALOG.find((spell) => spell.key === key));
-    const automatic = subclassSpellGrants(subclassOf(character, name), classLevel(character, name), name, "starting");
+    const automatic = subclassSpellGrants(rulesSubclass(character, name), classLevel(character, name), name, "starting");
     const errors: string[] = [];
     if (new Set(keys).size !== keys.length || spells.some((spell) => !spell || !spell.classes.includes(name) || spell.level > limits.maxLevel || automatic.some((granted) => granted.catalogKey === spell.key))) errors.push(`${name}: choose only available, distinct class spells.`);
     if (spells.filter((spell) => spell?.level === 0).length !== limits.cantrips) errors.push(`${name}: choose ${limits.cantrips} cantrips.`);
@@ -45,6 +45,6 @@ export function createStartingSpells(character: Character, selections: Record<st
     return [...keys.map((key, index) => {
       const spell = spellFromCatalog(key, `starting-${name}-${index}`, name);
       return { ...spell, prepared: spell.level === 0 || ++prepared <= limit };
-    }), ...subclassSpellGrants(subclassOf(character, name), classLevel(character, name), name, `starting-${name}`)];
+    }), ...subclassSpellGrants(rulesSubclass(character, name), classLevel(character, name), name, `starting-${name}`)];
   });
 }
