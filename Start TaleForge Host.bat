@@ -7,12 +7,12 @@ if errorlevel 1 goto missing_node
 where npm >nul 2>nul
 if errorlevel 1 goto missing_node
 
-node -e "if (Number(process.versions.node.split('.')[0]) < 18) process.exit(1)"
+node -e "if (Number(process.versions.node.split('.')[0]) < 24) process.exit(1)"
 if errorlevel 1 goto old_node
 
 if not exist "node_modules\vite\bin\vite.js" (
   echo First-time setup: downloading TaleForge's app files...
-  call npm install
+  call npm ci
   if errorlevel 1 goto setup_failed
 )
 
@@ -33,7 +33,7 @@ pause
 exit /b 1
 
 :old_node
-echo TaleForge needs Node.js 18 or newer. Please install the current Node.js LTS version.
+echo TaleForge needs Node.js 24 or newer. Please install Node.js 24 LTS or newer.
 echo Download it from https://nodejs.org/en/download
 start "" "https://nodejs.org/en/download"
 pause

@@ -3,13 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": { "node": ">=24" },
   "scripts": {
     "dev": "vite",
     "dev:lan": "node server/dev.mjs",
     "build": "tsc -b && vite build && node server/build-rules.mjs",
     "preview": "vite preview",
     "host": "npm run build && node server/index.mjs --production",
-    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs"
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
+    "verify": "npm run build && npm test && node --import ./tests/register.mjs --test tests/productionHost.smoke.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",

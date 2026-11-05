@@ -176,13 +176,34 @@ export function defaultCharacterStats(): Pick<Character,
 
 const CHARACTERS_KEY = "taleforge.characters.v1";
 const ACTIVE_CHARACTER_KEY = "taleforge.activeCharacter.v1";
+const RECOVERY_KEY = "taleforge.characters.recovery.v1";
+let librarySaveBlocked = false;
+
+export function characterLibraryRecovery(): string | null {
+  try { return localStorage.getItem(RECOVERY_KEY); } catch { return null; }
+}
+
+function preserveUnreadableLibrary(raw: string) {
+  try {
+    const existing = localStorage.getItem(RECOVERY_KEY);
+    if (existing !== null && existing !== raw) { librarySaveBlocked = true; return; }
+    localStorage.setItem(RECOVERY_KEY, raw);
+  } catch { librarySaveBlocked = true; }
+}
 
 export function loadCharacters(): Character[] {
+  librarySaveBlocked = false;
+  let raw: string | null = null;
   try {
-    const value: unknown = JSON.parse(localStorage.getItem(CHARACTERS_KEY) ?? "[]");
-    if (!Array.isArray(value)) return [];
-    return value.map(normalizeCharacter).filter((character): character is Character => character !== null);
+    raw = localStorage.getItem(CHARACTERS_KEY);
+    const value: unknown = JSON.parse(raw ?? "[]");
+    if (!Array.isArray(value)) throw new Error("The saved library is not an array.");
+    const characters = value.map((entry) => { try { return normalizeCharacter(entry); } catch { return null; } });
+    if (characters.some((entry) => entry === null) && raw !== null) preserveUnreadableLibrary(raw);
+    return characters.filter((character): character is Character => character !== null);
   } catch {
+    if (raw !== null) preserveUnreadableLibrary(raw);
+    else librarySaveBlocked = true;
     return [];
   }
 }
@@ -353,6 +374,7 @@ function isCustomResource(value: unknown): value is CustomResource {
 }
 
 export function saveCharacters(characters: Character[]): boolean {
+  if (librarySaveBlocked) return false;
   try {
     localStorage.setItem(CHARACTERS_KEY, JSON.stringify(characters));
     return true;
@@ -392,11 +414,13 @@ function isBaseCharacter(value: unknown): value is Omit<Character, keyof ReturnT
     && typeof character.species === "string"
     && typeof character.characterClass === "string"
     && (character.subclass === undefined || typeof character.subclass === "string")
-    && (character.classLevels === undefined || (typeof character.classLevels === "object" && character.classLevels !== null))
-    && (character.classSubclasses === undefined || (typeof character.classSubclasses === "object" && character.classSubclasses !== null))
+    && (character.classLevels === undefined || (typeof character.classLevels === "object" && character.classLevels !== null && !Array.isArray(character.classLevels)
+      && Object.values(character.classLevels).every((level) => Number.isInteger(level) && level >= 1 && level <= 20)
+      && (!Object.keys(character.classLevels).length || Object.values(character.classLevels).reduce((sum, level) => sum + level, 0) === character.level)))
+    && (character.classSubclasses === undefined || (typeof character.classSubclasses === "object" && character.classSubclasses !== null && !Array.isArray(character.classSubclasses) && Object.values(character.classSubclasses).every((name) => typeof name === "string")))
     && (character.unarmoredDefenseChoice === undefined || character.unarmoredDefenseChoice === "" || character.unarmoredDefenseChoice === "Barbarian" || character.unarmoredDefenseChoice === "Monk")
     && typeof character.background === "string"
-    && typeof character.level === "number"
+    && Number.isInteger(character.level) && character.level! >= 1 && character.level! <= 20
     && typeof character.createdAt === "string"
     && typeof character.updatedAt === "string";
 }

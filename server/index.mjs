@@ -1,12 +1,13 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
 import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeActivity } from "./activity.mjs";
 import { changeEncounter, emptyEncounter } from "./encounters.mjs";
+import { campaignPersistence, CampaignSaveError } from "./persistence.mjs";
 
 const isProduction = process.env.NODE_ENV === "production" || process.argv.includes("--production");
 const rules = isProduction ? await import("../dist/rules.mjs") : (await import("./rules-dev.mjs")).rules;
@@ -26,6 +27,7 @@ try {
   console.error(`Could not read the campaign store at ${dataFile}:`, error.message);
   process.exit(1);
 }
+const persistence = campaignPersistence(dataFile, store);
 
 function diceForRequest(body) {
   if (body.diceMode !== undefined && !["digital", "physical"].includes(body.diceMode)) throw new Error("Choose digital or physical dice.");
@@ -57,9 +59,7 @@ function synchronizeTurns(campaign, previous, next) {
 }
 
 function persist() {
-  const temporary = `${dataFile}.tmp`;
-  writeFileSync(temporary, JSON.stringify(store, null, 2), "utf8");
-  renameSync(temporary, dataFile);
+  persistence.save(store);
 }
 
 function sendJson(response, status, payload) {
@@ -134,7 +134,7 @@ function validCharacter(character) {
     .every((skill) => [0, 1, 2].includes(character.skillProficiencies[skill]));
   const classLevels = Object.entries(character.classLevels);
   const totalLevels = classLevels.reduce((sum, [, level]) => sum + (Number.isInteger(level) ? level : 0), 0);
-  return abilityScoresValid && savesValid && skillsValid && totalLevels <= 20 && validCombatData(character)
+  return abilityScoresValid && savesValid && skillsValid && classLevels.length > 0 && totalLevels === character.level && validCombatData(character)
     && classLevels.every(([name, level]) => typeof name === "string" && Number.isInteger(level) && level >= 1 && level <= 20);
 }
 
@@ -166,9 +166,9 @@ function validCombatData(character) {
 }
 
 const apiServer = createServer(async (request, response) => {
-  const requestUrl = new URL(request.url ?? "/", "http://localhost");
-  const pathname = requestUrl.pathname;
   try {
+    const requestUrl = new URL(request.url ?? "/", "http://localhost");
+    const pathname = requestUrl.pathname;
     if (request.method === "GET" && pathname === "/api/health") {
       const addresses = Object.values(networkInterfaces()).flatMap((items) => items ?? [])
         .filter((item) => !item.internal && (item.family === "IPv4" || item.family === 4) && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(item.address))
@@ -359,11 +359,12 @@ const apiServer = createServer(async (request, response) => {
 
     }
 
-    if (isProduction && request.method === "GET") return serveStatic(pathname, response);
+    if (isProduction && request.method === "GET" && !pathname.startsWith("/api/")) return serveStatic(pathname, response);
     return sendJson(response, 404, { error: "Not found." });
   } catch (error) {
     const message = error instanceof SyntaxError ? "Request body must be valid JSON." : error.message || "The LAN host could not complete that request.";
-    if (!response.headersSent) return sendJson(response, 400, { error: message });
+    if (error instanceof CampaignSaveError) console.error("Campaign save failed:", error.cause);
+    if (!response.headersSent) return sendJson(response, error instanceof CampaignSaveError ? 503 : 400, { error: message });
     response.end();
   }
 });
@@ -377,9 +378,12 @@ function serveStatic(pathname, response) {
     response.writeHead(403); response.end("Forbidden"); return;
   }
   let file = candidate;
-  if (!existsSync(file)) file = join(distRoot, "index.html");
+  if (!existsSync(file)) {
+    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Not found"); return;
+  }
   const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon" }[extname(file)] ?? "application/octet-stream";
-  response.writeHead(200, { "Content-Type": mime, "Cache-Control": file.endsWith("index.html") ? "no-cache" : "public, max-age=3600" });
+  response.writeHead(200, { "Content-Type": mime, "X-Content-Type-Options": "nosniff", "Cache-Control": file.endsWith("index.html") ? "no-cache" : "public, max-age=3600" });
   response.end(readFileSync(file));
 }
 

@@ -167,13 +167,17 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
   const selectedCharacter = ownCharacters.find((entry) => entry.character.id === selectedId)?.character ?? ownCharacters[0]?.character ?? null;
 
   function activateSession(next: LanSession) {
-    setSavedRooms(rememberLanSession(next));
-    localStorage.setItem(SESSION_KEY, JSON.stringify(next));
     setSession(next);
     setSnapshot(null);
     setSelectedId(null);
     setShowBuilder(false);
     setError("");
+    try {
+      setSavedRooms(rememberLanSession(next));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    } catch {
+      setError("Room access could not be saved in this browser. Keep this tab open; clearing or closing it may lose access to this identity.");
+    }
   }
 
   async function hostCampaign(event: FormEvent<HTMLFormElement>) {
