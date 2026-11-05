@@ -1,8 +1,11 @@
+import { hasFeat } from "./advancement";
+import { classLevel, subclassIs } from "./rulesCatalog";
+import { inventoryArmor } from "./equipment";
 import type { AbilityName, Character, CreatureSize, SkillName } from "./characters";
 import { SKILLS } from "./characters";
 import { classProgressionAtLevel } from "./classProgression";
 import { activeEffects, effectTotal } from "./effects";
-import { activeConditions, exhaustionLevel } from "./conditions";
+import { activeConditions, exhaustionLevel, isIncapacitated } from "./conditions";
 
 const HIT_DICE: Record<string, number> = {
   barbarian: 12,
@@ -85,6 +88,8 @@ const WARLOCK_SLOT_LEVELS = [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 
 
 /** Formulas follow the free 2024 rules: https://www.dndbeyond.com/sources/dnd/br-2024/playing-the-game and /creating-a-character. */
 export function calculateCharacterStats(character: Character): CalculatedStats {
+  const equipment = character.armorSource === "inventory" ? inventoryArmor(character) : null;
+  if (equipment) character = { ...character, armorMode: equipment.armorMode, armorBaseAC: equipment.armorBaseAC, armorStrengthRequirement: equipment.armorStrengthRequirement, hasShield: equipment.hasShield };
   const classes = getClassLevels(character);
   const level = clamp(classes.reduce((sum, entry) => sum + entry.level, 0) || Math.trunc(character.level), 1, 20);
   const primaryClass = character.characterClass.trim().toLowerCase();
@@ -94,10 +99,11 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     Object.entries(character.abilityScores).map(([ability, score]) => [ability, Math.floor((score - 10) / 2)]),
   ) as Record<AbilityName, number>;
 
+  const auraBonus = classLevel(character, "Paladin") >= 6 && !isIncapacitated(character) ? Math.max(1, abilityModifiers.Charisma) : 0;
   const savingThrows = Object.fromEntries(
     Object.entries(abilityModifiers).map(([ability, modifier]) => [
       ability,
-      modifier + (isSavingThrowProficient(character, ability as AbilityName) ? proficiencyBonus : 0) + effectTotal(character, "save") - 2 * exhaustion,
+      modifier + (isSavingThrowProficient(character, ability as AbilityName) ? proficiencyBonus : 0) + effectTotal(character, "save") + auraBonus - 2 * exhaustion,
     ]),
   ) as Record<AbilityName, number>;
 
@@ -122,7 +128,8 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     armorBase = 10 + dexterityModifier + abilityModifiers.Wisdom;
     appliedClassFeatures.push("Monk Unarmored Defense");
   }
-  const armorClass = armorBase + (character.hasShield ? 2 : 0) + character.otherAcBonus + effectTotal(character, "ac");
+  if (character.armorMode === "unarmored" && subclassIs(character, "Sorcerer", "Draconic")) { armorBase = Math.max(armorBase, 10 + dexterityModifier + abilityModifiers.Charisma); appliedClassFeatures.push("Draconic Resilience AC"); }
+  const armorClass = armorBase + (equipment ? equipment.shieldBonus : character.hasShield ? 2 : 0) + character.otherAcBonus + effectTotal(character, "ac") + (character.armorMode !== "unarmored" && hasFeat(character, "Defense") ? 1 : 0);
   const hitDie = HIT_DICE[className] ?? null;
   const constitutionModifier = abilityModifiers.Constitution;
   const calculatedHitPoints = classes.length === 0 ? null : classes.reduce((total, entry) => {
@@ -131,7 +138,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     return total + levels * Math.max(1, average + constitutionModifier);
   }, Math.max(1, (HIT_DICE[className] ?? 0) + constitutionModifier));
   // Dwarven Toughness grants 1 additional HP per character level in the 2024 rules.
-  const maxHitPoints = calculatedHitPoints === null ? null : calculatedHitPoints + (character.species.toLowerCase().startsWith("dwarf") ? level : 0) + effectTotal(character, "hpPerLevel") * level;
+  const maxHitPoints = calculatedHitPoints === null ? null : calculatedHitPoints + (character.species.toLowerCase().startsWith("dwarf") ? level : 0) + effectTotal(character, "hpPerLevel") * level + (character.hitPointAdjustment ?? 0) + (subclassIs(character, "Sorcerer", "Draconic") ? classLevel(character, "Sorcerer") : 0);
 
   const effectiveSize = character.powerfulBuild ? increaseSize(character.size) : character.size;
   const carryingCapacity = character.abilityScores.Strength * SIZE_MULTIPLIER[effectiveSize];
@@ -147,7 +154,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     && character.armorStrengthRequirement > 0
     && character.abilityScores.Strength < character.armorStrengthRequirement;
   const immobile = activeConditions(character).some((condition) => ["Grappled", "Restrained", "Paralyzed", "Petrified", "Unconscious"].includes(condition)) || character.combat?.dead;
-  const speed = immobile ? 0 : Math.max(0, character.speedFeet + character.otherSpeedBonus + classSpeedBonus - (armorReducesSpeed ? 10 : 0) - exhaustion * 5 + effectTotal(character, "speed"));
+  const speed = immobile ? 0 : Math.max(0, character.speedFeet + character.otherSpeedBonus + classSpeedBonus - (armorReducesSpeed ? 10 : 0) - exhaustion * 5 + effectTotal(character, "speed") + (hasFeat(character, "Speedy") ? 10 : 0));
   const spellcastingAbility = character.spellcastingAbility || CLASS_SPELLCASTING_ABILITIES[character.characterClass.trim().toLowerCase()] || "";
   const spellModifier = spellcastingAbility ? abilityModifiers[spellcastingAbility] : null;
   const spellSlots = spellSlotsForClasses(classes, { [capitalize(className)]: character.subclass, ...character.classSubclasses });
@@ -263,7 +270,7 @@ export function isClassSavingThrowProficient(character: Character, ability: Abil
 }
 
 export function isSavingThrowProficient(character: Character, ability: AbilityName): boolean {
-  return isClassSavingThrowProficient(character, ability) || character.savingThrowProficiencies[ability];
+  return isClassSavingThrowProficient(character, ability) || character.savingThrowProficiencies[ability] || (hasFeat(character, "Resilient") && character.rulesChoices?.["feat:Resilient"]?.includes(ability) === true) || classLevel(character, "Monk") >= 14 || (classLevel(character, "Rogue") >= 15 && ["Wisdom", "Charisma"].includes(ability));
 }
 
 function spellSlotsForClasses(classes: { name: string; level: number }[], subclasses: Record<string, string>): { spellLevel: number; total: number; pool: string }[] {

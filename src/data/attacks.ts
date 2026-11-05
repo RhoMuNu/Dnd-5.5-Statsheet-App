@@ -1,3 +1,6 @@
+import { spendTurn, turnState } from "./economy";
+import { hasFeat } from "./advancement";
+import { subclassIs } from "./rulesCatalog";
 import { effectDice, effectTotal } from "./effects";
 import type { Character, CharacterAttack } from "./characters";
 import { calculateCharacterStats } from "./calculations";
@@ -38,31 +41,36 @@ export function makeWeaponAttack(character: Character, name: string, id: string)
   return { id, name: preset.name, ability: ("ranged" in preset || ("finesse" in preset && dex)) ? "Dexterity" : "Strength",
     proficient: true, diceCount: preset.count, dieSize: preset.die, damageType: preset.type, attackBonus: 0,
     damageBonus: preset.name === "Unarmed Strike" ? 1 : 0, addAbilityToDamage: true,
+    ranged: "ranged" in preset, twoHanded: ["Greatsword", "Greataxe", "Maul", "Glaive", "Halberd", "Longbow", "Shortbow", "Light Crossbow", "Heavy Crossbow"].includes(preset.name),
     notes: "notes" in preset ? preset.notes : "" };
 }
 export function attackNumbers(character: Character, attack: CharacterAttack) {
   const stats = calculateCharacterStats(character);
-  return { toHit: stats.abilityModifiers[attack.ability] + (attack.proficient ? stats.proficiencyBonus : 0) + attack.attackBonus - 2 * exhaustionLevel(character) + effectTotal(character, "attack"),
-    damageBonus: (attack.addAbilityToDamage ? stats.abilityModifiers[attack.ability] : 0) + attack.damageBonus + effectTotal(character, "damage") };
+  return { toHit: stats.abilityModifiers[attack.ability] + (attack.proficient ? stats.proficiencyBonus : 0) + attack.attackBonus - 2 * exhaustionLevel(character) + effectTotal(character, "attack") + (attack.ranged && hasFeat(character, "Archery") ? 2 : 0),
+    damageBonus: ((attack.addAbilityToDamage || (attack.offHand && (hasFeat(character, "Two-Weapon Fighting") || stats.abilityModifiers[attack.ability] < 0))) ? stats.abilityModifiers[attack.ability] : 0) + attack.damageBonus + effectTotal(character, "damage") };
 }
-export function rollWeaponAttack(character: Character, attack: CharacterAttack, mode: RollMode, targetAC: number | null, extraAdvantage = false, extraDisadvantage = false, die = rollDie) {
+export function rollWeaponAttack(character: Character, attack: CharacterAttack, mode: RollMode, targetAC: number | null, extraAdvantage = false, extraDisadvantage = false, die = rollDie, cost: "attack" | "bonus" | "reaction" = attack.offHand ? "bonus" : "attack") {
   if (isIncapacitated(character)) throw new Error("Cannot attack while incapacitated or dead.");
-  const result = rollD20(character, "attack", mode, "", extraAdvantage, extraDisadvantage, die);
+  const updates = spendTurn(character, cost);
+  const result = rollD20(character, "attack", mode, attack.ability, extraAdvantage, extraDisadvantage, die);
   const bonus = attackNumbers(character, attack).toHit;
   const extra = effectDice(character, "attack", die);
   const total = result.natural + bonus + extra.total;
-  const critical = result.natural === 20;
+  const critical = result.natural >= (subclassIs(character, "Fighter", "Champion", 15) ? 18 : subclassIs(character, "Fighter", "Champion") ? 19 : 20);
   const hit = result.natural === 1 ? false : critical ? true : targetAC === null ? null : total >= targetAC;
-  return { ...result, effectRolls: extra.rolls, effectBonus: extra.total, bonus, total, critical, hit };
+  return { ...result, updates, effectRolls: extra.rolls, effectBonus: extra.total, bonus, total, critical, hit };
 }
 export function rollWeaponDamage(character: Character, attack: CharacterAttack, critical: boolean, sneakAttack = false, rage = false, die = rollDie) {
   const stats = calculateCharacterStats(character);
   const rogue = stats.classBreakdown.find((entry) => entry.name === "Rogue")?.level ?? 0;
   const barbarian = stats.classBreakdown.find((entry) => entry.name === "Barbarian")?.level ?? 0;
+  const turn = turnState(character);
+  if (sneakAttack && turn.enabled && turn.sneakTurn === turn.key) throw new Error("Sneak Attack has already been used this turn.");
+  const updates: Partial<Character> = sneakAttack && turn.enabled && character.combat ? { combat: { ...character.combat, turn: { ...turn, sneakTurn: turn.key } } } : {};
   const multiplier = critical ? 2 : 1;
-  const rolls = Array.from({ length: attack.diceCount * multiplier }, () => die(attack.dieSize));
+  const rolls = Array.from({ length: attack.diceCount * multiplier }, () => { const roll = die(attack.dieSize); return attack.twoHanded && hasFeat(character, "Great Weapon Fighting") ? Math.max(3, roll) : roll; });
   const sneak = Array.from({ length: sneakAttack ? Math.ceil(rogue / 2) * multiplier : 0 }, () => die(6));
   const rageBonus = rage && barbarian > 0 && attack.ability === "Strength" ? barbarian >= 16 ? 4 : barbarian >= 9 ? 3 : 2 : 0;
   const bonus = attackNumbers(character, attack).damageBonus + rageBonus;
-  return { rolls, sneak, bonus, total: Math.max(0, [...rolls, ...sneak].reduce((sum, roll) => sum + roll, 0) + bonus) };
+  return { updates, rolls, sneak, bonus, total: Math.max(0, [...rolls, ...sneak].reduce((sum, roll) => sum + roll, 0) + bonus) };
 }

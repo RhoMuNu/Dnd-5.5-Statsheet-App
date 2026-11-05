@@ -1,3 +1,5 @@
+import type { TurnState } from "./economy";
+import type { AdvancementRecord } from "./advancement";
 import { CONDITIONS, type Condition } from "./conditions";
 import { normalizeEffects, type ActiveEffect } from "./effects";
 
@@ -16,6 +18,9 @@ export type Character = {
   temporaryHitPoints: number;
   combat?: CombatState;
   attacks?: CharacterAttack[];
+  advancement?: AdvancementRecord[];
+  rulesChoices?: Record<string, string[]>;
+  hitPointAdjustment?: number;
   unarmoredDefenseChoice: "Barbarian" | "Monk" | "";
   background: string;
   level: number;
@@ -26,6 +31,9 @@ export type Character = {
   speedFeet: number;
   otherSpeedBonus: number;
   powerfulBuild: boolean;
+  armorSource?: "manual" | "inventory";
+  inventoryArmorTrained?: boolean;
+  inventoryShieldTrained?: boolean;
   armorMode: ArmorMode;
   armorBaseAC: number;
   hasShield: boolean;
@@ -45,6 +53,8 @@ export type Character = {
 export type CustomResource = { id: string; name: string; maxUses: number; used: number; recovery: "short-one" | "short-all" | "long" | "manual" };
 
 export type CombatState = {
+  turn?: TurnState;
+  concentrationId?: string;
   effects: ActiveEffect[];
   conditions: Condition[];
   exhaustion: number;
@@ -58,17 +68,17 @@ export type CombatState = {
 };
 
 export function defaultCombatState(): CombatState {
-  return { effects: [], conditions: [], exhaustion: 0, deathSuccesses: 0, deathFailures: 0, stable: false, dead: false, hitDiceUsed: {}, concentration: "", concentrationDC: null };
+  return { turn: undefined, concentrationId: undefined, effects: [], conditions: [], exhaustion: 0, deathSuccesses: 0, deathFailures: 0, stable: false, dead: false, hitDiceUsed: {}, concentration: "", concentrationDC: null };
 }
 
-export type CharacterAttack = { id: string; name: string; ability: AbilityName; proficient: boolean; diceCount: number; dieSize: number; damageType: string; attackBonus: number; damageBonus: number; addAbilityToDamage: boolean; notes: string };
+export type CharacterAttack = { id: string; name: string; ability: AbilityName; proficient: boolean; diceCount: number; dieSize: number; damageType: string; attackBonus: number; damageBonus: number; addAbilityToDamage: boolean; notes: string; ranged?: boolean; twoHanded?: boolean; offHand?: boolean };
 
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
 export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string };
 export type InventoryCurrency = { cp: number; sp: number; ep: number; gp: number; pp: number };
 export type InventoryItem = { id: string; name: string; quantity: number; weight: number; category: string; equipped: boolean; notes: string };
 export type CharacterInventory = { items: InventoryItem[]; currency: InventoryCurrency; startingKitsAdded: boolean };
-export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean; automation?: string };
+export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean; automation?: string; className?: string; catalogKey?: string; alwaysPrepared?: boolean };
 export type CharacterNotes = { backstory: string; entries: { id: string; title: string; body: string; createdAt: string; updatedAt: string }[] };
 export type CharacterCreationDetails = {
   abilityMethod: "standard" | "point-buy" | "manual" | "rolled";
@@ -182,11 +192,17 @@ export function normalizeCharacter(value: unknown): Character | null {
   return {
     ...defaults,
     ...character,
+    armorSource: character.armorSource === "inventory" ? "inventory" : "manual",
+    inventoryArmorTrained: character.inventoryArmorTrained !== false,
+    inventoryShieldTrained: character.inventoryShieldTrained !== false,
     resourceUses: character.resourceUses ?? {},
     customResources: Array.isArray(character.customResources) ? character.customResources.filter(isCustomResource).map((resource) => ({ ...resource, used: Math.min(Math.trunc(resource.maxUses), Math.max(0, Math.trunc(resource.used))) })) : [],
     currentHitPoints: Number.isFinite(character.currentHitPoints) ? Math.max(0, Math.trunc(character.currentHitPoints!)) : null,
     temporaryHitPoints: Number.isFinite(character.temporaryHitPoints) ? Math.max(0, Math.trunc(character.temporaryHitPoints!)) : 0,
     combat: normalizeCombatState(character.combat),
+    hitPointAdjustment: typeof character.hitPointAdjustment === "number" && Number.isFinite(character.hitPointAdjustment) ? Math.min(2000, Math.max(-2000, Math.trunc(character.hitPointAdjustment))) : 0,
+    rulesChoices: character.rulesChoices && typeof character.rulesChoices === "object" ? Object.fromEntries(Object.entries(character.rulesChoices).slice(0, 200).filter(([, choices]) => Array.isArray(choices)).map(([key, choices]) => [key, choices.filter((value) => typeof value === "string").slice(0, 50)])) : {},
+    advancement: Array.isArray(character.advancement) ? character.advancement.filter((entry) => entry && typeof entry.id === "string" && Number.isInteger(entry.level) && entry.level >= 2 && entry.level <= 20).slice(0, 19) : [],
     attacks: Array.isArray(character.attacks) ? character.attacks.filter(isCharacterAttack).slice(0, 100) : [],
     subclass: character.subclass ?? "",
     classLevels: character.classLevels && Object.keys(character.classLevels).length
@@ -212,6 +228,8 @@ function normalizeCombatState(value: unknown): CombatState {
   const state = value && typeof value === "object" ? value as Partial<CombatState> : {};
   const count = (value: unknown, max: number) => typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(0, Math.trunc(value))) : 0;
   return {
+    concentrationId: typeof state.concentrationId === "string" ? state.concentrationId.slice(0, 100) : undefined,
+    turn: state.turn && typeof state.turn === "object" ? { enabled: state.turn.enabled === true, key: typeof state.turn.key === "string" ? state.turn.key.slice(0, 100) : "local", active: state.turn.active === true, actionUsed: state.turn.actionUsed === true, bonusUsed: state.turn.bonusUsed === true, reactionUsed: state.turn.reactionUsed === true, attacksRemaining: count(state.turn.attacksRemaining, 4), slotTurn: typeof state.turn.slotTurn === "string" ? state.turn.slotTurn.slice(0, 100) : "", surgeUsed: state.turn.surgeUsed === true, surgeAction: state.turn.surgeAction === true, sneakTurn: typeof state.turn.sneakTurn === "string" ? state.turn.sneakTurn.slice(0, 100) : "" } : undefined,
     conditions: Array.isArray(state.conditions) ? [...new Set(state.conditions.filter((entry) => CONDITIONS.includes(entry)))] : [],
     effects: normalizeEffects(state.effects),
     exhaustion: count(state.exhaustion, 6),

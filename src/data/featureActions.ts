@@ -1,3 +1,4 @@
+import { spendTurn } from "./economy";
 import type { Character } from "./characters";
 import { calculateCharacterStats } from "./calculations";
 import { healCharacter, rollDie } from "./gameplay";
@@ -11,6 +12,7 @@ export function useHealingFeature(character: Character, feature: "second-wind" |
   const cost = feature === "second-wind" ? 1 : amount;
   if (!resource || !Number.isInteger(cost) || cost <= 0 || cost > (resource.maxUses ?? 0) - (resource.used ?? 0)) throw new Error("Not enough uses remain.");
   const fighterLevel = stats.classBreakdown.find((entry) => entry.name === "Fighter")?.level ?? 0;
+  const costUpdates = spendTurn(character, "bonus");
   const healing = feature === "second-wind" ? die(10) + fighterLevel : amount;
-  return { updates: { ...healCharacter(character, healing), resourceUses: { ...character.resourceUses, [key]: (resource.used ?? 0) + cost } }, healing };
+  return { updates: { ...costUpdates, ...healCharacter({ ...character, ...costUpdates }, healing), resourceUses: { ...character.resourceUses, [key]: (resource.used ?? 0) + cost } }, healing };
 }

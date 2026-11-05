@@ -1,9 +1,12 @@
 import type { Character, CharacterDraft } from "./characters";
 
-export type LanSession = { code: string; token: string; role: "dm" | "player"; playerId: string | null; name: string };
+export type LanSession = { campaignName?: string; code: string; token: string; role: "dm" | "player"; playerId: string | null; name: string };
 export type EncounterEntry = { id: string; name: string; initiative: number; tieOrder: number; characterId: string | null };
-export type Encounter = { revision: number; round: number; activeId: string | null; entries: EncounterEntry[] };
+export type Encounter = { turnSerial?: number; revision: number; round: number; activeId: string | null; entries: EncounterEntry[] };
+export type TableActivity = { id: string; actorId: string; actor: string; requestId: string; createdAt: string; kind: "dice" | "sheet"; characterName?: string; summary: string };
 export type LanSnapshot = {
+  targets?: { id: string; name: string }[];
+  activity?: TableActivity[];
   encounter?: Encounter;
   campaign: { code: string; name: string; dmName: string };
   role: "dm" | "player";

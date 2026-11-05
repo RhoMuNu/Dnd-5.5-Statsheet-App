@@ -1,0 +1,57 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { once } from "node:events";
+import { defaultCharacterStats } from "../src/data/characters.ts";
+import { SPELL_CATALOG, spellFromCatalog } from "../src/data/rulesCatalog.ts";
+import { newLevelUpPlan } from "../src/data/advancement.ts";
+
+test("LAN host validates level-ups, advances action economy, resolves targeted casts atomically and deduplicates retries", { timeout: 25000 }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), "taleforge-play-test-"));
+  const child = spawn(process.execPath, ["server/index.mjs"], { env: { ...process.env, TALEFORGE_PORT: "0", TALEFORGE_DATA_DIR: directory }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  let output = "", errors = ""; child.stderr.on("data", (data) => { errors += data; });
+  try {
+    const port = await new Promise((resolve, reject) => { child.stdout.on("data", (data) => { output += data; const match = output.match(/listening on 0\.0\.0\.0:(\d+)/); if (match) resolve(Number(match[1])); }); child.once("error", reject); child.once("exit", (code) => reject(Error(`Host exited ${code}: ${errors}`))); });
+    const request = async (path, method = "GET", body, token) => { const response = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }); return { status: response.status, data: await response.json() }; };
+    const dm = (await request("/api/campaigns", "POST", { name: "Rules campaign" })).data, route = `/api/campaigns/${dm.code}`;
+    const alice = (await request(`${route}/join`, "POST", { name: "Alice" })).data, bob = (await request(`${route}/join`, "POST", { name: "Bob" })).data;
+    const hero = (id, name) => ({ ...defaultCharacterStats(), id, name: id, concept: "", species: "Human", characterClass: name, classLevels: { [name]: 5 }, level: 5, background: "", createdAt: "2026-11-05T00:00:00Z", updatedAt: "2026-11-05T00:00:00Z" });
+    const source = hero("cleric", "Cleric"); source.subclass = "Life Domain"; source.classSubclasses = { Cleric: "Life Domain" }; source.abilityScores.Wisdom = 16;
+    source.spells = ["Bless", "Healing Word", "Sacred Flame"].map((name, index) => spellFromCatalog(SPELL_CATALOG.find((spell) => spell.name === name).key, `spell-${index}`, "Cleric"));
+    const target = hero("fighter", "Fighter"); target.currentHitPoints = 5;
+    assert.equal((await request(`${route}/characters`, "POST", { character: source, shared: true }, alice.token)).status, 200);
+    await request(`${route}/characters`, "POST", { character: target, shared: true }, bob.token);
+    const plan = newLevelUpPlan(source), advance = { characterId: source.id, plan, requestId: "level-6", baseUpdatedAt: source.updatedAt };
+    assert.equal((await request(`${route}/level-up`, "POST", advance, bob.token)).status, 404);
+    const advanced = await request(`${route}/level-up`, "POST", advance, alice.token); assert.equal(advanced.status, 200, JSON.stringify(advanced.data)); assert.equal(advanced.data.character.level, 6);
+    assert.equal((await request(`${route}/level-up`, "POST", advance, alice.token)).data.character.level, 6);
+    assert.equal((await request(`${route}/level-up`, "POST", { ...advance, requestId: "stale" }, alice.token)).status, 409);
+    let revision = 0;
+    const encounter = async (action) => { const result = await request(`${route}/encounter`, "POST", { revision, action }, dm.token); assert.equal(result.status, 200, JSON.stringify(result.data)); revision = result.data.encounter.revision; return result.data.encounter; };
+    await encounter({ type: "add", characterId: source.id, initiative: 20 }); await encounter({ type: "add", characterId: target.id, initiative: 10 }); await encounter({ type: "start" });
+    const snapshot = async (token) => (await request(route, "GET", undefined, token)).data;
+    const caster = () => snapshot(alice.token).then((state) => state.characters[0].character);
+    let current = await caster(); assert.equal(current.combat.turn.enabled, true); assert.equal(current.combat.turn.active, true);
+    assert.equal((await request(`${route}/level-up`, "POST", { ...advance, baseUpdatedAt: current.updatedAt, requestId: "combat-level" }, alice.token)).status, 400);
+    const cast = { casterId: source.id, spellId: "spell-0", className: "Cleric", slotKey: "spell-slot:Spellcasting · Long Rest:1", targets: [{ id: target.id }], requestId: "bless-cast", baseUpdatedAt: current.updatedAt };
+    assert.equal((await request(`${route}/cast`, "POST", { ...cast, baseUpdatedAt: source.updatedAt }, alice.token)).status, 409);
+    const result = await request(`${route}/cast`, "POST", cast, alice.token); assert.equal(result.status, 200, JSON.stringify(result.data));
+    assert.equal((await request(`${route}/cast`, "POST", cast, alice.token)).status, 200);
+    current = await caster(); assert.equal(current.resourceUses[cast.slotKey], 1); assert.equal(current.combat.turn.actionUsed, true);
+    const bobState = await snapshot(bob.token); assert.equal(bobState.characters[0].character.combat.effects[0].name, "Bless");
+    assert.equal((await request(`${route}/cast`, "POST", { ...cast, spellId: "spell-2", slotKey: undefined, requestId: "too-many-actions", baseUpdatedAt: current.updatedAt }, alice.token)).status, 400);
+    await encounter({ type: "next" }); current = await caster(); assert.equal(current.combat.turn.active, false);
+    assert.equal((await request(`${route}/cast`, "POST", { ...cast, requestId: "off-turn", baseUpdatedAt: current.updatedAt }, alice.token)).status, 400);
+    const endConcentration = { ...current, combat: { ...current.combat, concentration: "" } };
+    assert.equal((await request(`${route}/characters`, "POST", { character: endConcentration, shared: true, baseUpdatedAt: current.updatedAt }, alice.token)).status, 200);
+    assert.equal((await snapshot(bob.token)).characters[0].character.combat.effects.length, 0);
+    await encounter({ type: "next" }); current = await caster(); assert.equal(current.combat.turn.actionUsed, false);
+    const healing = await request(`${route}/cast`, "POST", { ...cast, spellId: "spell-1", requestId: "healing-word", baseUpdatedAt: current.updatedAt }, alice.token);
+    assert.equal(healing.status, 200, JSON.stringify(healing.data)); assert.ok((await snapshot(bob.token)).characters[0].character.currentHitPoints > 5);
+    current = await caster(); assert.equal(current.combat.turn.bonusUsed, true);
+    assert.equal((await snapshot(bob.token)).activity.filter((entry) => entry.requestId === "bless-cast").length, 1);
+  } finally { const stopped = once(child, "exit"); child.kill(); await stopped; await rm(directory, { recursive: true, force: true }); }
+});
