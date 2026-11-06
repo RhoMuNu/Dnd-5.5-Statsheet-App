@@ -1,5 +1,6 @@
 import type { Character, CharacterAttack, InventoryItem } from "./characters";
 import { makeWeaponAttack, WEAPON_PRESETS } from "./attacks";
+import { itemIsCarried } from "./inventoryManagement";
 
 export function weaponForItem(item: Pick<InventoryItem, "name">) {
   const match = item.name.trim().toLowerCase().replace(/\s+/g, " ").match(/^(?:\+([1-3])\s+)?(.+?)(?:\s*\+([1-3]))?$/);
@@ -13,7 +14,7 @@ export function weaponForItem(item: Pick<InventoryItem, "name">) {
 export function characterAttacks(character: Character): CharacterAttack[] {
   const saved = character.attacks ?? [];
   const manual = saved.filter((attack) => !attack.inventoryItemId);
-  const equipped = character.inventory.items.filter((item) => item.equipped && item.quantity > 0);
+  const equipped = character.inventory.items.filter((item) => item.equipped && itemIsCarried(item, character.inventory.items));
   const linked = equipped.flatMap((item) => {
     const weapon = weaponForItem(item);
     if (!weapon) return [];

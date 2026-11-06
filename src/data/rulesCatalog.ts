@@ -2,6 +2,7 @@ import spells from "./spellCatalog.json" with { type: "json" };
 import classes from "./classCatalog.json" with { type: "json" };
 import feats from "./featCatalog.json" with { type: "json" };
 import type { Character, CharacterSpell } from "./characters";
+import { describesSpellAttack, SPELL_ATTACK_ONLY } from "./spellAttackOptions";
 
 export const SPELL_CATALOG = spells;
 export const CLASS_CATALOG = classes;
@@ -17,7 +18,7 @@ export function spellFromCatalog(key: string, id: string, className: string): Ch
   const spell = SPELL_CATALOG.find((entry) => entry.key === key);
   if (!spell) throw new Error("Unknown spell selection.");
   const automated = ["Cure Wounds", "Healing Word", "Fire Bolt", "Sacred Flame", "Guiding Bolt", "Thunderwave", "Shatter", "Fireball", "Bless", "Bane", "Shield"];
-  return { id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime, range: spell.range, components: spell.components, concentration: spell.concentration, description: spell.description, prepared: true, className, catalogKey: key, automation: automated.includes(spell.name) ? spell.name : "" };
+  return { id, name: spell.name, level: spell.level, school: spell.school, castingTime: spell.castingTime, range: spell.range, components: spell.components, concentration: spell.concentration, description: spell.description, prepared: true, className, catalogKey: key, automation: automated.includes(spell.name) ? spell.name : describesSpellAttack(spell.description) ? SPELL_ATTACK_ONLY : "" };
 }
 export function classLevel(character: Character, name: string): number {
   const entry = Object.entries(character.classLevels ?? {}).find(([key]) => key.toLowerCase() === name.toLowerCase());

@@ -6,6 +6,8 @@ import type { Character } from "./characters";
 import { calculateCharacterStats } from "./calculations";
 import { castCharacterSpell, healCharacter, rollD20, rollDie, spellSlotKey } from "./gameplay";
 import { isIncapacitated, exhaustionLevel, type RollMode } from "./conditions";
+import { usesSpellAttackOnly } from "./spellAttackOptions";
+import { rollSpellAttack } from "./spellAttacks";
 
 type SpellFormula = { name: string; level: number; count: number; die: number; perSlot: number; ability: boolean; kind: "healing" | "damage" | "effect"; type: string; cantripScaling?: boolean; attack?: boolean; note: string };
 // Opt-in formulas from the free 2024 spell descriptions. Targeting and saves stay explicit.
@@ -30,7 +32,13 @@ export function resolveSpellCast(character: Character, id: string, slotKey: stri
   if (character.armorSource === "inventory" && inventoryArmor(character).untrained) throw new Error("You cannot cast spells while wearing armor without training.");
   const updates = castCharacterSpell(character, id, slotKey);
   const formula = SPELL_FORMULAS.find((entry) => entry.name === spell.automation && entry.level === spell.level);
-  if (!formula) return { updates, amount: 0, rolledAmount: 0, attack: null, summary: `${spell.name} cast. Resolve its effects with the DM.` };
+  if (!formula) {
+    if (usesSpellAttackOnly(spell)) {
+      const attack = rollSpellAttack(character, id, className, mode, targetAC, die);
+      return { updates, amount: 0, rolledAmount: 0, attack, summary: `${attack.summary} Casting recorded once. For additional rays, beams, or an ongoing spell, use Additional spell attack; check any later action costs yourself.` };
+    }
+    return { updates, amount: 0, rolledAmount: 0, attack: null, summary: `${spell.name} cast. Resolve its effects with the DM.` };
+  }
   if (spell.className && spell.className !== className) throw new Error("Choose the class this spell belongs to.");
   const caster = stats.spellcastingProgressions.find((entry) => entry.className === className);
   if (!caster) throw new Error("Choose the class whose spellcasting ability applies.");

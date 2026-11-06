@@ -2,6 +2,7 @@ import { AdvancementContext } from "../data/advancementTransport";
 import { LanSpellProvider } from "./LanSpellTargets";
 import { rememberLanSession, savedLanSessions } from "../data/lanSessions";
 import { TableRoom } from "./TableRoom";
+import { PartyChat, CampaignBoardPanel } from "./PartyTools";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AbilitiesPage } from "./AbilitiesPage";
 import { EncounterPanel } from "./EncounterPanel";
@@ -323,6 +324,8 @@ export function LanGame({ localCharacters }: { localCharacters: Character[] }) {
     }}>
     <LanSpellProvider key={session.token} session={session} snapshot={snapshot} connected={connection === "connected"} pendingIds={Object.keys(pending)} onRefresh={refreshSnapshot}>
     <TableRoom key={session.token} session={session} snapshot={snapshot} connected={connection === "connected"}>
+    <PartyChat key={`chat-${session.token}`} session={session} snapshot={snapshot} connected={connection === "connected"} />
+    <CampaignBoardPanel key={`board-${session.token}`} session={session} snapshot={snapshot} connected={connection === "connected"} />
     {snapshot && <EncounterPanel session={session} snapshot={snapshot} connected={connection === "connected"} onRefresh={refreshSnapshot} />}
     {session.role === "dm" ? <div className="lan-dashboard-grid">
       <aside className="lan-party-panel"><div className="lan-panel-heading"><div><p className="eyebrow">THE PARTY</p><h3>Players</h3></div><span>{snapshot?.players.length ?? 0}</span></div>

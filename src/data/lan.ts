@@ -4,10 +4,14 @@ export type LanSession = { campaignName?: string; code: string; token: string; r
 export type EncounterEntry = { id: string; name: string; initiative: number; tieOrder: number; characterId: string | null };
 export type Encounter = { turnSerial?: number; revision: number; round: number; activeId: string | null; entries: EncounterEntry[] };
 export type TableActivity = { diceSource?: "digital" | "physical"; id: string; actorId: string; actor: string; requestId: string; createdAt: string; kind: "dice" | "sheet"; characterName?: string; summary: string };
+export type PartyMessage = { id: string; actorId: string; actor: string; requestId: string; text: string; createdAt: string };
+export type CampaignBoard = { revision: number; title: string; text: string; image: string; privateNotes?: string };
 export type LanSnapshot = {
   targets?: { id: string; name: string }[];
   activity?: TableActivity[];
   encounter?: Encounter;
+  messages?: PartyMessage[];
+  board?: CampaignBoard;
   campaign: { code: string; name: string; dmName: string };
   role: "dm" | "player";
   playerId: string | null;

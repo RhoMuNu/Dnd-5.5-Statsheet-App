@@ -34,8 +34,11 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
     const character = { ...defaultCharacterStats(), id: "lan-hero", name: "LAN hero", concept: "", species: "Human", characterClass: "Fighter", background: "", classLevels: { Fighter: 1 }, level: 1, createdAt: "2026-11-05T00:00:00Z", updatedAt: "2026-11-05T00:00:00Z" };
     character.combat = { ...defaultCombatState(), effects: [makeEffect("Bless", "bless")] };
     character.attacks = [makeWeaponAttack(character, "Dagger", "dagger")];
+    character.heroicInspiration = true;
+    character.inventory.items = [{ id: 'magic-pack', name: 'Magic pack', quantity: 1, weight: 5, category: 'Gear', equipped: false, notes: '', isContainer: true, fixedWeight: true, carried: false, attuned: true, charges: { maximum: 3, used: 1, recovery: 'long' } }];
     character.customModifiers = [{ id: "ring", name: "Guardian ring", target: "ac", amount: 2, enabled: true }];
     assert.equal((await request(`${route}/characters`, "POST", { character, shared: false }, player.token)).status, 200);
+    assert.equal((await request(`${route}/characters`, 'POST', { character: { ...character, inventory: { ...character.inventory, items: [{ ...character.inventory.items[0], charges: { maximum: 1, used: 2, recovery: 'long' } }] } } }, player.token)).status, 400);
     assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, combat: { conditions: "Poisoned" } } }, player.token)).status, 400);
     assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, attacks: [{ diceCount: 1000000 }] } }, player.token)).status, 400);
     assert.equal((await request(`${route}/characters`, "POST", { character: { ...character, customModifiers: "invalid" } }, player.token)).status, 400);
@@ -97,6 +100,8 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
       assert.equal(saved.campaigns[0].characters[0].character.combat.effects[0].name, "Bless");
       assert.equal(saved.campaigns[0].characters[0].character.attacks[0].name, "Dagger");
       assert.deepEqual(saved.campaigns[0].characters[0].character.customModifiers, character.customModifiers);
+      assert.deepEqual(saved.campaigns[0].characters[0].character.inventory, character.inventory);
+      assert.equal(saved.campaigns[0].characters[0].character.heroicInspiration, true);
     } finally { controller.abort(); await reader.cancel().catch(() => {}); }
   } finally {
     const stopped = once(child, "exit");

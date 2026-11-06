@@ -74,6 +74,29 @@ test("built production host serves assets, rejects missing routes, recovers from
     const route = `/api/campaigns/${dm.data.code}`;
     const player = await request(route + "/join", { name: "Returning player" });
     assert.equal(player.status, 201);
+    const chat = { requestId: 'chat-retry', text: 'Ready for the session', actor: 'Forged DM' };
+    assert.equal((await request(route + '/messages', chat)).status, 401);
+    assert.equal((await request(route + '/messages', chat, player.data.token)).data.message.actor, 'Returning player');
+    await request(route + '/messages', chat, player.data.token);
+    const board = { revision: 0, title: 'Old ruins', text: 'The bridge is broken.', privateNotes: 'Secret encounter', image: '' };
+    assert.equal((await request(route + '/board', board, player.data.token)).status, 403);
+    assert.equal((await request(route + '/board', board, dm.data.token)).status, 200);
+    assert.equal((await request(route + '/board', board, dm.data.token)).status, 409);
+    const playerView = (await request(route, undefined, player.data.token)).data;
+    assert.equal(playerView.messages.length, 1);
+    assert.equal(playerView.board.text, board.text);
+    assert.equal('privateNotes' in playerView.board, false);
+    const eventsController = new AbortController();
+    const events = await fetch(`${base}${route}/events?token=${player.data.token}`, { signal: eventsController.signal });
+    const eventsReader = events.body.getReader();
+    try {
+      let event = new TextDecoder().decode((await eventsReader.read()).value);
+      assert.doesNotMatch(event, /Secret encounter|privateNotes/);
+      await request(route + '/board', { ...board, revision: 1, text: 'An updated handout.' }, dm.data.token);
+      event = '';
+      while (!event.includes('An updated handout.')) event += new TextDecoder().decode((await eventsReader.read()).value);
+      assert.doesNotMatch(event, /Secret encounter|privateNotes/);
+    } finally { eventsController.abort(); await eventsReader.cancel().catch(() => {}); }
     const file = join(directory, "lan-campaigns.json");
     const saved = JSON.parse(await readFile(file, "utf8"));
     assert.equal(saved.campaigns[0].players.length, 1);
@@ -90,6 +113,10 @@ test("built production host serves assets, rejects missing routes, recovers from
     assert.equal(resumed.status, 200);
     assert.equal(resumed.data.players.length, 2);
     assert.equal(resumed.data.campaign.name, "Production restart check");
+    assert.equal(resumed.data.messages.length, 1);
+    assert.equal(resumed.data.board.text, 'An updated handout.');
+    assert.equal('privateNotes' in resumed.data.board, false);
+    assert.equal((await request(route, undefined, dm.data.token)).data.board.privateNotes, 'Secret encounter');
     assert.equal((await request(route, undefined, dm.data.token)).data.role, "dm");
   } finally { await stop(); await rm(directory, { recursive: true, force: true }); }
 });

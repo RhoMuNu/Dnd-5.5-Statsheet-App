@@ -105,6 +105,8 @@ Characters autosave to this browser's local storage. The collection supports sel
 
 Character sections include class features and custom traits, a quantity and weight inventory with coin tracking, a spellbook with ready-state and spell-slot spending, and a backstory with a dated journal. These fields are included in character backups.
 
+Inventory also supports nested containers, carried/stored status, fixed-weight containers, attunement tracking and item charges with configurable rest recovery. Coin quick transactions make change and display GP-equivalent funds. Heroic Inspiration has a manual reroll tracker on the character sheet. LAN rooms include party chat, a shared text/image handout and a private DM notebook. See the [Adventurer’s Codex feature comparison](docs/ADVENTURERS-CODEX-COMPARISON.md) for usage and remaining gaps.
+
 **Features & traits:** Search offline descriptions of class, subclass, species, background feats, and recorded build choices. Each supported species has individual trait descriptions, including lineage tables and level-based unlocks. Expand spell references and rules reminders directly inside a trait. Existing characters receive these references automatically. Unknown homebrew abilities can be described under **Your features**. See [source attribution](docs/SRD-ATTRIBUTION.md).
 
 ## Calculated stats
@@ -128,6 +130,10 @@ The abilities page includes damage and healing amounts, temporary HP absorption,
 **Equipped weapons:** Standard equipped weapons automatically appear in attacks and attack references in Paper and Tracked sheets, including +1/+2/+3 bonuses. Unequipping, deleting, or reducing an item to zero quantity hides its linked attack. Manual attacks remain independent. Edit linked profiles for proficiency, off-hand attacks, versatile damage, and custom adjustments. Custom weapon names need a manual attack profile. Weapon profiles follow the [2024 Basic Rules equipment table](https://www.dndbeyond.com/sources/dnd/br-2024/equipment/).
 
 **Compact spellbook:** Spell rows start collapsed. Open a row for its description and casting controls, search by name or school, filter readiness, or use Expand all / Collapse all. General casting options are under Cast settings.
+
+The spellbook displays **Spell attack bonus** and **Spell save DC** for each casting class, plus **remaining / maximum slots for every level and pool**. Pact Magic stays separate from regular Spellcasting, even when both use the same spell level. Expanded spell cards show the selected casting class’s bonus and DC as well.
+
+**Spell attack rolls:** In Assisted play, attack-roll spells without a supported damage formula use **Spell attack roll only**. Casting rolls one attack, adds the selected class’s bonus and active effect dice, and records the slot/action/concentration once. This works with digital dice or physical die entry. **Additional spell attack · no slot** rolls each remaining ray/beam or an attack for an already-cast ongoing spell without spending another slot or action; record later-turn action costs separately on the play sheet. Results appear next to the spell’s controls. Damage, critical damage dice, range, extra effects, and target eligibility remain manual for attack-only spells. Fire Bolt and Guiding Bolt retain their existing attack-and-damage formulas. Choose **Manual effects** to disable the attack helper for a spell; Paper and Tracked sheets continue to leave all attack dice to the table.
 
 **Compact inventory:** Item rows also start collapsed, showing name, type, quantity, total weight, and equipped/carried/depleted status. Expand a row to edit quantities, weight, equipment, or notes. Search includes names, types, and notes; Expand all and Collapse all operate on the listed items. Equipment links, carrying load, coins, and armor settings continue to work independently of which rows are open.
 
