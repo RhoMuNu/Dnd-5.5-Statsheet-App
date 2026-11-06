@@ -32,7 +32,8 @@ test("spell labels follow the selected formula, its level, and the actual automa
   assert.equal(spellCoverage(fire, "classic").level, "manual");
   assert.equal(spellCoverage(fire, "paper").level, "manual");
   assert.doesNotMatch(spellCoverage(fire, "paper").app, /spends|tracks its slot/);
-  assert.equal(spellCoverage({ ...fire, automation: "" }, "digital").level, "manual");
+  assert.equal(spellCoverage({ ...fire, automation: "manual" }, "digital").level, "manual");
+  assert.equal(spellCoverage({ ...fire, automation: "" }, "digital").level, "partial");
   assert.equal(spellCoverage({ ...fire, automation: "Fireball" }, "digital").level, "manual");
   assert.match(spellCoverage({ ...fire, name: "Custom beam" }, "digital").table, /using the Fire Bolt formula/);
   assert.equal(spellCoverage(spell("Mage Hand"), "digital").level, "manual");

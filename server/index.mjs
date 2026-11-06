@@ -9,6 +9,7 @@ import { makeActivity } from "./activity.mjs";
 import { changeEncounter, emptyEncounter } from "./encounters.mjs";
 import { campaignPersistence, CampaignSaveError } from "./persistence.mjs";
 import { hostPort, lanAddresses } from "./startup.mjs";
+import { partyMessage, boardFor, changeCampaignBoard, emptyCampaignBoard } from "./partyTools.mjs";
 
 const isProduction = process.env.NODE_ENV === "production" || process.argv.includes("--production");
 const rules = isProduction ? await import("../dist/rules.mjs") : (await import("./rules-dev.mjs")).rules;
@@ -99,7 +100,7 @@ function snapshotFor(auth) {
     : campaign.characters.filter((entry) => entry.ownerId === player.id).map((entry) => ({ character: entry.character, shared: entry.shared }));
   const publicIds = new Set((campaign.encounter?.entries ?? []).map((entry) => entry.characterId));
   const targets = campaign.characters.filter((entry) => entry.shared && publicIds.has(entry.character.id)).map((entry) => ({ id: entry.character.id, name: entry.character.name }));
-  return { targets, campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters, activity: campaign.activity ?? [], encounter: campaign.encounter ?? emptyEncounter() };
+  return { targets, campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters, messages: campaign.messages ?? [], board: boardFor(auth), activity: campaign.activity ?? [], encounter: campaign.encounter ?? emptyEncounter() };
 }
 function pushSnapshot(token) {
   const connections = clients.get(token);
@@ -140,6 +141,8 @@ function validCharacter(character) {
 }
 
 function validCombatData(character) {
+  if (character.heroicInspiration !== undefined && typeof character.heroicInspiration !== "boolean") return false;
+  if (character.inventory !== undefined && (!character.inventory || !Array.isArray(character.inventory.items) || character.inventory.items.length > 1000 || !character.inventory.items.every((item) => item && typeof item === "object" && rules.validInventoryExtras(item)))) return false;
   if (character.customSubclasses !== undefined && !rules.validCustomSubclassMap(character.customSubclasses)) return false;
   const integer = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
   if (character.customModifiers !== undefined) {
@@ -229,6 +232,21 @@ const apiServer = createServer(async (request, response) => {
       return sendJson(response, 200, snapshotFor(auth));
     }
 
+    const partyMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/(messages|board)$/i);
+    if (request.method === "POST" && partyMatch) {
+      const auth = authorizedCampaign(request, partyMatch[1]);
+      if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
+      if (partyMatch[2] === "board" && auth.role !== "dm") return sendJson(response, 403, { error: "Only the DM can change handouts and private notes." });
+      const body = await readJson(request);
+      if (partyMatch[2] === "messages") {
+        const message = partyMessage(auth, body, randomToken(12));
+        if (!(auth.campaign.messages ?? []).some((entry) => entry.id === message.id)) { auth.campaign.messages = [...(auth.campaign.messages ?? []), message].slice(-100); persist(); broadcastCampaign(auth.campaign); }
+        return sendJson(response, 200, { message });
+      }
+      const board = changeCampaignBoard(auth.campaign.board ?? emptyCampaignBoard(), body);
+      auth.campaign.board = board; persist(); broadcastCampaign(auth.campaign);
+      return sendJson(response, 200, { board: boardFor(auth) });
+    }
     const activityMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/activity$/i);
     if (request.method === "POST" && activityMatch) {
       const auth = authorizedCampaign(request, activityMatch[1]);
@@ -364,7 +382,7 @@ const apiServer = createServer(async (request, response) => {
   } catch (error) {
     const message = error instanceof SyntaxError ? "Request body must be valid JSON." : error.message || "The LAN host could not complete that request.";
     if (error instanceof CampaignSaveError) console.error("Campaign save failed:", error.cause);
-    if (!response.headersSent) return sendJson(response, error instanceof CampaignSaveError ? 503 : 400, { error: message });
+    if (!response.headersSent) return sendJson(response, error instanceof CampaignSaveError ? 503 : error.status === 409 ? 409 : 400, { error: message });
     response.end();
   }
 });

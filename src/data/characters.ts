@@ -4,6 +4,7 @@ import type { AdvancementRecord } from "./advancement";
 import { CONDITIONS, type Condition } from "./conditions";
 import { normalizeEffects, type ActiveEffect } from "./effects";
 import { validCustomSubclassMap, type CustomSubclass } from "./customSubclasses";
+import { validInventoryExtras } from "./inventoryManagement";
 
 export type Character = {
   id: string;
@@ -20,6 +21,7 @@ export type Character = {
   customModifiers?: CustomModifier[];
   currentHitPoints: number | null;
   temporaryHitPoints: number;
+  heroicInspiration?: boolean;
   combat?: CombatState;
   attacks?: CharacterAttack[];
   advancement?: AdvancementRecord[];
@@ -80,7 +82,7 @@ export type CharacterAttack = { id: string; inventoryItemId?: string; inventoryW
 export type CharacterDraft = Omit<Character, "id" | "createdAt" | "updatedAt">;
 export type CharacterFeature = { id: string; name: string; category: "class" | "species" | "feat" | "other"; description: string; manualOnly?: boolean; source?: string };
 export type InventoryCurrency = { cp: number; sp: number; ep: number; gp: number; pp: number };
-export type InventoryItem = { id: string; name: string; quantity: number; weight: number; category: string; equipped: boolean; notes: string };
+export type InventoryItem = { id: string; name: string; quantity: number; weight: number; category: string; equipped: boolean; notes: string; carried?: boolean; isContainer?: boolean; fixedWeight?: boolean; containerId?: string; attuned?: boolean; charges?: { maximum: number; used: number; recovery: "manual" | "short" | "long" } };
 export type CharacterInventory = { items: InventoryItem[]; currency: InventoryCurrency; startingKitsAdded: boolean };
 export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean; automation?: string; className?: string; catalogKey?: string; alwaysPrepared?: boolean };
 export type CharacterNotes = { backstory: string; entries: { id: string; title: string; body: string; createdAt: string; updatedAt: string }[] };
@@ -225,6 +227,7 @@ export function normalizeCharacter(value: unknown): Character | null {
     customResources: Array.isArray(character.customResources) ? character.customResources.filter(isCustomResource).map((resource) => ({ ...resource, used: Math.min(Math.trunc(resource.maxUses), Math.max(0, Math.trunc(resource.used))) })) : [],
     currentHitPoints: Number.isFinite(character.currentHitPoints) ? Math.max(0, Math.trunc(character.currentHitPoints!)) : null,
     temporaryHitPoints: Number.isFinite(character.temporaryHitPoints) ? Math.max(0, Math.trunc(character.temporaryHitPoints!)) : 0,
+    heroicInspiration: character.heroicInspiration === true,
     combat: normalizeCombatState(character.combat),
     hitPointAdjustment: typeof character.hitPointAdjustment === "number" && Number.isFinite(character.hitPointAdjustment) ? Math.min(2000, Math.max(-2000, Math.trunc(character.hitPointAdjustment))) : 0,
     rulesChoices: character.rulesChoices && typeof character.rulesChoices === "object" ? Object.fromEntries(Object.entries(character.rulesChoices).slice(0, 200).filter(([, choices]) => Array.isArray(choices)).map(([key, choices]) => [key, choices.filter((value) => typeof value === "string").slice(0, 50)])) : {},
@@ -295,7 +298,7 @@ function isInventoryItem(value: unknown): value is InventoryItem {
     && Number.isInteger(item.quantity) && (item.quantity ?? 0) >= 0
     && Number.isFinite(item.weight) && (item.weight ?? -1) >= 0
     && typeof item.category === "string" && typeof item.equipped === "boolean"
-    && typeof item.notes === "string";
+    && typeof item.notes === "string" && validInventoryExtras(item as unknown as Record<string, unknown>);
 }
 
 function isCharacterSpell(value: unknown): value is CharacterSpell {

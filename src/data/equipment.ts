@@ -1,4 +1,5 @@
 import type { ArmorMode, Character, InventoryItem } from "./characters";
+import { itemIsCarried } from "./inventoryManagement";
 
 type Armor = { name: string; mode: ArmorMode | "shield"; ac: number; strength: number; stealth: boolean; weight: number };
 // 2024 Basic Rules, Equipment / Armor.
@@ -28,7 +29,7 @@ export function armorForItem(item: Pick<InventoryItem, "name">): (Armor & { magi
 }
 
 export function inventoryArmor(character: Character) {
-  const equipped = (character.inventory?.items ?? []).filter((item) => item.equipped && item.quantity > 0);
+  const equipped = (character.inventory?.items ?? []).filter((item) => item.equipped && itemIsCarried(item, character.inventory.items));
   const known = equipped.map((item) => ({ item, armor: armorForItem(item) })).filter((entry) => entry.armor !== null);
   const suits = known.filter((entry) => entry.armor!.mode !== "shield");
   const shields = known.filter((entry) => entry.armor!.mode === "shield");
@@ -57,7 +58,7 @@ export function equipInventoryItem(items: InventoryItem[], id: string, patch: Pa
   const target = items.find((item) => item.id === id);
   if (!target) return items;
   const updated = { ...target, ...patch };
-  const armor = updated.equipped && updated.quantity > 0 ? armorForItem(updated) : null;
+  const armor = updated.equipped && itemIsCarried(updated, items.map((item) => item.id === id ? updated : item)) ? armorForItem(updated) : null;
   return items.map((item) => {
     if (item.id === id) return updated;
     const other = armorForItem(item);

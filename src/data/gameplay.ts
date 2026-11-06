@@ -1,3 +1,4 @@
+import { recoverItemCharges } from "./inventoryManagement";
 import { spellTurnCost } from "./economy";
 import { inventoryArmor } from "./equipment";
 import { activeEffects, effectTotal } from "./effects";
@@ -77,7 +78,7 @@ export function restCharacter(character: Character, kind: "Short Rest" | "Long R
   const restedCombat = kind === "Long Rest"
     ? { ...combat, effects, exhaustion: Math.max(0, combat.exhaustion - 1), hitDiceUsed: {}, deathSuccesses: 0, deathFailures: 0, stable: false, concentration: "", concentrationDC: null }
     : { ...combat, effects };
-  return { resourceUses, customResources, combat: restedCombat, ...(kind === "Long Rest" ? {
+  return { resourceUses, customResources, inventory: { ...character.inventory, items: recoverItemCharges(character.inventory.items, kind) }, combat: restedCombat, ...(kind === "Long Rest" ? {
     currentHitPoints: calculateCharacterStats({ ...character, combat: restedCombat }).maxHitPoints, temporaryHitPoints: 0,
   } : {}) };
 }

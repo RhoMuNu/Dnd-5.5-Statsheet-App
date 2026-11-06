@@ -48,7 +48,7 @@ try {
   cpSync(join(root, "dist"), join(stage, "dist"), { recursive: true });
   // Whitelist executable app files. Never include campaign data, browser exports,
   // development sources, screenshots, caches, or node_modules in a distribution.
-  for (const file of ["index.mjs", "launch.mjs", "startup.mjs", "activity.mjs", "encounters.mjs", "persistence.mjs"]) copyFileSync(join(root, "server", file), join(stage, "server", file));
+  for (const file of ["index.mjs", "launch.mjs", "startup.mjs", "activity.mjs", "encounters.mjs", "persistence.mjs", "partyTools.mjs"]) copyFileSync(join(root, "server", file), join(stage, "server", file));
   copyFileSync(join(root, "Start TaleForge Host.bat"), join(stage, "Start TaleForge Host.bat"));
   for (const file of ["host-settings.json", "START HERE.txt", "Open campaign data.bat"]) copyFileSync(join(root, "packaging", file), join(stage, file));
   for (const file of ["Start TaleForge Host.bat", "Open campaign data.bat"]) writeFileSync(join(stage, file), readFileSync(join(stage, file), "utf8").replace(/\r?\n/g, "\r\n"));

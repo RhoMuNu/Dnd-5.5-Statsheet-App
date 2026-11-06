@@ -4,6 +4,7 @@ import { calculateCharacterStats } from "./calculations";
 import { classLevel, subclassIs } from "./rulesCatalog";
 import { SPELL_FORMULAS } from "./spellEffects";
 import { characterRuleFeatures } from "./featureDescriptions";
+import { usesSpellAttackOnly } from "./spellAttackOptions";
 
 export type CoverageMode = "digital" | "physical" | "classic" | "paper";
 export type AutomationCoverage = { level: "automatic" | "partial" | "manual"; app: string; table: string };
@@ -57,6 +58,7 @@ export function spellCoverage(spell: CharacterSpell, mode: CoverageMode): Automa
   const bookkeeping = "Marking a cast tracks its slot, concentration, and action cost when turn tracking is enabled.";
   if (mode === "classic" || mode === "paper") return manual(mode === "paper" ? "Calculated bonuses and spell references remain visible. Casting is not recorded automatically." : bookkeeping, "Roll dice and resolve all spell effects at the table. This automation level does not execute the saved spell formula.");
   const formula = SPELL_FORMULAS.find((entry) => entry.name === spell.automation && entry.level === spell.level);
+  if (!formula && usesSpellAttackOnly(spell)) return partial(`${bookkeeping} ${mode === "physical" ? "Enter the natural attack die faces; the app adds spell attack bonuses and effect dice." : "The app rolls the spell attack and adds spell attack bonuses and effect dice."} Additional spell attack rolls do not spend another slot.`, "Resolve damage, critical damage dice, extra effects, and remaining attacks at the table. For ongoing-spell attacks on later turns, record their action cost on the play sheet. Check range, components, visibility, and target eligibility yourself.");
   if (!formula) return manual(bookkeeping, "Resolve all spell effects at the table. No valid effect formula is selected.");
   const dice = mode === "physical" ? "You enter physical die faces; the app calculates totals." : "The app rolls the required dice and calculates totals.";
   return partial(`${bookkeeping} ${formula.kind === "effect" ? "LAN target casting applies the selected effect to eligible shared sheets; a local cast only records casting." : `${dice} The selected ${formula.name} formula scales supported damage or healing; LAN target casting resolves supported saves and HP changes.`}`, `Check range, components, visibility, target eligibility, and any extra spell effects yourself.${spell.name.toLowerCase() !== formula.name.toLowerCase() ? ` This spell is using the ${formula.name} formula; confirm it matches your intended rules.` : ""} Local casts do not update another creature’s sheet; optional self-healing must be enabled in Cast settings.`);

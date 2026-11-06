@@ -1,0 +1,39 @@
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { makeCharacterId } from "../data/characters";
+import { lanRequest, type CampaignBoard, type LanSession, type LanSnapshot } from "../data/lan";
+
+export function PartyChat({ session, snapshot, connected }: { session: LanSession; snapshot: LanSnapshot | null; connected: boolean }) {
+  const key = `taleforge.chat-draft.v1.${session.code}.${session.playerId ?? "dm"}`;
+  const [draft, setDraft] = useState<{ text: string; requestId: string }>(() => { try { const saved = JSON.parse(localStorage.getItem(key) ?? "null"); if (saved && typeof saved.text === "string" && saved.text.length <= 2000 && typeof saved.requestId === "string") return saved; } catch { /* Start a new draft. */ } return { text: "", requestId: makeCharacterId() }; });
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(draft)); } catch { setError("Chat draft could not be saved on this device."); } }, [draft, key]);
+  async function send(event: FormEvent) {
+    event.preventDefault(); if (busy || !connected || !draft.text.trim()) return;
+    setBusy(true); setError("");
+    try { await lanRequest(`/api/campaigns/${session.code}/messages`, { method: "POST", body: JSON.stringify(draft), signal: AbortSignal.timeout(15000) }, session.token); setDraft({ text: "", requestId: makeCharacterId() }); }
+    catch (reason) { setError((reason instanceof Error ? reason.message : "Could not confirm delivery.") + " Retry the unchanged draft to avoid duplicate messages; editing starts a new message."); }
+    finally { setBusy(false); }
+  }
+  return <details className="collection-panel party-chat"><summary>Party chat · {snapshot?.messages?.length ?? 0} messages</summary><p className="collection-helper">Messages are visible to everyone in this campaign. The host keeps the most recent 100. Text is displayed as text; links are not opened automatically.</p><ol className="party-message-list">{(snapshot?.messages ?? []).map((message) => <li key={message.id}><strong>{message.actor}</strong><small>{new Date(message.createdAt).toLocaleString()}</small><p>{message.text}</p></li>)}</ol><form onSubmit={send}><label>Message to the party<textarea rows={2} maxLength={2000} value={draft.text} disabled={busy} onChange={(event) => setDraft({ text: event.target.value, requestId: makeCharacterId() })} /></label><button type="submit" className="backup-button" disabled={!connected || busy || !draft.text.trim()}>{busy ? "Sending…" : "Send message"}</button></form>{!connected && <p className="collection-helper">Reconnect to send. Your draft stays on this device.</p>}{error && <p role="status" className="lan-error">{error}</p>}</details>;
+}
+
+const EMPTY: CampaignBoard = { revision: 0, title: "", text: "", image: "", privateNotes: "" };
+export function CampaignBoardPanel({ session, snapshot, connected }: { session: LanSession; snapshot: LanSnapshot | null; connected: boolean }) {
+  const board = snapshot?.board ?? EMPTY;
+  const [draft, setDraft] = useState(board), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [reading, setReading] = useState(false), [message, setMessage] = useState("");
+  const [large, setLarge] = useState(false), imageButton = useRef<HTMLButtonElement>(null), closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (!dirty) setDraft((current) => board.revision >= current.revision ? board : current); }, [board.revision, dirty]);
+  function edit(patch: Partial<CampaignBoard>) { setDraft((value) => ({ ...value, ...patch })); setDirty(true); }
+  async function save(event: FormEvent) {
+    event.preventDefault(); if (busy || !connected || reading) return;
+    setBusy(true); setMessage("");
+    try { const result = await lanRequest<{ board: CampaignBoard }>(`/api/campaigns/${session.code}/board`, { method: "POST", body: JSON.stringify({ ...draft, privateNotes: draft.privateNotes ?? "" }) }, session.token); setDraft(result.board); setDirty(false); setMessage("DM notes saved privately; handout published to the party."); }
+    catch (reason) { setMessage(reason instanceof Error ? reason.message : "Could not save the board."); }
+    finally { setBusy(false); }
+  }
+  function closeImage() { setLarge(false); imageButton.current?.focus(); }
+  return <section className="campaign-board"><details className="collection-panel"><summary>Party handout{board.title ? ` · ${board.title}` : ""}</summary>{board.title && <h3>{board.title}</h3>}{board.text && <p className="party-handout-text">{board.text}</p>}{board.image && <button type="button" className="handout-image-button" ref={imageButton} onClick={() => setLarge(true)} aria-label="Enlarge handout image"><img src={board.image} alt={board.title || "Campaign handout"} /></button>}{!board.title && !board.text && !board.image && <p className="collection-helper">No handout is currently published.</p>}</details>
+    {session.role === "dm" && <details className="collection-panel dm-board-editor"><summary>DM notebook &amp; handout editor</summary><form onSubmit={save}><fieldset disabled={busy}><label>Private DM notes<textarea rows={5} maxLength={20000} value={draft.privateNotes ?? ""} onChange={(event) => edit({ privateNotes: event.target.value })} /></label><p className="collection-helper">Private notes are sent only to the DM’s session, never to players. The fields below are public when saved.</p><label>Handout title<input maxLength={100} value={draft.title} onChange={(event) => edit({ title: event.target.value })} /></label><label>Handout text<textarea rows={4} maxLength={10000} value={draft.text} onChange={(event) => edit({ text: event.target.value })} /></label><label>Handout image · PNG, JPEG, WebP or GIF, up to 768 KB<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={reading} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; if (file.size > 768 * 1024) { setMessage("Choose an image no larger than 768 KB."); return; } setReading(true); const reader = new FileReader(); reader.onload = () => { edit({ image: String(reader.result) }); setReading(false); }; reader.onerror = () => { setMessage("Could not read that image."); setReading(false); }; reader.readAsDataURL(file); }} /></label>{draft.image && <p className="collection-helper">An image is attached to this draft.</p>}<div className="play-controls"><button type="button" className="text-button" onClick={() => edit({ title: "", text: "", image: "" })}>Clear handout draft</button><button type="submit" className="primary-button" disabled={!connected || busy || reading || !dirty}>Save notes &amp; publish handout</button>{dirty && <span>Unsaved changes</span>}<button type="button" className="backup-button" disabled={busy} onClick={() => { if (!dirty || window.confirm("Discard this unsaved draft and reload the host copy?")) { setDraft(board); setDirty(false); setMessage(""); } }}>Reload host copy</button></div></fieldset></form>{dirty && draft.revision !== board.revision && <p className="lan-error">The host copy changed on another device. Your draft is preserved; reload the host copy before saving.</p>}{message && <p role="status">{message}</p>}</details>}
+    {large && board.image && <div className="handout-lightbox" role="dialog" aria-modal="true" aria-label="Handout image" onClick={(event) => { if (event.target === event.currentTarget) closeImage(); }} onKeyDown={(event) => { if (event.key === "Escape") closeImage(); if (event.key === "Tab") { event.preventDefault(); closeButton.current?.focus(); } }}><button type="button" autoFocus ref={closeButton} onClick={closeImage}>Close image ×</button><img src={board.image} alt={board.title || "Campaign handout"} /></div>}
+  </section>;
+}
