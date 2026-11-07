@@ -37,6 +37,10 @@ const CLASS_SPELLCASTING_ABILITIES: Record<string, AbilityName> = {
   ranger: "Wisdom", sorcerer: "Charisma", warlock: "Charisma", wizard: "Intelligence",
 };
 
+const bonusCantrips = (character: Character, name: string) => Object.entries(character.rulesChoices ?? {}).filter(([key]) => key.startsWith(name + ':') && /:order-cantrip$|:warrior-cantrips$|:tome-cantrips$/.test(key)).reduce((count, [, values]) => count + values.length, 0);
+
+const withBonusCantrips = (character: Character, name: string, base: number | null) => bonusCantrips(character, name) ? (base ?? 0) + bonusCantrips(character, name) : base;
+
 const SIZE_MULTIPLIER: Record<CreatureSize, number> = {
   Tiny: 7.5,
   Small: 15,
@@ -111,7 +115,9 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
   const skillBonuses = Object.fromEntries(SKILLS.map(({ name, ability }) => {
     const rank = character.skillProficiencies[name] ?? 0;
     const jack = rank === 0 && classLevelOf(classes, "bard") >= 2 ? Math.floor(proficiencyBonus / 2) : 0;
-    return [name, abilityModifiers[ability] + proficiencyBonus * rank + jack + effectTotal(character, "check") + customModifierTotal(character, `skill:${name}`) - 2 * exhaustion];
+    const build = Object.values(character.rulesChoices ?? {}).flat();
+    const orderBonus = ((build.includes("Thaumaturge") && ["Arcana", "Religion"].includes(name)) || (build.includes("Magician") && ["Arcana", "Nature"].includes(name))) ? Math.max(1, abilityModifiers.Wisdom) : 0;
+    return [name, abilityModifiers[ability] + proficiencyBonus * rank + jack + orderBonus + effectTotal(character, "check") + customModifierTotal(character, `skill:${name}`) - 2 * exhaustion];
   })) as Record<SkillName, number>;
 
   const className = primaryClass;
@@ -169,7 +175,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     const ability = spellAbilityFor(name, rulesSubclass(character, capitalize(name)), name === className ? character.spellcastingAbility : "");
     if (!ability) return [];
     const count = spellCountFor(name, classLevel);
-    return [{ className: capitalize(name), cantrips: classProgression.cantrips, count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus + customModifierTotal(character, "spellDC"), attackBonus: abilityModifiers[ability] + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack") + customModifierTotal(character, "spellAttack") }];
+    return [{ className: capitalize(name), cantrips: withBonusCantrips(character, capitalize(name), classProgression.cantrips), count: count.value, label: count.label, saveDC: 8 + abilityModifiers[ability] + proficiencyBonus + customModifierTotal(character, "spellDC"), attackBonus: abilityModifiers[ability] + proficiencyBonus - 2 * exhaustion + effectTotal(character, "attack") + customModifierTotal(character, "spellAttack") }];
   });
   const multiclassWarnings = multiclassPrerequisiteWarnings(classes, character.abilityScores);
   const extraAttackClasses = classes.filter(({ name, level: classLevel }) => classProgressionAtLevel(name, classLevel).gainedFeatures.some(({ name: feature }) => feature === "Extra Attack"));
@@ -198,7 +204,7 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
     appliedClassFeatures,
     classResources,
     classFeatures: progression,
-    cantrips: classProgressionAtLevel(className, classes.find((entry) => entry.name === className)?.level ?? level, rulesSubclass(character, capitalize(className))).cantrips,
+    cantrips: withBonusCantrips(character, capitalize(className), classProgressionAtLevel(className, classes.find((entry) => entry.name === className)?.level ?? level, rulesSubclass(character, capitalize(className))).cantrips),
     preparedSpellCount: preparedSpellCount.value,
     spellCountLabel: preparedSpellCount.label,
     spellcastingProgressions,

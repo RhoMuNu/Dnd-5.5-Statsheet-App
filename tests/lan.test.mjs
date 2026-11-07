@@ -8,6 +8,8 @@ import { once } from "node:events";
 import { defaultCharacterStats, defaultCombatState } from "../src/data/characters.ts";
 import { makeEffect } from "../src/data/effects.ts";
 import { makeWeaponAttack } from "../src/data/attacks.ts";
+import { newLevelUpPlan } from "../src/data/advancement.ts";
+import { SPELL_CATALOG } from "../src/data/rulesCatalog.ts";
 
 test("LAN host enforces ownership, sharing and conflicts, streams updates, and persists campaign sheets", { timeout: 20000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "taleforge-lan-test-"));
@@ -102,6 +104,20 @@ test("LAN host enforces ownership, sharing and conflicts, streams updates, and p
       assert.deepEqual(saved.campaigns[0].characters[0].character.customModifiers, character.customModifiers);
       assert.deepEqual(saved.campaigns[0].characters[0].character.inventory, character.inventory);
       assert.equal(saved.campaigns[0].characters[0].character.heroicInspiration, true);
+      const warlock = { ...character, id: 'lan-warlock', characterClass: 'Warlock', classLevels: { Warlock: 1 }, rulesChoices: { 'Warlock:invocations:1': ['Eldritch Mind'] }, features: [{ id: 'mind', name: 'Eldritch Mind', category: 'class', description: 'Advantage on concentration saves.' }], spells: [] };
+      assert.equal((await request(`${route}/characters`, 'POST', { character: warlock, shared: false }, player.token)).status, 200);
+      const plan = newLevelUpPlan(warlock);
+      const advance = { requestId: 'warlock-two', characterId: warlock.id, baseUpdatedAt: warlock.updatedAt, plan };
+      assert.equal((await request(`${route}/level-up`, 'POST', advance, player.token)).status, 400);
+      plan.replacements = [{ key: 'Warlock:invocations:1', from: 'Eldritch Mind', to: 'Armor of Shadows' }];
+      plan.choices['Warlock:invocations:2'] = ['Pact of the Blade', "Devil's Sight"];
+      plan.spellKeys = [SPELL_CATALOG.find(spell => spell.name === 'Hex').key];
+      const advanced = await request(`${route}/level-up`, 'POST', advance, player.token);
+      assert.equal(advanced.status, 200, JSON.stringify(advanced.data));
+      assert.equal(advanced.data.character.level, 2);
+      assert.ok(!advanced.data.character.features.some(feature => feature.name === 'Eldritch Mind'));
+      assert.deepEqual(advanced.data.character.rulesChoices['Warlock:invocations:1'], ['Armor of Shadows']);
+      assert.equal((await request(`${route}/level-up`, 'POST', advance, player.token)).data.character.level, 2);
     } finally { controller.abort(); await reader.cancel().catch(() => {}); }
   } finally {
     const stopped = once(child, "exit");

@@ -1,6 +1,9 @@
+import { pruneChoices } from "../data/buildChoices";
+import { BuildChoicePicker } from "./BuildChoicePicker";
+import { startingClassChoices, startingChoiceErrors, applyStartingChoices } from "../data/startingChoices";
 import { useDiceRoll } from "./DiceProvider";
 import type { DieRoller } from "../data/physicalDice";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ABILITIES, CLASSES, defaultCharacterStats, type AbilityName, type Character, type CharacterCreationDetails, type CharacterDraft, type SkillName } from "../data/characters";
 import { BACKGROUNDS, CLASS_ARMOR, CLASS_EQUIPMENT, CLASS_SKILLS, CLASS_TOOLS, LANGUAGES, SPECIES, SPECIES_SKILL_CHOICES, STANDARD_ARRAY, STANDARD_ARRAY_BY_CLASS, pointBuyCost } from "../data/creationOptions";
 import { StartingSpellPicker } from "./StartingSpellPicker";
@@ -52,6 +55,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   const [gearChanged, setGearChanged] = useState(false);
   const [classChoices, setClassChoices] = useState(saved?.classChoices ?? "");
   const [appearance, setAppearance] = useState(saved?.appearance ?? "");
+  const [buildSelections, setBuildSelections] = useState<Record<string, string[]>>({});
   const [startingSelections, setStartingSelections] = useState<Record<string, string[]>>({});
   const [chooseSpellsLater, setChooseSpellsLater] = useState(false);
   const [error, setError] = useState("");
@@ -70,13 +74,17 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
     ...(character ?? defaultCharacterStats()), name, concept, species, characterClass, subclass, classLevels,
     classSubclasses, background, level: Object.values(classLevels).reduce((sum, value) => sum + value, 0) || Number(level) || 1,
     abilityScores, skillProficiencies: { ...defaultCharacterStats().skillProficiencies, ...(character?.skillProficiencies ?? {}), ...Object.fromEntries([...(backgroundData?.skills ?? []), ...classSkills, ...(speciesSkillProficiency ? [speciesSkillProficiency] : [])].map((skill) => [skill, 1])) },
+    rulesChoices: character?.rulesChoices ?? buildSelections,
     size: customSize, speedFeet: customSpeed,
     armorMode: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.mode : character?.armorMode ?? "unarmored",
     armorBaseAC: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.baseAC : character?.armorBaseAC ?? 10,
     armorStrengthRequirement: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.strengthRequirement ?? 0 : character?.armorStrengthRequirement ?? 0,
     hasShield: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.shield : character?.hasShield ?? false,
-  }) as Character, [character, name, concept, species, speciesSkillProficiency, characterClass, subclass, classLevels, classSubclasses, background, level, abilityScores, backgroundData, classSkills, speciesData, customSize, customSpeed, gearSelectionChanged, selectedClassArmor]);
-  const calculated = calculateCharacterStats(previewCharacter);
+  }) as Character, [buildSelections, character, name, concept, species, speciesSkillProficiency, characterClass, subclass, classLevels, classSubclasses, background, level, abilityScores, backgroundData, classSkills, speciesData, customSize, customSpeed, gearSelectionChanged, selectedClassArmor]);
+  const buildChoices = !character ? startingClassChoices(previewCharacter, buildSelections) : [];
+  const buildDefinitions = JSON.stringify(buildChoices);
+  useEffect(() => { if (!character) { const cleaned = pruneChoices(buildSelections, buildChoices); if (JSON.stringify(cleaned) !== JSON.stringify(buildSelections)) setBuildSelections(cleaned); } }, [buildDefinitions]);
+  const calculated = calculateCharacterStats(!character && startingChoiceErrors(previewCharacter, buildSelections).length === 0 ? { ...previewCharacter, ...applyStartingChoices(previewCharacter, buildSelections) } : previewCharacter);
   const casterClasses = Object.keys(classLevels).filter((name) => { const limits = startingSpellLimits(previewCharacter, name); return limits.cantrips > 0 || limits.spells > 0; });
   const hasSpellStep = !character && casterClasses.length > 0;
   const reviewStep = hasSpellStep ? 4 : 3;
@@ -108,6 +116,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       if (background === "Custom" && !customBackground.trim()) { setError("Enter your custom background name."); return false; }
 
     }
+    if (!character && (step === 2 || step === reviewStep)) { const errors = startingChoiceErrors(previewCharacter, buildSelections); if (errors.length) { setError(errors.join(" ")); return false; } }
     if (step === 2) {
       if (abilityMethod === "point-buy" && scoreTotal !== 27) { setError(`Point Buy uses exactly 27 points. You have spent ${scoreTotal}.`); return false; }
       if (backgroundData) {
@@ -138,12 +147,12 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
     for (const skill of [...(backgroundData?.skills ?? []), ...classSkills, ...(speciesSkillProficiency ? [speciesSkillProficiency] : [])]) skillProficiencies[skill] = Math.max(1, skillProficiencies[skill]) as 1 | 2;
     const selectedClassEquipment = classEquipmentOption === "custom" ? classEquipment.trim() : classEquipmentOptions.find((option) => option.startsWith(`${classEquipmentOption}:`)) ?? classEquipmentOptions[0] ?? classEquipment.trim();
     const characterCreation: CharacterCreationDetails = { abilityMethod, baseAbilityScores: baseScores, backgroundAbilityBoosts: boosts, classSkills, languages, toolProficiency, classToolProficiency: classToolProficiency.trim(), equipmentChoice, classEquipment: selectedClassEquipment, classEquipmentOption, classChoices: classChoices.trim(), appearance: appearance.trim(), ...(speciesSkillProficiency ? { speciesSkillProficiency } : {}) };
-    onSave({
+    const draft = {
       ...defaultCharacterStats(),
       ...(character ? {
         abilityScores: character.abilityScores, savingThrowProficiencies: character.savingThrowProficiencies, skillProficiencies: character.skillProficiencies,
         advancement: character.advancement, rulesChoices: character.rulesChoices, hitPointAdjustment: character.hitPointAdjustment,
-        customModifiers: character.customModifiers, attacks: character.attacks, combat: character.combat, resourceUses: character.resourceUses, customResources: character.customResources, currentHitPoints: character.currentHitPoints,
+        heroicInspiration: character.heroicInspiration, customModifiers: character.customModifiers, attacks: character.attacks, combat: character.combat, resourceUses: character.resourceUses, customResources: character.customResources, currentHitPoints: character.currentHitPoints,
         temporaryHitPoints: character.temporaryHitPoints, size: character.size, speedFeet: character.speedFeet,
         otherSpeedBonus: character.otherSpeedBonus, powerfulBuild: character.powerfulBuild, armorMode: character.armorMode,
         armorSource: character.armorSource, inventoryArmorTrained: character.inventoryArmorTrained, inventoryShieldTrained: character.inventoryShieldTrained,
@@ -164,7 +173,8 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
       hasShield: gearSelectionChanged && selectedClassArmor ? selectedClassArmor.shield : character?.hasShield ?? false,
       ...(!character && hasSpellStep && !chooseSpellsLater ? { spells: createStartingSpells(previewCharacter, spellSelections) } : {}),
       creationDetails: characterCreation,
-    });
+    } as Character;
+    onSave(character ? draft : { ...draft, ...applyStartingChoices(draft, buildSelections) });
   }
 
   function changeSpecies(next: string) {
@@ -172,6 +182,7 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
   }
   function changeClass(next: string) {
     if (character) return;
+    setBuildSelections({}); setStartingSelections({});
     setCharacterClass(next); setClassSkills([]); setClassEquipmentOption("A"); setClassEquipment(""); setGearChanged(true);
     if (next && abilityMethod === "standard" && !scoreDistributionTouched && STANDARD_ARRAY_BY_CLASS[next]) setBaseScores(STANDARD_ARRAY_BY_CLASS[next]);
   }
@@ -213,6 +224,8 @@ export function CharacterBuilder({ character, onSave, onCancel }: CharacterBuild
         <div className="creator-section"><h3>Languages, equipment &amp; story</h3><p>Common plus two languages for your character.</p><div className="creator-language-grid">{[0, 1, 2].map((index) => <label className="form-field" key={index}><span>{index === 0 ? "Language 1" : `Additional language ${index}`}</span><select value={languages[index] ?? ""} onChange={(event) => setLanguages((current) => { const next = [...current]; next[index] = event.target.value; return next; })}>{(index === 0 ? LANGUAGES : LANGUAGES.filter((item) => item !== "Common")).map((language) => <option key={language}>{language}</option>)}</select></label>)}</div><label className="form-field creator-tool"><span>{characterClass} class equipment</span><select value={classEquipmentOption} onChange={(event) => { setClassEquipmentOption(event.target.value as CharacterCreationDetails["classEquipmentOption"]); setGearChanged(true); }}>{(CLASS_EQUIPMENT[characterClass] ?? []).map((option) => { const choice = option.slice(0, 1); return <option key={option} value={choice}>{option}</option>; })}<option value="custom">Custom equipment</option></select></label>{classEquipmentOption === "custom" && <label className="form-field creator-tool"><span>Equipment / gold</span><input maxLength={240} value={classEquipment} onChange={(event) => setClassEquipment(event.target.value)} placeholder="Record the gear or gold you chose" /></label>}{CLASS_TOOLS[characterClass] && <label className="form-field creator-tool"><span>{characterClass} tool proficiency · {CLASS_TOOLS[characterClass]}</span><input maxLength={100} value={classToolProficiency} onChange={(event) => setClassToolProficiency(event.target.value)} placeholder="Record your choice" /></label>}<label className="form-field creator-tool"><span>Class choices <small>OPTIONAL</small></span><input maxLength={240} value={classChoices} onChange={(event) => setClassChoices(event.target.value)} placeholder="Fighting style, expertise, or other choices" /></label><label className="form-field creator-tool"><span>Appearance or notes <small>OPTIONAL</small></span><input maxLength={140} value={appearance} onChange={(event) => setAppearance(event.target.value)} placeholder="A few words to help picture them" /></label></div>
       </>}
 
+      {!character && step === 2 && <BuildChoicePicker choices={buildChoices} values={buildSelections} onChange={setBuildSelections} />}
+      {step === reviewStep && !character && <section className="creator-section"><h3>Starting build choices</h3>{Object.values(buildSelections).flat().map(value => <p key={value}>{value}</p>)}</section>}
       {hasSpellStep && step === 3 && <><label className="toggle-row"><input type="checkbox" checked={chooseSpellsLater} onChange={(event) => { setChooseSpellsLater(event.target.checked); setError(""); }} />Choose spells later in the Spellbook</label>{!chooseSpellsLater && <StartingSpellPicker character={previewCharacter} selections={spellSelections} onChange={(value) => { setStartingSelections(value); setError(""); }} />}</>}
       {step === reviewStep && hasSpellStep && <div className="creator-section"><h3>Starting spells</h3>{chooseSpellsLater ? <p>No starting spells selected. Add them in the Spellbook.</p> : createStartingSpells(previewCharacter, spellSelections).map((spell) => <p key={spell.id}>{spell.name} · {spell.className}{spell.alwaysPrepared ? " · Always prepared" : spell.prepared ? " · Ready" : " · In spellbook"}</p>)}</div>}
       {step === reviewStep && <div className="creator-review"><div className="review-hero"><span className="review-avatar">{name.trim().charAt(0).toUpperCase() || "✦"}</span><div><h3>{name || "Unnamed Adventurer"}</h3><p>{species}{speciesChoice ? ` · ${speciesChoice}` : ""} · {background === "Custom" ? customBackground : background} · {calculated.classBreakdown.map((entry) => `${entry.name} ${entry.level}`).join(" / ")}</p>{concept && <p>{concept}</p>}</div></div><div className="review-stat-grid">{[["Armor Class", calculated.armorClass], ["Hit Points", calculated.maxHitPoints ?? "—"], ["Speed", `${calculated.speed} ft.`], ["Initiative", calculated.initiative >= 0 ? `+${calculated.initiative}` : calculated.initiative], ["Proficiency", `+${calculated.proficiencyBonus}`], ["Passive Perception", 10 + calculated.skillBonuses.Perception]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><div className="creator-section"><h3>Ability scores</h3><div className="review-abilities">{ABILITIES.map((ability) => <span key={ability}>{ability.slice(0, 3).toUpperCase()} <strong>{abilityScores[ability]}</strong> ({Math.floor((abilityScores[ability] - 10) / 2) >= 0 ? "+" : ""}{Math.floor((abilityScores[ability] - 10) / 2)})</span>)}</div></div><div className="creator-section"><h3>Origin &amp; proficiencies</h3><p>{backgroundData ? `${backgroundData.feat} · ${backgroundData.skills.join(", ")} · ${toolProficiency || backgroundData.tool}` : "Custom origin"}</p><p>Class skills: {classSkills.join(", ") || "None chosen"}</p><p>Languages: {languages.join(", ")}</p><p>Background equipment: {backgroundData ? (equipmentChoice === "B" || equipmentChoice === "gold" ? backgroundData.equipmentB : backgroundData.equipmentA) : "Choose equipment with your DM."}</p><p>Class equipment: {classEquipmentSummary}</p>{classToolProficiency && <p>Class tool proficiency: {classToolProficiency}</p>}{classChoices && <p>Class choices: {classChoices}</p>}{speciesData && <p>{speciesData.note}</p>}{appearance && <p>{appearance}</p>}</div><div className="creator-section"><h3>Saving throws &amp; features</h3><p>Saving throw bonuses: {Object.entries(calculated.savingThrows).map(([ability, value]) => `${ability.slice(0, 3)} ${value >= 0 ? "+" : ""}${value}`).join(" · ")}</p><p>{calculated.classResources.map((resource) => resource.label).join(" · ") || "Class features are calculated on the sheet"}</p></div></div>}

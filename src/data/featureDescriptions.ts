@@ -65,8 +65,8 @@ export function buildChoiceDescriptions(character: Character) {
   const recorded = (character.creationDetails?.classChoices ?? "").split(/[,;\n]/).map((choice) => choice.trim()).filter(Boolean).map((choice) => { const name = choice.replace(/^[^:]+:\s*/, ""); return { name, source: character.characterClass + " · Recorded class choice", description: featureDescription(name, character) || "No bundled rules match this custom choice. Add its description under Your features." }; });
   return [...recorded, ...Object.entries(character.rulesChoices ?? {}).flatMap(([key, choices]) => choices.map((choice) => {
     const parts = key.split(":"), kind = parts[1] ?? key;
-    const parent = /expertise/i.test(kind) ? "Expertise" : /scholar/i.test(kind) ? "Scholar" : /skilled/i.test(kind) ? "Skilled" : /lore-skills/i.test(kind) ? "Bonus Proficiencies" : parts[0] === "feat" ? kind : kind.replaceAll("-", " ");
-    const description = featureDescription(choice, character) || featureDescription(parent, character);
+    const parent = (kind.startsWith("lessons-magic") || (parts[0] === "Origin" && kind.startsWith("magic-"))) ? "Magic Initiate" : kind === "lessons-skilled" ? "Skilled" : kind === "mastery" ? "Weapon Mastery" : kind === "arcanum" ? "Mystic Arcanum" : kind.startsWith("tome-") ? "Pact of the Tome" : kind === "order-cantrip" || kind === "warrior-cantrips" ? "Spellcasting" : /expertise/i.test(kind) ? "Expertise" : /scholar/i.test(kind) ? "Scholar" : /skilled/i.test(kind) ? "Skilled" : /lore-skills/i.test(kind) ? "Bonus Proficiencies" : parts[0] === "feat" ? kind : kind.replaceAll("-", " ");
+    const description = featureDescription(choice, character) || SPELL_CATALOG.find(spell => spell.name === choice)?.description || featureDescription(parent, character);
     return { name: choice, source: parts[0] + " · " + parent, description: description || "No bundled rules match this custom choice. Add its description under Your features." };
   }))];
 }
