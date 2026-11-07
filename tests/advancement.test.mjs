@@ -36,18 +36,18 @@ test("subclass selection is required at class level 3, rejects mismatched choice
 });
 test("ASI validates allocations and caps, and Constitution changes HP retroactively while preserving damage", () => {
   const character = hero(3, { subclass: "Champion", classSubclasses: { Fighter: "Champion" }, currentHitPoints: 22 });
-  const plan = newLevelUpPlan(character); plan.boosts = { Constitution: 2 };
+  const plan = newLevelUpPlan(character); plan.boosts = { Constitution: 2 }; plan.choices["Fighter:mastery:4"] = ["Longsword"];
   const result = { ...character, ...applyLevelUp(character, plan, "level-4", "now") };
   assert.equal(result.abilityScores.Constitution, 16);
   assert.equal(calculateCharacterStats(result).maxHitPoints, 40);
   assert.equal(result.currentHitPoints, 34);
   plan.boosts = { Strength: 3 }; assert.ok(levelUpErrors(character, plan).length);
-  plan.boosts = { Strength: 2 }; character.abilityScores.Strength = 20;
+  plan.boosts = { Strength: 2 }; plan.choices["Fighter:mastery:4"] = ["Longsword"]; character.abilityScores.Strength = 20;
   assert.ok(levelUpErrors(character, plan).some((message) => message.includes("cap")));
 });
 test("feat prerequisites and repeatability are validated; Tough applies once even with its manual template", () => {
   const character = hero(3, { subclass: "Champion", classSubclasses: { Fighter: "Champion" }, abilityScores: { Strength: 16, Dexterity: 14, Constitution: 14, Intelligence: 10, Wisdom: 10, Charisma: 10 } });
-  const plan = newLevelUpPlan(character); plan.feat = "Tough";
+  const plan = newLevelUpPlan(character); plan.feat = "Tough"; plan.choices["Fighter:mastery:4"] = ["Longsword"];
   assert.ok(!eligibleFeats(character, plan).some((feat) => feat.name === "War Caster"));
   const result = { ...character, ...applyLevelUp(character, plan, "tough", "now") };
   assert.equal(calculateCharacterStats(result).maxHitPoints, 44);

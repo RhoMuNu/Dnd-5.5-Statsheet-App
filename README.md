@@ -105,6 +105,8 @@ Characters autosave to this browser's local storage. The collection supports sel
 
 Character sections include class features and custom traits, a quantity and weight inventory with coin tracking, a spellbook with ready-state and spell-slot spending, and a backstory with a dated journal. These fields are included in character backups.
 
+In 0.4, all feature and trait cards collapse, with Expand all / Collapse all controls. Creation and advancement use structured class and Origin-feat choices, including the level-1 Warlock invocation. Optional class-option and spell replacements appear in the level-up wizard and its history. See the [0.4 progression audit](docs/PROGRESSION-AUDIT-0.4.md) for supported choices and manual effects.
+
 Inventory also supports nested containers, carried/stored status, fixed-weight containers, attunement tracking and item charges with configurable rest recovery. Coin quick transactions make change and display GP-equivalent funds. Heroic Inspiration has a manual reroll tracker on the character sheet. LAN rooms include party chat, a shared text/image handout and a private DM notebook. See the [Adventurer’s Codex feature comparison](docs/ADVENTURERS-CODEX-COMPARISON.md) for usage and remaining gaps.
 
 **Features & traits:** Search offline descriptions of class, subclass, species, background feats, and recorded build choices. Each supported species has individual trait descriptions, including lineage tables and level-based unlocks. Expand spell references and rules reminders directly inside a trait. Existing characters receive these references automatically. Unknown homebrew abilities can be described under **Your features**. See [source attribution](docs/SRD-ATTRIBUTION.md).

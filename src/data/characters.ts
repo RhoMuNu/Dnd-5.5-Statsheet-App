@@ -84,7 +84,7 @@ export type CharacterFeature = { id: string; name: string; category: "class" | "
 export type InventoryCurrency = { cp: number; sp: number; ep: number; gp: number; pp: number };
 export type InventoryItem = { id: string; name: string; quantity: number; weight: number; category: string; equipped: boolean; notes: string; carried?: boolean; isContainer?: boolean; fixedWeight?: boolean; containerId?: string; attuned?: boolean; charges?: { maximum: number; used: number; recovery: "manual" | "short" | "long" } };
 export type CharacterInventory = { items: InventoryItem[]; currency: InventoryCurrency; startingKitsAdded: boolean };
-export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean; automation?: string; className?: string; catalogKey?: string; alwaysPrepared?: boolean };
+export type CharacterSpell = { id: string; name: string; level: number; school: string; castingTime: string; range: string; components: string; concentration: boolean; description: string; prepared: boolean; automation?: string; className?: string; catalogKey?: string; alwaysPrepared?: boolean; grantedBy?: string };
 export type CharacterNotes = { backstory: string; entries: { id: string; title: string; body: string; createdAt: string; updatedAt: string }[] };
 export type CharacterCreationDetails = {
   abilityMethod: "standard" | "point-buy" | "manual" | "rolled";

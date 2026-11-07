@@ -33,7 +33,7 @@ test("custom descriptions and manual features survive backups and later level-up
   const plan = newLevelUpPlan(restored);
   assert.equal(plan.customSubclass, true);
   assert.equal(plan.customDescription, third.customSubclasses.Fighter.description);
-  plan.boosts = { Strength: 2 };
+  plan.boosts = { Strength: 2 }; plan.choices["Fighter:mastery:4"] = ["Longsword"];
   plan.customFeatures = [{ name: "Silver Step", description: "Move 10 feet after using Moonlit Guard; resolve positioning at the table." }];
   const fourth = { ...restored, ...applyLevelUp(restored, plan, "fourth", "later") };
   assert.equal(fourth.features.filter((feature) => feature.name === "Moonlit Guard").length, 1);
@@ -65,7 +65,7 @@ test("multiclass plans preserve another class’s custom subclass and legacy cus
   const character = hero(3, { subclass: "Moon Knight", classSubclasses: { Fighter: "Moon Knight" } });
   const plan = newLevelUpPlan(character);
   assert.equal(plan.customSubclass, true);
-  plan.customDescription = "Legacy subclass rules"; plan.boosts = { Strength: 2 };
+  plan.customDescription = "Legacy subclass rules"; plan.boosts = { Strength: 2 }; plan.choices["Fighter:mastery:4"] = ["Longsword"];
   const next = { ...character, ...applyLevelUp(character, plan, "fourth", "now") };
   const multiclass = newLevelUpPlan(next, "Barbarian");
   assert.equal(multiclass.customSubclass, false);
