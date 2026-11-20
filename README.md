@@ -47,13 +47,15 @@ The LAN host and party dashboard are available from the **LAN campaign** menu. S
 
 **Portable release:** double-click `Start TaleForge Host.bat`; no dependency setup or compilation is needed. **Source checkout:** the same launcher checks for Node.js, installs locked dependencies the first time, and builds the app. Keep the host window open while playing; press Ctrl+C there to stop it. Players need no install; they open the invite address in a browser.
 
-You can also run `npm run host` from a terminal. This builds the app and starts the combined web and campaign server at port `4173`; open `http://localhost:4173` on the host PC, then give players a LAN address displayed in the DM dashboard.
+You can also run `npm run host` from a terminal. It rebuilds the app only when its sources changed since the last build (skipping the type check, which `npm run build` and `npm run verify` still run) and starts the combined web and campaign server at port `4173`; open `http://localhost:4173` on the host PC, then give players a LAN address displayed in the DM dashboard.
 
 On Windows, allow Node.js through Windows Defender Firewall for **Private networks** if prompted. The host and players need to be on the same network, and the host PC must stay awake with the server running. The DM can stop a development host with Ctrl+C; for a production host, stop its PowerShell process with Ctrl+C.
 
 Players can create a character or copy one of their local sheets into the room. They control and edit their own campaign characters. Each character has a **Share with DM** switch; only opted-in sheets appear in the DM's live, read-only dashboard. Player changes save to the host immediately when connected. If a connection drops, edits are kept in that browser and retried after reconnecting. If the host has a newer copy, the player gets a choice between the host version and their offline version.
 
-Campaigns are stored on the host PC in `%APPDATA%\TaleForge\lan-campaigns.json` on Windows. The LAN version uses HTTP and room codes, so use it on a trusted private network. Do not forward the host port to the public internet.
+Campaigns are stored on the host PC in `%APPDATA%\TaleForge\lan-campaigns.json` on Windows, with handout images saved once each in the `board-images` folder beside it. The LAN version uses HTTP and room codes, so use it on a trusted private network. Do not forward the host port to the public internet.
+
+**Host performance:** the host sends app files compressed and lets browsers keep the versioned files, so returning players load almost nothing. Live updates are compressed and reach only the devices whose view changed, and handout images are fetched once by URL rather than resent with every update. Saves write compact JSON and skip the disk when nothing changed.
 
 The host saves the previous committed snapshot as `lan-campaigns.json.bak`. Failed disk writes roll back uncommitted changes and return a retryable error. Keep a separate copy of the entire TaleForge data folder while the host is stopped; the rotating backup does not replace an off-device backup. Room access credentials are inside these files, so keep backups private. If the main file becomes unreadable, stop the host, preserve it, then restore a known-good copy to `lan-campaigns.json` before restarting. The host deliberately stops on an unreadable store rather than silently starting empty.
 

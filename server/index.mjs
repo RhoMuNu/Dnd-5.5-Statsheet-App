@@ -1,13 +1,14 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { randomBytes, randomInt } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createHash, randomBytes, randomInt } from "node:crypto";
+import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeActivity } from "./activity.mjs";
 import { changeEncounter, emptyEncounter } from "./encounters.mjs";
-import { campaignPersistence, CampaignSaveError } from "./persistence.mjs";
+import { campaignPersistence, CampaignSaveError, loadCampaignStore, pruneBoardImages } from "./persistence.mjs";
+import { openEventStream, staticFiles } from "./delivery.mjs";
 import { hostPort, lanAddresses } from "./startup.mjs";
 import { partyMessage, boardFor, changeCampaignBoard, emptyCampaignBoard } from "./partyTools.mjs";
 
@@ -23,13 +24,15 @@ const clients = new Map();
 let store = { campaigns: [] };
 try {
   mkdirSync(dataRoot, { recursive: true });
-  if (existsSync(dataFile)) store = JSON.parse(readFileSync(dataFile, "utf8"));
+  store = loadCampaignStore(dataFile);
   if (!store || !Array.isArray(store.campaigns)) throw new Error("Campaign store has an unsupported format.");
 } catch (error) {
   console.error(`Could not read the campaign store at ${dataFile}:`, error.message);
   process.exit(1);
 }
 const persistence = campaignPersistence(dataFile, store);
+pruneBoardImages(dataFile);
+const appFiles = staticFiles(distRoot);
 
 function diceForRequest(body) {
   if (body.diceMode !== undefined && !["digital", "physical"].includes(body.diceMode)) throw new Error("Choose digital or physical dice.");
@@ -100,15 +103,37 @@ function snapshotFor(auth) {
     : campaign.characters.filter((entry) => entry.ownerId === player.id).map((entry) => ({ character: entry.character, shared: entry.shared }));
   const publicIds = new Set((campaign.encounter?.entries ?? []).map((entry) => entry.characterId));
   const targets = campaign.characters.filter((entry) => entry.shared && publicIds.has(entry.character.id)).map((entry) => ({ id: entry.character.id, name: entry.character.name }));
-  return { targets, campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters, messages: campaign.messages ?? [], board: boardFor(auth), activity: campaign.activity ?? [], encounter: campaign.encounter ?? emptyEncounter() };
+  return { targets, campaign: { code: campaign.code, name: campaign.name, dmName: campaign.dmName }, role, playerId: player?.id ?? null, players, characters, messages: campaign.messages ?? [], board: publicBoard(auth), activity: campaign.activity ?? [], encounter: campaign.encounter ?? emptyEncounter() };
 }
 function pushSnapshot(token) {
   const connections = clients.get(token);
   if (!connections) return;
   const auth = store.campaigns.map((campaign) => authorizedCampaign({ headers: { authorization: `Bearer ${token}` } }, campaign.code)).find(Boolean);
   if (!auth) return;
-  const event = `event: snapshot\ndata: ${JSON.stringify(snapshotFor(auth))}\n\n`;
-  for (const response of connections) response.write(event);
+  // Streams skip snapshots identical to the last one they received, so a sheet edit only
+  // reaches the devices whose view actually changed (the owner and, if shared, the DM).
+  const data = JSON.stringify(snapshotFor(auth));
+  for (const stream of connections) stream.snapshot(data);
+}
+// Handout images can be ~1 MB. Snapshots carry a versioned URL instead, so the image is downloaded
+// once per change rather than resent with every update to every device.
+const imageIds = new Map();
+function imageId(image) {
+  let id = imageIds.get(image);
+  if (!id) {
+    if (imageIds.size > 50) imageIds.clear();
+    id = createHash("sha256").update(image).digest("base64url").slice(0, 16);
+    imageIds.set(image, id);
+  }
+  return id;
+}
+function boardImageUrl(campaign) {
+  const image = campaign.board?.image;
+  return image ? `/api/campaigns/${campaign.code}/board-image?v=${imageId(image)}` : "";
+}
+function publicBoard(auth) {
+  const board = boardFor(auth);
+  return board.image ? { ...board, image: boardImageUrl(auth.campaign) } : board;
 }
 function broadcastCampaign(campaign) {
   for (const token of [campaign.dmToken, ...campaign.players.map((player) => player.token)]) pushSnapshot(token);
@@ -211,15 +236,15 @@ const apiServer = createServer(async (request, response) => {
       const auth = authorizedCampaign({ headers: { authorization: `Bearer ${requestUrl.searchParams.get("token") ?? ""}` } }, eventsMatch[1]);
       if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
       const token = requestUrl.searchParams.get("token");
-      response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
-      response.write("retry: 1500\n\n");
-      setConnected(token, response);
-      response.write(`event: snapshot\ndata: ${JSON.stringify(snapshotFor(auth))}\n\n`);
+      const stream = openEventStream(request, response);
+      stream.snapshot(JSON.stringify(snapshotFor(auth)), "retry: 1500\n\n");
+      setConnected(token, stream);
       broadcastCampaign(auth.campaign);
-      const heartbeat = setInterval(() => response.write(": keepalive\n\n"), 15_000);
+      const heartbeat = setInterval(() => stream.write(": keepalive\n\n"), 15_000);
       request.on("close", () => {
         clearInterval(heartbeat);
-        removeConnected(token, response);
+        stream.close();
+        removeConnected(token, stream);
         broadcastCampaign(auth.campaign);
       });
       return;
@@ -230,6 +255,18 @@ const apiServer = createServer(async (request, response) => {
       const auth = authorizedCampaign(request, campaignMatch[1]);
       if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
       return sendJson(response, 200, snapshotFor(auth));
+    }
+
+    const imageMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/board-image$/i);
+    if ((request.method === "GET" || request.method === "HEAD") && imageMatch) {
+      const auth = authorizedCampaign({ headers: { authorization: `Bearer ${requestUrl.searchParams.get("token") ?? ""}` } }, imageMatch[1]) ?? authorizedCampaign(request, imageMatch[1]);
+      if (!auth) return sendJson(response, 401, { error: "This campaign session is not valid." });
+      const image = (auth.campaign.board?.image ?? "").match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/]+={0,2})$/);
+      if (!image) return sendJson(response, 404, { error: "No handout image is published." });
+      const bytes = Buffer.from(image[2], "base64");
+      // The URL changes whenever the image does, so browsers may keep this copy indefinitely.
+      response.writeHead(200, { "Content-Type": image[1], "Content-Length": bytes.length, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" });
+      return response.end(request.method === "HEAD" ? undefined : bytes);
     }
 
     const partyMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/(messages|board)$/i);
@@ -243,9 +280,12 @@ const apiServer = createServer(async (request, response) => {
         if (!(auth.campaign.messages ?? []).some((entry) => entry.id === message.id)) { auth.campaign.messages = [...(auth.campaign.messages ?? []), message].slice(-100); persist(); broadcastCampaign(auth.campaign); }
         return sendJson(response, 200, { message });
       }
-      const board = changeCampaignBoard(auth.campaign.board ?? emptyCampaignBoard(), body);
+      const current = auth.campaign.board ?? emptyCampaignBoard();
+      // Snapshots show the image as a URL; sending that URL back means "keep the current image".
+      const keepsImage = typeof body?.image === "string" && body.image !== "" && body.image === boardImageUrl(auth.campaign);
+      const board = changeCampaignBoard(current, keepsImage ? { ...body, image: current.image } : body);
       auth.campaign.board = board; persist(); broadcastCampaign(auth.campaign);
-      return sendJson(response, 200, { board: boardFor(auth) });
+      return sendJson(response, 200, { board: publicBoard(auth) });
     }
     const activityMatch = pathname.match(/^\/api\/campaigns\/([A-Z0-9]+)\/activity$/i);
     if (request.method === "POST" && activityMatch) {
@@ -377,7 +417,7 @@ const apiServer = createServer(async (request, response) => {
 
     }
 
-    if (isProduction && request.method === "GET" && !pathname.startsWith("/api/")) return serveStatic(pathname, response);
+    if (isProduction && (request.method === "GET" || request.method === "HEAD") && !pathname.startsWith("/api/")) return appFiles.serve(request, response, pathname);
     return sendJson(response, 404, { error: "Not found." });
   } catch (error) {
     const message = error instanceof SyntaxError ? "Request body must be valid JSON." : error.message || "The LAN host could not complete that request.";
@@ -387,24 +427,6 @@ const apiServer = createServer(async (request, response) => {
   }
 });
 
-function serveStatic(pathname, response) {
-  let requestPath = decodeURIComponent(pathname);
-  if (requestPath === "/") requestPath = "/index.html";
-  const candidate = resolve(distRoot, `.${normalize(requestPath)}`);
-  const relativePath = relative(distRoot, candidate);
-  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
-    response.writeHead(403); response.end("Forbidden"); return;
-  }
-  let file = candidate;
-  if (!existsSync(file)) {
-    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("Not found"); return;
-  }
-  const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon" }[extname(file)] ?? "application/octet-stream";
-  response.writeHead(200, { "Content-Type": mime, "X-Content-Type-Options": "nosniff", "Cache-Control": file.endsWith("index.html") ? "no-cache" : "public, max-age=3600" });
-  response.end(readFileSync(file));
-}
-
 apiServer.on("error", (error) => {
   console.error(error.code === "EADDRINUSE" ? `\nPort ${port} is already used by another app. Close that app, or choose a different port in host-settings.json, then start TaleForge again.` : `\nTaleForge could not start its host: ${error.message}`);
   process.exitCode = 1;
@@ -412,6 +434,7 @@ apiServer.on("error", (error) => {
 apiServer.listen(port, "0.0.0.0", () => {
   const listeningPort = apiServer.address().port;
   console.log(`TaleForge LAN server listening on 0.0.0.0:${apiServer.address().port}`);
+  if (isProduction) setTimeout(() => appFiles.warm(), 0);
   console.log(`Campaign data: ${dataFile}`);
   if (isProduction) {
     console.log(`\nREADY - open http://localhost:${listeningPort} on this PC.`);
