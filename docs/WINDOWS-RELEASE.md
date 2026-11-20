@@ -18,12 +18,12 @@ Outputs are `releases/TaleForge-<version>-windows-x64.zip` and its `.sha256` che
 The build reuses an installed runtime only if its version and SHA-256 match the pinned official binary. Otherwise it downloads the pinned binary from nodejs.org and checks its SHA-256 before packaging. The first build also downloads the runtime's license; verified runtime files are cached under `.release-cache`. Release users need no internet connection to launch. To verify an existing archive again:
 
 ```powershell
-node scripts/verify-release.mjs releases/TaleForge-0.5.0-windows-x64.zip
+node scripts/verify-release.mjs releases/TaleForge-0.6.0-windows-x64.zip
 ```
 
 ## Runtime and notices
 
-`packaging/runtime.json` pins Node.js 24.22.1 Windows x64 and its checksum, checked against the [official release checksums](https://nodejs.org/en/blog/release/v24.22.1/). The package includes the [Node.js and embedded dependencies license text](https://github.com/nodejs/node/blob/v24.22.1/LICENSE), React/React DOM/Scheduler licenses, and SRD attribution. When updating the runtime pin, verify the new binary and checksum using the official release before building. Maintain the current rules-content distribution scope when sharing this beta.
+`packaging/runtime.json` pins Node.js 24.22.1 Windows x64 and its checksum, checked against the [official release checksums](https://nodejs.org/en/blog/release/v24.22.1/). The package includes the [Node.js and embedded dependencies license text](https://github.com/nodejs/node/blob/v24.22.1/LICENSE), React/React DOM/Scheduler licenses, the SIL Open Font License texts for the bundled Cinzel and Inter fonts, and SRD attribution. When updating the runtime pin, verify the new binary and checksum using the official release before building. Maintain the current rules-content distribution scope when sharing this beta.
 
 ## Startup and upgrades
 

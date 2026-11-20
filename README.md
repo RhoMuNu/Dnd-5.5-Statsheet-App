@@ -119,6 +119,8 @@ In 0.4, all feature and trait cards collapse, with Expand all / Collapse all con
 
 In 0.5, editing basics keeps level-up ability increases, creation uses structured lineage and language choices, the Play sheet adds **Print sheet**, and roster cards add **Duplicate**. Several rules counters and corrections were added; see the [0.5.0 release notes](docs/RELEASE-0.5.0.md).
 
+In 0.6, the interface moves to a token-based design system with bundled Cinzel and Inter fonts. The play sheet leads with ability tiles and vitals, quick Damage/Heal, one-tap rolls for abilities, saves and skills, proficiency and use pips, and result notices. LAN hosting sends far less data. See the [0.6.0 release notes](docs/RELEASE-0.6.0.md).
+
 Inventory also supports nested containers, carried/stored status, fixed-weight containers, attunement tracking and item charges with configurable rest recovery. Coin quick transactions make change and display GP-equivalent funds. Heroic Inspiration has a manual reroll tracker on the character sheet. LAN rooms include party chat, a shared text/image handout and a private DM notebook. See the [Adventurer’s Codex feature comparison](docs/ADVENTURERS-CODEX-COMPARISON.md) for usage and remaining gaps.
 
 **Features & traits:** Search offline descriptions of class, subclass, species, background feats, and recorded build choices. Each supported species has individual trait descriptions, including lineage tables and level-based unlocks. Expand spell references and rules reminders directly inside a trait. Existing characters receive these references automatically. Unknown homebrew abilities can be described under **Your features**. See [source attribution](docs/SRD-ATTRIBUTION.md).
