@@ -71,6 +71,8 @@ src/
     SectionPage.tsx    Character-section routing and empty states
     CharacterSections.tsx Feature, inventory, spellbook, and journal editors
     CharacterBuilder.tsx Guided 2024 character creator
+    PrintableSheet.tsx Print / Save as PDF version of the play sheet
+    NumberField.tsx    Number input that can be cleared and retyped
     Sidebar.tsx        Main navigation
   data/
     navigation.ts      Menu labels, sections, and URL helpers
@@ -95,13 +97,17 @@ Menu sections use URL hashes (for example `/#inventory`), so they can be bookmar
 
 ## Character records
 
-New characters start at level 1 with one class and no subclass. Use **Level up** on the character sheet (including Tracked sheet mode) for further levels, subclass choices, and multiclassing. Editing basics preserves existing levels, classes, and subclasses; imported higher-level characters retain their progression. Paper and Tracked modes let you enter a manually rolled Hit Die result during level-up or use the class average.
+New characters start at level 1 with one class and no subclass. Use **Level up** on the character sheet (including Tracked sheet mode) for further levels, subclass choices, and multiclassing. Editing basics preserves existing levels, classes, subclasses, and ability score increases from level-ups (changing a creation score moves the final score by the same amount); imported higher-level characters retain their progression. Paper and Tracked modes let you enter a manually rolled Hit Die result during level-up or use the class average.
+
+**Creation choices:** Elf, Gnome, Tiefling, Dragonborn, and Goliath characters pick their 2024 lineage, legacy, or ancestry from a list (Wood Elf sets a 35-foot speed). Languages are Common plus two choices, grouped into Standard and Rare languages. Point Buy enforces scores of 8–15 and exactly 27 points; Manual scores must be whole numbers from 1 to 20. Class skill lists hide skills already granted by your background or species, and the builder lists every unfinished choice at once.
+
+**Print sheet:** On the Play sheet, choose **Print sheet** to print the character or save it as a PDF from the print dialog. The printable copy lists vitals, abilities and saves, skills, attacks, spellcasting and spells by level, limited-use features, features and traits, equipment and coins, languages and tools, and backstory.
 
 **Custom subclasses:** At class level 3, choose **Custom subclass** under **Features & choices** instead of a bundled subclass. Enter a name and overview, then add any features gained at that level with their descriptions. Later level-ups retain the subclass and let you add further features. The overview and editable features appear in **Features & traits**, are included in backups, and sync through LAN campaigns. Imported custom subclass names can gain an overview at their next level-up. Once selected, level-ups preserve the subclass identity and type.
 
 Custom subclass effects are manual: use custom stat boosts, effects, and resource trackers for their benefits, and add granted spells in Spellbook. The app does not infer spellcasting progression, proficiencies, or bundled subclass behavior from a custom name. Even a custom subclass named Champion or Life Domain remains distinct from that bundled rules implementation.
 
-Characters autosave to this browser's local storage. The collection supports selecting, editing, and deleting characters. Use **Export library** to download a versioned JSON backup, or export one character from its roster card. **Import backup** merges characters into the current library and skips IDs already present; it never overwrites an existing local character. Keep a downloaded backup somewhere separate from the browser for recovery or transfer to another device.
+Characters autosave to this browser's local storage. The collection supports selecting, editing, duplicating, and deleting characters; **Duplicate** makes an independent copy (for example, to try another build) without changing the original. Use **Export library** to download a versioned JSON backup, or export one character from its roster card. **Import backup** merges characters into the current library and skips IDs already present; it never overwrites an existing local character. Keep a downloaded backup somewhere separate from the browser for recovery or transfer to another device.
 
 Character sections include class features and custom traits, a quantity and weight inventory with coin tracking, a spellbook with ready-state and spell-slot spending, and a backstory with a dated journal. These fields are included in character backups.
 
@@ -127,7 +133,7 @@ The former Classic sheet preference migrates to Tracked sheet. Existing digital/
 
 **Automation labels** appear in Features & traits and collapsed spell rows. Automatic means a calculated benefit is applied; Partial automation means only the listed parts are handled; Manual effects means effects must be resolved at the table, even when a counter or cast record is available. Open an entry for **App handles** and **At the table** explanations. Labels follow the selected play settings and spell formula. Unknown homebrew defaults to manual resolution.
 
-The abilities page includes damage and healing amounts, temporary HP absorption, death saves (including natural 1/20, stabilization, and massive damage), concentration reminders and Constitution saves, and skill/save/initiative rolls with advantage or disadvantage. Enter damage before resistance/vulnerability and select **Damage defense**; the app applies that multiplier once, including Petrified resistance. Apply other damage reductions yourself first. Resolve each concentration check before entering the next damage event.
+The abilities page includes damage and healing amounts, temporary HP absorption, death saves (including natural 1/20, stabilization, and massive damage), concentration reminders and Constitution saves, and skill/save/initiative rolls with advantage or disadvantage. Enter damage before resistance/vulnerability and select **Damage defense**; the app applies that multiplier once, including Petrified resistance. Following the 2024 order of application, Resistance halves damage (rounding down) before Vulnerability doubles it. Apply other damage reductions yourself first. Resolve each concentration check before entering the next damage event.
 
 **Equipped weapons:** Standard equipped weapons automatically appear in attacks and attack references in Paper and Tracked sheets, including +1/+2/+3 bonuses. Unequipping, deleting, or reducing an item to zero quantity hides its linked attack. Manual attacks remain independent. Edit linked profiles for proficiency, off-hand attacks, versatile damage, and custom adjustments. Custom weapon names need a manual attack profile. Weapon profiles follow the [2024 Basic Rules equipment table](https://www.dndbeyond.com/sources/dnd/br-2024/equipment/).
 
@@ -146,6 +152,8 @@ The spellbook displays **Spell attack bonus** and **Spell save DC** for each cas
 **Effects, feats & custom modifiers:** Bless/Bane add or subtract a d4 on attacks and saves; Shield adds AC; Tough, Alert, and War Caster templates implement their HP, initiative, and concentration-save benefits. Custom profiles support flat modifiers for other feats, items, and subclass features. Templates do not grant eligibility or implement every benefit of the named feature. Same-named effects do not stack. Manual effect templates advance with **Advance effect timers**, independently of LAN initiative; expire effects at their actual trigger (such as the start of a turn for Shield). For manually added effects, recipients remove Bless/Bane when the caster loses concentration. Host-targeted casts link their recipients automatically. Completed rests also expire timed effects according to elapsed time.
 
 **Healing features:** Second Wind rolls and heals your own HP while spending a use. Lay on Hands can heal your own HP and spend the selected amount from the pool. For another target, spend the pool with its tracker and have that player apply the healing.
+
+**Species and class counters:** Resources & rest also tracks Orc Relentless Endurance, Goliath Giant Ancestry, Dragonborn Draconic Flight (level 5), the free level 3 and 5 lineage spells of Elves and Tieflings, Forest Gnome Speak with Animals, and Monk Uncanny Metabolism. Human Resourceful marks Heroic Inspiration as available when you finish a Long Rest. Cleric Channel Divinity reaches four uses at level 18, and Monk Unarmored Movement stacks with Barbarian Fast Movement for multiclass characters.
 
 After completing a Short Rest, use **Short Rest · spend Hit Dice** to spend a class Hit Die and restore HP. The rest recovery buttons restore eligible class resources and spell slots. A 2024 Long Rest restores all spent Hit Dice, HP, and eligible resources and clears temporary HP. Rest benefits require at least 1 HP; the DM remains responsible for duration and interruptions.
 

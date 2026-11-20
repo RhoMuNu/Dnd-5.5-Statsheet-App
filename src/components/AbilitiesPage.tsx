@@ -6,6 +6,8 @@ import { useDiceRoll } from "./DiceProvider";
 import { TurnPanel } from "./TurnPanel";
 import { LevelUpWizard } from "./LevelUpWizard";
 import { EquipmentSettings } from "./EquipmentSettings";
+import { NumberField } from "./NumberField";
+import { PrintableSheet } from "./PrintableSheet";
 import { ABILITIES, SKILLS, type AbilityName, type Character, type SkillName } from "../data/characters";
 import { calculateCharacterStats, isClassSavingThrowProficient } from "../data/calculations";
 import { useEffect, useId, useState } from "react";
@@ -117,12 +119,13 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
       <header className="sheet-hero">
         <div className="sheet-hero-emblem"><Icon name="dice" /></div>
         <div className="sheet-hero-copy">{readOnly && <p className="eyebrow">SHARED CHARACTER</p>}<h2>{character.name}</h2><p>{[character.species, character.background].filter(Boolean).join(" · ")}</p><div className="hero-class-chips">{stats.classBreakdown.map(({ name, level }) => <span key={name}>{name} <b>{level}</b></span>)}{readOnly && <span>View only</span>}</div></div>
-        <div className="hero-level"><span>LEVEL</span><strong>{stats.totalLevel.toString().padStart(2, "0")}</strong><small>2024 rules</small>{!readOnly && onChange && <button type="button" className="level-up-button" disabled={stats.totalLevel >= 20} onClick={() => setLevelingUp(true)}>{stats.totalLevel >= 20 ? "Maximum level" : "Level up ✦"}</button>}</div>
+        <div className="hero-level"><span>LEVEL</span><strong>{stats.totalLevel.toString().padStart(2, "0")}</strong><small>2024 rules</small>{!readOnly && onChange && <button type="button" className="level-up-button" disabled={stats.totalLevel >= 20} onClick={() => setLevelingUp(true)}>{stats.totalLevel >= 20 ? "Maximum level" : "Level up ✦"}</button>}{!readOnly && <button type="button" className="text-button print-sheet-button" title="Print this character, or choose Save as PDF in the print dialog" onClick={() => window.print()}>Print sheet</button>}</div>
       </header>
+      {!readOnly && <PrintableSheet character={character} />}
       {dice.classic && <div className="classic-mode-banner"><Icon name="dice" /><div><strong>{dice.paper ? "Paper sheet" : "Tracked sheet"}</strong><span>{dice.paper ? "Use calculated bonuses as a reference. Resolve rolls and effects yourself; enter final HP and resource changes." : "Roll and resolve effects at the table. Record casts, actions, slots, resources, and rests here."}</span></div></div>}
       <div className="vitals-strip" aria-label="Character vital statistics">
         <div className="vital-stat hp-vital"><span><Icon name="heart" />Hit points</span><strong>{currentHp}<small> / {stats.maxHitPoints ?? "—"}</small></strong><div className="vital-meter"><i style={{ width: `${hpPercent}%` }} /></div></div>
-        {[{ label: "Armor class", value: stats.armorClass, icon: "shield" }, { label: "Initiative", value: formatModifier(stats.initiative), icon: "dice" }, { label: "Speed", value: `${stats.speed} ft`, icon: "arrow" }, { label: "Proficiency", value: formatModifier(stats.proficiencyBonus), icon: "spark" }, { label: "Perception", value: stats.passivePerception, icon: "features" }].map(({label,value,icon}) => <div className="vital-stat" key={label}><span><Icon name={icon} />{label}</span><strong>{value}</strong></div>)}
+        {[{ label: "Armor class", value: stats.armorClass, icon: "shield" }, { label: "Initiative", value: formatModifier(stats.initiative), icon: "dice" }, { label: "Speed", value: `${stats.speed} ft`, icon: "arrow" }, { label: "Proficiency", value: formatModifier(stats.proficiencyBonus), icon: "spark" }, { label: "Passive Perception", value: stats.passivePerception, icon: "features" }].map(({label,value,icon}) => <div className="vital-stat" key={label}><span><Icon name={icon} />{label}</span><strong>{value}</strong></div>)}
       </div>
       <CustomModifiersPanel character={character} onChange={onChange} readOnly={readOnly} />
       {(activeConditions(character).length > 0 || (character.combat?.exhaustion ?? 0) > 0 || character.combat?.concentration) && <div className="sheet-status-chips">{activeConditions(character).map((condition) => <span key={condition}>{condition}</span>)}{(character.combat?.exhaustion ?? 0) > 0 && <span>Exhaustion {character.combat!.exhaustion}</span>}{character.combat?.concentration && <span className="concentration-chip">Concentrating · {character.combat.concentration}</span>}</div>}
@@ -151,7 +154,7 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
               {ABILITIES.map((ability) => (
                 <label className="ability-score-card" key={ability}>
                   <span>{ability}</span>
-                  <input disabled={readOnly} type="number" min={1} max={30} step={1} aria-label={`${ability} score`} value={character.abilityScores[ability]} onChange={(event) => setAbilityScore(ability, event.target.value)} />
+                  <NumberField disabled={readOnly} min={1} max={30} step={1} aria-label={`${ability} score`} value={character.abilityScores[ability]} onValue={(value) => setAbilityScore(ability, String(value))} />
                   <strong>{formatModifier(stats.abilityModifiers[ability])}</strong>
                 </label>
               ))}
@@ -222,15 +225,15 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <EquipmentSettings character={character} onChange={onChange} readOnly={readOnly} />
             <fieldset className="setup-fields" disabled={readOnly}>
               <label className="compact-field"><span>Size</span><select value={character.size} onChange={(event) => onChange?.({ size: event.target.value as Character["size"] })}>{SIZES.map((size) => <option key={size}>{size}</option>)}</select></label>
-              <label className="compact-field"><span>Base speed (feet)</span><input type="number" min={0} max={500} value={character.speedFeet} onChange={(event) => onChange?.({ speedFeet: numberOr(event.target.value, character.speedFeet, 0, 500) })} /></label>
-              <label className="compact-field"><span>Other speed bonus (feet)</span><input type="number" min={-500} max={500} value={character.otherSpeedBonus} onChange={(event) => onChange?.({ otherSpeedBonus: numberOr(event.target.value, character.otherSpeedBonus, -500, 500) })} /></label>
+              <label className="compact-field"><span>Base speed (feet)</span><NumberField min={0} max={500} value={character.speedFeet} onValue={(value) => onChange?.({ speedFeet: value })} /></label>
+              <label className="compact-field"><span>Other speed bonus (feet)</span><NumberField min={-500} max={500} value={character.otherSpeedBonus} onValue={(value) => onChange?.({ otherSpeedBonus: value })} /></label>
               <label className="toggle-row"><input type="checkbox" checked={character.powerfulBuild} onChange={(event) => onChange?.({ powerfulBuild: event.target.checked })} /><span>Counts as one size larger for carrying</span></label>
               <label className="compact-field"><span>Armor formula</span><select disabled={character.armorSource === "inventory"} value={character.armorMode} onChange={(event) => onChange?.({ armorMode: event.target.value as Character["armorMode"] })}>{ARMOR_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
               {stats.classBreakdown.some(({ name }) => name === "Barbarian") && stats.classBreakdown.some(({ name }) => name === "Monk") && <label className="compact-field"><span>Unarmored Defense choice</span><select value={character.unarmoredDefenseChoice} onChange={(event) => onChange?.({ unarmoredDefenseChoice: event.target.value as Character["unarmoredDefenseChoice"] })}><option value="">Use starting class</option><option value="Barbarian">Barbarian · Dex + Con</option><option value="Monk">Monk · Dex + Wis (no shield)</option></select></label>}
-              {character.armorMode !== "unarmored" && <label className="compact-field"><span>Armor base AC</span><input type="number" min={1} max={40} disabled={character.armorSource === "inventory"} value={character.armorBaseAC} onChange={(event) => onChange?.({ armorBaseAC: numberOr(event.target.value, character.armorBaseAC, 1, 40) })} /></label>}
-              {character.armorMode === "heavy" && <label className="compact-field"><span>Armor Strength requirement</span><input type="number" min={0} max={30} disabled={character.armorSource === "inventory"} value={character.armorStrengthRequirement} onChange={(event) => onChange?.({ armorStrengthRequirement: numberOr(event.target.value, character.armorStrengthRequirement, 0, 30) })} /></label>}
+              {character.armorMode !== "unarmored" && <label className="compact-field"><span>Armor base AC</span><NumberField min={1} max={40} disabled={character.armorSource === "inventory"} value={character.armorBaseAC} onValue={(value) => onChange?.({ armorBaseAC: value })} /></label>}
+              {character.armorMode === "heavy" && <label className="compact-field"><span>Armor Strength requirement</span><NumberField min={0} max={30} disabled={character.armorSource === "inventory"} value={character.armorStrengthRequirement} onValue={(value) => onChange?.({ armorStrengthRequirement: value })} /></label>}
               <label className="toggle-row"><input disabled={character.armorSource === "inventory"} type="checkbox" checked={character.hasShield} onChange={(event) => onChange?.({ hasShield: event.target.checked })} /><span>Shield AC bonus (+2 when trained)</span></label>
-              <label className="compact-field"><span>Other AC bonus</span><input type="number" min={-20} max={20} value={character.otherAcBonus} onChange={(event) => onChange?.({ otherAcBonus: numberOr(event.target.value, character.otherAcBonus, -20, 20) })} /></label>
+              <label className="compact-field"><span>Other AC bonus</span><NumberField min={-20} max={20} value={character.otherAcBonus} onValue={(value) => onChange?.({ otherAcBonus: value })} /></label>
               <label className="compact-field"><span>Spellcasting ability override</span><select value={character.spellcastingAbility} onChange={(event) => onChange?.({ spellcastingAbility: event.target.value as AbilityName | "" })}><option value="">Use class default</option>{ABILITIES.map((ability) => <option key={ability}>{ability}</option>)}</select></label>
               <p className="setup-note">Class saving throw proficiencies and spell ability are applied automatically. For features that grant extras, use the save checkboxes or spell ability override. Choose Custom AC for an alternate class AC formula. Enter species speed and any armor Strength requirement here.</p>
             </fieldset>
@@ -266,10 +269,4 @@ function resourceRecoveryLabel(recovery: Character["customResources"][number]["r
 
 function formatWeight(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-function numberOr(raw: string, current: number, min: number, max: number): number {
-  if (raw === "") return current;
-  const number = Number(raw);
-  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : current;
 }

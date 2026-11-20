@@ -1,6 +1,6 @@
 import type { Character, CharacterSpell } from "./characters";
 import { hasFeat } from "./advancement";
-import { calculateCharacterStats } from "./calculations";
+import { calculateCharacterStats, gainsInspirationOnLongRest } from "./calculations";
 import { classLevel, subclassIs } from "./rulesCatalog";
 import { SPELL_FORMULAS } from "./spellEffects";
 import { characterRuleFeatures } from "./featureDescriptions";
@@ -49,7 +49,8 @@ export function featureCoverage(name: string, character: Character, mode: Covera
   if (["improved critical", "superior critical"].includes(normalized) && subclassIs(character, "Fighter", "Champion")) return manualDice ? manual("Champion is recorded.", "Apply the expanded critical range to your physical attack roll and double the eligible damage dice.") : partial("Weapon attack helpers use Champion’s expanded critical range.", "Resolve the hit against the target and apply damage yourself.");
   if (normalized === "draconic resilience" && subclassIs(character, "Sorcerer", "Draconic")) return partial("Maximum HP includes the Sorcerer-level bonus; unarmored AC considers Dexterity and Charisma.", "Check the recorded armor settings and resolve any other benefits in the description.");
   if (["disciple of life", "blessed healer", "supreme healing", "potent cantrip", "empowered evocation", "evasion"].includes(normalized)) return manualDice ? manual("The feature is recorded.", "Apply this feature to eligible rolls and effects at the table.") : partial("Supported spell helpers include this benefit where implemented; LAN targeting resolves supported recipient effects.", "Apply it yourself for unsupported spells, manual rolls, NPCs, and other eligible situations. This does not automate every use of the feature.");
-  const resource = calculateCharacterStats(character).classResources.find((entry) => key(entry.label.split(" · ").at(-1) ?? "") === normalized || (normalized === "resourceful" && entry.key === "species.resourceful"));
+  if (normalized === "resourceful" && gainsInspirationOnLongRest(character)) return partial("Finishing a Long Rest with the sheet’s rest control marks Heroic Inspiration as available.", "Spend it on a reroll at the table, then clear the Heroic Inspiration tracker.");
+  const resource = calculateCharacterStats(character).classResources.find((entry) => key(entry.label.split(" · ").at(-1) ?? "") === normalized);
   if (resource) return manual(resource.maxUses !== undefined ? "Resources & rest provides a use counter and its listed rest recovery. Adjusting the counter does not apply the ability’s effects." : "Resources & rest displays a reference value for this ability.");
   return manual();
 }
