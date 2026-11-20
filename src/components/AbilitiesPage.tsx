@@ -1,4 +1,5 @@
 import { InspirationControl } from "./InspirationControl";
+import { PanelTitle } from "./Hint";
 import { PaperControls } from "./PaperControls";
 import { CustomModifiersPanel } from "./CustomModifiersPanel";
 import { HealthPanel } from "./HealthPanel";
@@ -16,7 +17,12 @@ import { activeConditions } from "../data/conditions";
 import { EffectsPanel } from "./EffectsPanel";
 import { AttacksPanel } from "./AttacksPanel";
 import { GameplayPanel } from "./GameplayPanel";
-import { combatState, restCharacter } from "../data/gameplay";
+import { applyDamage, combatState, healCharacter, restCharacter } from "../data/gameplay";
+import type { RollMode } from "../data/conditions";
+import { useCheckRoller } from "./useCheckRoller";
+import { useToast } from "./Toasts";
+import { ROLL_MODE_OPTIONS, SegmentedControl } from "./SegmentedControl";
+import { MAX_PIPS, UsePips } from "./UsePips";
 
 type AbilitiesPageProps = { character: Character; onChange?: (updates: Partial<Character>) => void; readOnly?: boolean };
 
@@ -36,6 +42,24 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
   const maximumHp = stats.maxHitPoints ?? 0;
   const currentHp = Math.min(maximumHp, character.currentHitPoints ?? maximumHp);
   const hpPercent = maximumHp > 0 ? (currentHp / maximumHp) * 100 : 0;
+  const roller = useCheckRoller(character);
+  const notify = useToast();
+  const [rollMode, setRollMode] = useState<RollMode>("normal");
+  const [hpAmount, setHpAmount] = useState("");
+  const canRoll = roller.available && !readOnly;
+  /** Quick damage/healing from the header. Assisted and Tracked sheets apply the combat rules (temporary HP, death saves, concentration); Paper sheets just adjust HP. */
+  function quickHp(kind: "damage" | "heal") {
+    const amount = Number(hpAmount);
+    if (!onChange || !Number.isInteger(amount) || amount < 1 || amount > 9999) return;
+    if (dice.paper) setHitPoints(String(kind === "damage" ? currentHp - amount : currentHp + amount));
+    else {
+      const updates = kind === "damage" ? applyDamage(character, amount) : healCharacter(character, amount);
+      if (!Object.keys(updates).length) { notify(kind === "heal" ? "Healing has no effect right now." : "Damage could not be applied.", "error"); return; }
+      onChange(updates);
+      notify(`${character.name}: ${kind === "damage" ? `took ${amount} damage` : `healed ${amount}`} → ${updates.currentHitPoints ?? currentHp} HP${updates.temporaryHitPoints !== undefined && character.temporaryHitPoints > 0 ? ` (${updates.temporaryHitPoints} temporary)` : ""}`, "info");
+    }
+    setHpAmount("");
+  }
   const tabId = useId();
   const tabs = [{ id: "combat", name: "Combat", icon: "abilities", description: "Hit points, attacks & effects" }, { id: "abilities", name: "Abilities & skills", icon: "dice", description: "Scores, saves & proficiencies" }, { id: "resources", name: "Resources & rest", icon: "spells", description: "Spell slots & feature uses" }, { id: "setup", name: "Setup", icon: "shield", description: "Armor, movement & class notes" }] as const;
   type View = typeof tabs[number]["id"];
@@ -123,10 +147,21 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
       </header>
       {!readOnly && <PrintableSheet character={character} />}
       {dice.classic && <div className="classic-mode-banner"><Icon name="dice" /><div><strong>{dice.paper ? "Paper sheet" : "Tracked sheet"}</strong><span>{dice.paper ? "Use calculated bonuses as a reference. Resolve rolls and effects yourself; enter final HP and resource changes." : "Roll and resolve effects at the table. Record casts, actions, slots, resources, and rests here."}</span></div></div>}
+      <section className="stat-header" aria-label="Core statistics">
+      <div className="ability-strip">{ABILITIES.map((ability) => {
+        const modifier = formatModifier(stats.abilityModifiers[ability]), score = character.abilityScores[ability];
+        const content = <><span className="ability-tile-name">{ability.slice(0, 3).toUpperCase()}</span><strong>{modifier}</strong><small>{score}</small></>;
+        return canRoll
+          ? <button type="button" className="ability-tile" key={ability} title={`Roll a ${ability} check`} aria-label={`${ability} ${modifier}, score ${score}. Roll a ${ability} check`} onClick={() => void roller.roll(`${ability} check`, rollMode)}>{content}</button>
+          : <div className="ability-tile" key={ability} role="group" aria-label={`${ability} ${modifier}, score ${score}`}>{content}</div>;
+      })}</div>
       <div className="vitals-strip" aria-label="Character vital statistics">
-        <div className="vital-stat hp-vital"><span><Icon name="heart" />Hit points</span><strong>{currentHp}<small> / {stats.maxHitPoints ?? "—"}</small></strong><div className="vital-meter"><i style={{ width: `${hpPercent}%` }} /></div></div>
+        <div className="vital-stat hp-vital"><span><Icon name="heart" />Hit points</span><strong>{currentHp}<small> / {stats.maxHitPoints ?? "—"}</small>{character.temporaryHitPoints > 0 && <em className="temp-hp"> +{character.temporaryHitPoints} temp</em>}</strong><div className="vital-meter"><i style={{ width: `${hpPercent}%` }} /></div>
+          {!readOnly && onChange && maximumHp > 0 && <div className="hp-quick"><label className="sr-only" htmlFor={`${tabId}-hp-amount`}>Damage or healing amount</label><input id={`${tabId}-hp-amount`} type="number" inputMode="numeric" min={1} max={9999} placeholder="Amount" value={hpAmount} onChange={(event) => setHpAmount(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); quickHp("damage"); } }} /><button type="button" className="button-danger" disabled={!hpAmount} onClick={() => quickHp("damage")}>Damage</button><button type="button" className="button-healing" disabled={!hpAmount} onClick={() => quickHp("heal")}>Heal</button></div>}
+        </div>
         {[{ label: "Armor class", value: stats.armorClass, icon: "shield" }, { label: "Initiative", value: formatModifier(stats.initiative), icon: "dice" }, { label: "Speed", value: `${stats.speed} ft`, icon: "arrow" }, { label: "Proficiency", value: formatModifier(stats.proficiencyBonus), icon: "spark" }, { label: "Passive Perception", value: stats.passivePerception, icon: "features" }].map(({label,value,icon}) => <div className="vital-stat" key={label}><span><Icon name={icon} />{label}</span><strong>{value}</strong></div>)}
       </div>
+      </section>
       <CustomModifiersPanel character={character} onChange={onChange} readOnly={readOnly} />
       {(activeConditions(character).length > 0 || (character.combat?.exhaustion ?? 0) > 0 || character.combat?.concentration) && <div className="sheet-status-chips">{activeConditions(character).map((condition) => <span key={condition}>{condition}</span>)}{(character.combat?.exhaustion ?? 0) > 0 && <span>Exhaustion {character.combat!.exhaustion}</span>}{character.combat?.concentration && <span className="concentration-chip">Concentrating · {character.combat.concentration}</span>}</div>}
       <div className="sheet-view-tabs" role="tablist" aria-label="Character sheet views">{tabs.map((tab) => <button type="button" role="tab" key={tab.id} id={`${tabId}-tab-${tab.id}`} aria-selected={view === tab.id} aria-controls={`${tabId}-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => chooseView(tab.id)} onKeyDown={(event) => {
@@ -138,18 +173,13 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
       <div className="sheet-tab-panel" role="tabpanel" id={`${tabId}-panel-combat`} aria-labelledby={`${tabId}-tab-combat`} hidden={view !== "combat"}>
         <div className="combat-layout"><div className="sheet-stack">          <section className="derived-panel">
             <p className="eyebrow">DEFENSE &amp; MOVEMENT</p>
-            <div className="derived-stat-grid">
-              <div><small>ARMOR CLASS</small><strong>{stats.armorClass}</strong></div>
-              <div><small>MAX HIT POINTS</small><strong>{stats.maxHitPoints ?? "—"}</strong></div>
-              <div><small>SPEED</small><strong>{stats.speed}<i> ft</i></strong></div>
-              <div><small>HIT DIE</small><strong>{stats.hitDie ? `d${stats.hitDie}` : "—"}</strong></div>
-            </div>
+            <div className="derived-line"><span>Hit dice</span><strong>{stats.classBreakdown.map(({ level, hitDie }) => `${level}d${hitDie}`).join(" + ") || "—"}</strong></div>
             <HealthPanel character={character} onChange={onChange ? (updates) => { if (updates.currentHitPoints !== undefined && updates.currentHitPoints !== null) setHitPoints(String(updates.currentHitPoints)); else onChange(updates); } : undefined} readOnly={readOnly} manual={dice.paper} />
             {stats.appliedClassFeatures.length > 0 && <div className="applied-features"><small>CLASS FEATURES APPLIED</small>{stats.appliedClassFeatures.map((feature) => <span key={feature}>✦ {feature}</span>)}</div>}
           </section>{dice.paper ? <PaperControls character={character} onChange={onChange} readOnly={readOnly} /> : <><TurnPanel character={character} onChange={onChange} readOnly={readOnly} /><GameplayPanel key={character.id} character={character} onChange={onChange} readOnly={readOnly} /></>}</div><div className="sheet-stack"><AttacksPanel key={`attacks-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} />{!dice.paper && <EffectsPanel key={`effects-${character.id}`} character={character} onChange={onChange} readOnly={readOnly} />}</div></div>
       </div>
       <div className="sheet-tab-panel ability-view" role="tabpanel" id={`${tabId}-panel-abilities`} aria-labelledby={`${tabId}-tab-abilities`} hidden={view !== "abilities"}>          <section className="sheet-panel" aria-labelledby="ability-scores-title">
-            <div className="panel-heading"><div><p className="eyebrow">THE SIX ABILITIES</p><h2 id="ability-scores-title">Ability scores</h2></div><span className="panel-hint">Modifiers update live</span></div>
+            <div className="panel-heading"><div><p className="eyebrow">THE SIX ABILITIES</p><h2 id="ability-scores-title">Ability scores</h2></div>{canRoll ? <SegmentedControl label="Roll mode for checks and saves" value={rollMode} options={[...ROLL_MODE_OPTIONS]} onChange={setRollMode} compact /> : <span className="panel-hint">Modifiers update live</span>}</div>
             <div className="ability-score-grid">
               {ABILITIES.map((ability) => (
                 <label className="ability-score-card" key={ability}>
@@ -166,29 +196,25 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <div className="panel-heading"><div><p className="eyebrow">RESIST A THREAT</p><h2 id="saving-throws-title">Saving throws</h2></div><span className="panel-hint">Mark your proficiencies</span></div>
             <div className="save-grid">
               {ABILITIES.map((ability) => (
-                <label className="save-row" key={ability}>
-                  <input type="checkbox" checked={character.savingThrowProficiencies[ability] || isClassSavingThrowProficient(character, ability)} disabled={readOnly || isClassSavingThrowProficient(character, ability)} onChange={(event) => setSaveProficiency(ability, event.target.checked)} />
-                  <span>{ability}{isClassSavingThrowProficient(character, ability) && <small className="class-proficiency-label">CLASS</small>}</span><b>{formatModifier(stats.savingThrows[ability])}</b>
-                </label>
+                <div className="save-row" key={ability}>
+                  <label className="save-check"><input type="checkbox" checked={character.savingThrowProficiencies[ability] || isClassSavingThrowProficient(character, ability)} disabled={readOnly || isClassSavingThrowProficient(character, ability)} onChange={(event) => setSaveProficiency(ability, event.target.checked)} />
+                  <span>{ability}{isClassSavingThrowProficient(character, ability) && <small className="class-proficiency-label">CLASS</small>}</span></label><b>{formatModifier(stats.savingThrows[ability])}</b>
+                  {canRoll && <button type="button" className="roll-button" aria-label={`Roll a ${ability} saving throw`} title="Roll" onClick={() => void roller.roll(`Save: ${ability}`, rollMode)}><Icon name="dice" /></button>}
+                </div>
               ))}
             </div>
           </section>
 
           <section className="sheet-panel" aria-labelledby="skills-title">
-            <div className="panel-heading"><div><p className="eyebrow">TRAINED TALENTS</p><h2 id="skills-title">Skills</h2></div><span className="panel-hint">Expertise doubles proficiency</span></div>
+            <div className="panel-heading"><div><p className="eyebrow">TRAINED TALENTS</p><h2 id="skills-title">Skills</h2></div><span className="panel-hint skill-legend"><i className="skill-rank-toggle rank-0" aria-hidden="true"><span /></i>None <i className="skill-rank-toggle rank-1" aria-hidden="true"><span /></i>Proficient <i className="skill-rank-toggle rank-2" aria-hidden="true"><span /></i>Expertise</span></div>
             <div className="skills-table">
               {SKILLS.map(({ name, ability }) => (
                 <div className="skill-row" key={name}>
-                  <span className={`skill-rank rank-${character.skillProficiencies[name]}`} aria-hidden="true">{character.skillProficiencies[name] === 2 ? "◆" : character.skillProficiencies[name] === 1 ? "●" : "·"}</span>
+                  <button type="button" className={`skill-rank-toggle rank-${character.skillProficiencies[name]}`} disabled={readOnly} title={`${RANK_LABELS[character.skillProficiencies[name]]} · tap to change`} aria-label={`${name}: ${RANK_LABELS[character.skillProficiencies[name]]}. Change proficiency`} onClick={() => setSkillRank(name, String((character.skillProficiencies[name] + 1) % 3))}><span aria-hidden="true" /></button>
                   <span className="skill-name">{name}</span>
                   <span className="skill-ability">{ability.slice(0, 3).toUpperCase()}</span>
                   <b>{formatModifier(stats.skillBonuses[name])}</b>
-                  <label className="sr-only" htmlFor={`skill-${name.replaceAll(" ", "-")}`}>{name} proficiency</label>
-                  <select disabled={readOnly} id={`skill-${name.replaceAll(" ", "-")}`} value={character.skillProficiencies[name]} onChange={(event) => setSkillRank(name, event.target.value)}>
-                    <option value={0}>Not proficient</option>
-                    <option value={1}>Proficient</option>
-                    <option value={2}>Expertise</option>
-                  </select>
+                  {canRoll && <button type="button" className="roll-button" aria-label={`Roll ${name}`} title="Roll" onClick={() => void roller.roll(name, rollMode)}><Icon name="dice" /></button>}
                 </div>
               ))}
             </div>
@@ -202,18 +228,18 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
             <div className="derived-divider" />
             {stats.spellcastingProgressions.length === 0 ? <p className="no-spellcasting">Choose a spellcasting class to calculate spell stats.</p> : <>
               {stats.spellcastingProgressions.length === 1 && <><div className="derived-line"><span>Spell save DC</span><strong>{stats.spellcastingProgressions[0].saveDC}</strong></div><div className="derived-line"><span>Spell attack</span><strong>{formatModifier(stats.spellcastingProgressions[0].attackBonus)}</strong></div></>}
-              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · REMAINING / MAX</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => { const key = spellSlotKey(pool, spellLevel); const used = Math.min(total, character.resourceUses[key] ?? 0); return <div className="derived-line tracked-resource" key={key}><span>{pool} · Level {spellLevel}</span><div className="resource-controls"><button type="button" disabled={readOnly || used === total} aria-label={`Use level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, 1, total)}>−</button><strong>{total - used} / {total}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, -1, total)}>+</button></div></div>; })}</div>}
+              {stats.spellSlots.length > 0 && <div className="spell-slot-list"><small>SPELL SLOTS · REMAINING / MAX</small>{stats.spellSlots.map(({ spellLevel, total, pool }) => { const key = spellSlotKey(pool, spellLevel); const used = Math.min(total, character.resourceUses[key] ?? 0); return <div className="derived-line tracked-resource" key={key}><span>{pool} · Level {spellLevel}</span>{total <= MAX_PIPS ? <UsePips label={`Level ${spellLevel} ${pool.startsWith("Pact") ? "pact" : "spell"} slot`} total={total} used={used} disabled={readOnly} onChange={(next) => onChange?.({ resourceUses: { ...character.resourceUses, [key]: next } })} /> : <div className="resource-controls"><button type="button" disabled={readOnly || used === total} aria-label={`Use level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, 1, total)}>−</button><strong>{total - used} / {total}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore level ${spellLevel} spell slot`} onClick={() => changeSpellSlot(key, -1, total)}>+</button></div>}</div>; })}</div>}
               {stats.spellcastingProgressions.length > 0 && <div className="spell-slot-list"><small>SPELLCASTING BY CLASS</small>{stats.spellcastingProgressions.map((entry) => <div className="derived-line" key={entry.className}><span>{entry.className}: {entry.cantrips === null ? "—" : `${entry.cantrips} cantrips`}{entry.count !== null ? ` · ${entry.count} ${entry.label?.toLowerCase()}` : ""} · DC {entry.saveDC} / {entry.attackBonus >= 0 ? "+" : ""}{entry.attackBonus}</span><strong>Lvl {stats.classBreakdown.find((item) => item.name === entry.className)?.level}</strong></div>)}</div>}
             </>}
           </section>          {stats.classResources.length > 0 && <section className="derived-panel class-resource-panel">
-            <p className="eyebrow">CLASS FEATURES &amp; RESOURCES</p><p className="setup-note">Tracker only: − / + changes remaining uses, without applying the ability’s effects.</p>
-            {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key ? <div className="resource-controls"><button type="button" disabled={readOnly || used === maxUses} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}{value ? ` ${value}` : ""}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
+            <PanelTitle hint={<>Tap a filled pip (or −) to spend a use and an empty pip (or +) to restore one. Trackers count uses only; they do not apply the ability’s effects.</>}>CLASS FEATURES &amp; RESOURCES</PanelTitle>
+            {stats.classResources.map(({ key, label, value, maxUses, used, recovery }) => <div className={`derived-line ${maxUses !== undefined ? "tracked-resource" : ""}`} key={key ?? label}><span>{label}{recovery && <small className="resource-recovery">{recovery} recovery</small>}</span>{maxUses !== undefined && key && maxUses <= MAX_PIPS ? <div className="resource-pips"><UsePips label={label} total={maxUses} used={used ?? 0} disabled={readOnly} onChange={(next) => onChange?.({ resourceUses: { ...character.resourceUses, [key]: next } })} />{value && <small>{value}</small>}</div> : maxUses !== undefined && key ? <div className="resource-controls"><button type="button" disabled={readOnly || used === maxUses} aria-label={`Use one ${label}`} onClick={() => changeResource(key, 1, maxUses)}>−</button><strong>{maxUses - (used ?? 0)} / {maxUses}{value ? ` ${value}` : ""}</strong><button type="button" disabled={readOnly || used === 0} aria-label={`Restore one ${label}`} onClick={() => changeResource(key, -1, maxUses)}>+</button></div> : <strong>{value}</strong>}</div>)}
           </section>}
 
           <section className="derived-panel class-resource-panel custom-resource-panel">
-            <p className="eyebrow">FEATS &amp; CUSTOM FEATURE TRACKERS</p>
-            <p className="setup-note">Add limited-use feats, subclass features, magic items, or any other resource. Choose how it recovers.</p>
-            {character.customResources.map((resource) => <div className="derived-line tracked-resource" key={resource.id}><span>{resource.name}<small className="resource-recovery">{resourceRecoveryLabel(resource.recovery)}</small></span><div className="resource-controls"><button type="button" disabled={readOnly || resource.used >= resource.maxUses} aria-label={`Use one ${resource.name}`} onClick={() => changeCustomResource(resource.id, 1)}>−</button><strong>{resource.maxUses - resource.used} / {resource.maxUses}</strong><button type="button" disabled={readOnly || resource.used <= 0} aria-label={`Restore one ${resource.name}`} onClick={() => changeCustomResource(resource.id, -1)}>+</button><button type="button" className="resource-remove" disabled={readOnly} aria-label={`Remove ${resource.name} tracker`} onClick={() => onChange?.({ customResources: character.customResources.filter((entry) => entry.id !== resource.id) })}>×</button></div></div>)}
+            <PanelTitle hint={<>Add limited-use feats, subclass features, magic items, or any other resource. Choose how it recovers.</>}>FEATS &amp; CUSTOM FEATURE TRACKERS</PanelTitle>
+            
+            {character.customResources.map((resource) => <div className="derived-line tracked-resource" key={resource.id}><span>{resource.name}<small className="resource-recovery">{resourceRecoveryLabel(resource.recovery)}</small></span><div className="resource-controls">{resource.maxUses <= MAX_PIPS ? <UsePips label={resource.name} total={resource.maxUses} used={resource.used} disabled={readOnly} onChange={(next) => changeCustomResource(resource.id, next - resource.used)} /> : <><button type="button" disabled={readOnly || resource.used >= resource.maxUses} aria-label={`Use one ${resource.name}`} onClick={() => changeCustomResource(resource.id, 1)}>−</button><strong>{resource.maxUses - resource.used} / {resource.maxUses}</strong><button type="button" disabled={readOnly || resource.used <= 0} aria-label={`Restore one ${resource.name}`} onClick={() => changeCustomResource(resource.id, -1)}>+</button></>}<button type="button" className="resource-remove" disabled={readOnly} aria-label={`Remove ${resource.name} tracker`} onClick={() => onChange?.({ customResources: character.customResources.filter((entry) => entry.id !== resource.id) })}>×</button></div></div>)}
             {!readOnly && !dice.paper && (stats.classResources.some(({ recovery }) => recovery === "Short Rest") || stats.spellSlots.some(({ pool }) => pool.startsWith("Pact Magic")) || character.customResources.some(({ recovery }) => recovery.startsWith("short-")) || character.inventory.items.some((item) => item.charges?.recovery === "short")) && <button type="button" className="resource-rest-button" disabled={currentHp <= 0 || combatState(character).dead} onClick={() => recoverResources("Short Rest")}>Take a Short Rest <span>↻</span></button>}
             {!readOnly && !dice.paper && stats.maxHitPoints !== null && <button type="button" className="resource-rest-button" disabled={currentHp <= 0 || combatState(character).dead} onClick={() => recoverResources("Long Rest")}>Take a Long Rest <span>↻</span></button>}
             {!readOnly && <div className="custom-resource-form"><label><span>Feature / feat name</span><input value={resourceName} maxLength={50} placeholder="e.g. Lucky" onChange={(event) => setResourceName(event.target.value)} /></label><label><span>Uses</span><input type="number" min={1} max={999} value={resourceMax} onChange={(event) => setResourceMax(event.target.value)} /></label><label><span>Recovery</span><select value={resourceRecovery} onChange={(event) => setResourceRecovery(event.target.value as typeof resourceRecovery)}><option value="long">Long rest · all</option><option value="short-one">Short rest · one</option><option value="short-all">Short rest · all</option><option value="manual">Manual only</option></select></label><button type="button" className="resource-add-button" disabled={!resourceName.trim() || !Number.isInteger(Number(resourceMax)) || Number(resourceMax) < 1 || Number(resourceMax) > 999} onClick={addCustomResource}>Add tracker</button></div>}
@@ -251,6 +277,8 @@ export function AbilitiesPage({ character, onChange, readOnly = false }: Abiliti
     </section>
   );
 }
+
+const RANK_LABELS = ["Not proficient", "Proficient", "Expertise"] as const;
 
 function formatModifier(value: number): string {
   return value >= 0 ? `+${value}` : String(value);

@@ -2,17 +2,22 @@ import { spendTurn } from "../data/economy";
 import { useTableActivity } from "../data/tableActivity";
 import { useDiceRoll } from "./DiceProvider";
 import { useState } from "react";
+import { useToast } from "./Toasts";
+import { useCheckRoller } from "./useCheckRoller";
+import { ROLL_MODE_OPTIONS, SegmentedControl } from "./SegmentedControl";
+import { Hint } from "./Hint";
 import { ABILITIES, SKILLS, type Character } from "../data/characters";
 import { calculateCharacterStats } from "../data/calculations";
 import { activeEffects, effectDice, effectTotal } from "../data/effects";
 import { useHealingFeature } from "../data/featureActions";
-import { CONDITIONS, CONDITION_NOTES, activeConditions, automaticSaveFailure, isIncapacitated, type RollMode } from "../data/conditions";
+import { CONDITIONS, CONDITION_NOTES, activeConditions, isIncapacitated, type RollMode } from "../data/conditions";
 import { adjustedDamage, rollD20, setCondition, setExhaustion, applyDamage, combatState, deathSave, healCharacter, spendHitDie } from "../data/gameplay";
 
 export function GameplayPanel({ character, onChange, readOnly = false }: { character: Character; onChange?: (updates: Partial<Character>) => void; readOnly?: boolean }) {
   const diceSource = useDiceRoll(character.updatedAt);
   const publish = useTableActivity(character.id);
-  function report(summary: string) { setMessage(summary); publish(summary); }
+  const notify = useToast();
+  function report(summary: string) { setMessage(summary); publish(summary); notify(summary); }
   const stats = calculateCharacterStats(character);
   const combat = combatState(character);
   const [amount, setAmount] = useState("1");
@@ -31,23 +36,8 @@ export function GameplayPanel({ character, onChange, readOnly = false }: { chara
       const rolled = await diceSource.run(feature, (die) => useHealingFeature(character, feature, amount, die)); if (!rolled) return; const result = rolled.result; onChange?.(result.updates); report(`${rolled.physical ? "Physical dice · " : ""}${feature === "second-wind" ? "Second Wind" : "Lay on Hands"}: ${result.healing} HP before maximum; use and Bonus Action spent.`); }
     catch (reason) { setMessage(reason instanceof Error ? reason.message : "Feature unavailable."); }
   }
-  async function rollCheck() {
-    const ability = check.startsWith("Save: ") ? check.slice(6) : "";
-    if (automaticSaveFailure(character, ability)) { report(check + ": automatic failure due to condition"); return; }
-    try {
-    const rolled = await diceSource.run(check, (die) => {
-    const result = rollD20(character, check === "Initiative" ? "initiative" : ability ? "save" : "check", mode, ability || check, false, false, die);
-    const dice = result.rolls;
-    const chosen = result.natural;
-    const bonus = check === "Initiative" ? stats.initiative : check.startsWith("Save: ")
-      ? stats.savingThrows[check.slice(6) as keyof typeof stats.savingThrows]
-      : stats.skillBonuses[check as keyof typeof stats.skillBonuses];
-    const extra = ability ? effectDice(character, "save", die) : { total: 0, rolls: [] };
-    return `${check}: ${dice.join(", ")}${dice.length > 1 ? ` → ${chosen}` : ""} ${bonus >= 0 ? "+" : "−"} ${Math.abs(bonus)}${extra.rolls.length ? ` + effects [${extra.rolls.join(", ")}]` : ""} = ${chosen + bonus + extra.total}`;
-    });
-    if (rolled) report((rolled.physical ? "Physical dice · " : "") + rolled.result);
-    } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Could not resolve roll."); }
-  }
+  const roller = useCheckRoller(character, setMessage);
+  function rollCheck() { void roller.roll(check, mode); }
 
   async function rollDeath() {
     try {
@@ -105,8 +95,8 @@ export function GameplayPanel({ character, onChange, readOnly = false }: { chara
         {CONDITIONS.map((condition) => <label className="condition-toggle" key={condition}><input type="checkbox" checked={activeConditions(character).includes(condition)} disabled={!(combat.conditions ?? []).includes(condition) && activeConditions(character).includes(condition)} onChange={(event) => onChange?.(setCondition(character, condition, event.target.checked))} /><span><strong>{condition}</strong><small>{CONDITION_NOTES[condition]}</small></span></label>)}
         <p className="setup-note">Inherited conditions clear with their source. Context-dependent effects such as fear, sight, and grapple targets need the situational roll controls.</p>
       </details>
-      {!diceSource.classic && <><div className="play-controls"><label>Roll a check<select value={check} onChange={(event) => setCheck(event.target.value)}><option>Initiative</option>{ABILITIES.map((ability) => <option key={ability}>Save: {ability}</option>)}{SKILLS.map(({ name }) => <option key={name}>{name}</option>)}</select></label><label>Roll mode<select value={mode} onChange={(event) => setMode(event.target.value as RollMode)}><option value="normal">Normal</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option></select></label><button type="button" onClick={rollCheck}>Roll d20</button></div>
-      <p className="setup-note">Sheet bonuses, exhaustion, and unconditional condition effects apply automatically. Advantage and disadvantage cancel. Use roll mode for situational effects.</p></>}
+      {!diceSource.classic && <><div className="play-controls"><label>Roll a check<select value={check} onChange={(event) => setCheck(event.target.value)}><option>Initiative</option>{ABILITIES.map((ability) => <option key={ability}>Save: {ability}</option>)}{SKILLS.map(({ name }) => <option key={name}>{name}</option>)}</select></label><button type="button" onClick={rollCheck}>Roll d20</button><Hint>Sheet bonuses, exhaustion, and unconditional condition effects apply automatically. Advantage and disadvantage cancel. Use the roll mode for situational effects. You can also roll from the Abilities &amp; skills tab.</Hint></div>
+      <SegmentedControl label="Roll mode" value={mode} options={[...ROLL_MODE_OPTIONS]} onChange={setMode} compact /></>}
       {diceSource.classic && <p className="setup-note">Resolve dice at the table. Record final HP, death saves, and remaining Hit Dice here; track feature uses in Resources &amp; rest.</p>}
     </fieldset>
     <p role="status" aria-live="polite">{message}</p>

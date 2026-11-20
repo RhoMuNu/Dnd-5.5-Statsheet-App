@@ -32,6 +32,8 @@ function App() {
   const [largerText, setLargerText] = useState(() => { try { return localStorage.getItem("taleforge.largerText") === "true"; } catch { return false; } });
   const [helpOpen, setHelpOpen] = useState(false);
   const current = sectionContent[activeSection];
+  // Character pages lead with the character header; the page title stays for screen readers and focus.
+  const characterPage = !["overview", "builder", "lan"].includes(activeSection);
   const activeCharacter = characters.find((character) => character.id === selectedCharacterId) ?? characters[0] ?? null;
 
   useLayoutEffect(() => {
@@ -211,12 +213,12 @@ function App() {
         <main className="page-content" id="main-content" tabIndex={-1}>
           {recoveryData !== null && <div className="lan-help-note" role="alert"><strong>Saved library recovery available</strong><span>Some saved character data could not be read. The original data has been preserved. Download it for recovery; readable characters are still available.</span><button className="backup-button" onClick={exportRecovery}>Download recovery file</button></div>}
           {!storageAvailable && <p className="lan-error" role="alert">Changes are only kept in this session. Export your character library before closing this page. Browser storage may be full, unavailable, or protecting unreadable saved data.</p>}
-          <section className="welcome-row" aria-labelledby="page-title">
+          <section className={`welcome-row${characterPage && activeCharacter ? " welcome-row-compact" : ""}`} aria-labelledby="page-title">
             <div>
-              <h1 id="page-title" tabIndex={-1}>{current.title}</h1>
+              <h1 id="page-title" tabIndex={-1} className={characterPage && activeCharacter && activeSection === "abilities" ? "sr-only" : undefined}>{current.title}</h1>
               {current.description && <p className="welcome-subtitle">{current.description}</p>}
             </div>
-            {activeSection !== "builder" && activeSection !== "lan" && (
+            {!characterPage && activeSection !== "builder" && activeSection !== "lan" && (
               <button className="create-button" onClick={() => { setEditingCharacterId(null); navigate("builder"); }}>
                 <span aria-hidden="true">＋</span> Create a character
               </button>

@@ -1,0 +1,104 @@
+/*
+ * TaleForge design tokens. Every colour, size and motion value in the app should come from here.
+ * Older variable names at the bottom are kept as aliases so existing rules keep working.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, from the page background up to raised controls */
+  --surface-0: #0f0e14;
+  --surface-1: #17151e;
+  --surface-2: #1e1b27;
+  --surface-3: #282433;
+  --surface-4: #332e40;
+  --surface-sunken: #121018;
+
+  /* Lines */
+  --border-subtle: #2a2634;
+  --border: #3d3648;
+  --border-strong: #6f647c;
+
+  /* Text (all pass WCAG AA on --surface-1) */
+  --text-strong: #f6f0e7;
+  --text: #e6dfd4;
+  --text-muted: #bbb2c5;
+  --text-faint: #958c9f;
+
+  /* Accent: illuminated-manuscript gold */
+  --accent: #f0ca86;
+  --accent-strong: #ffdca0;
+  --accent-deep: #b08446;
+  --accent-ink: #24190b;
+  --accent-soft: rgb(240 202 134 / 0.12);
+  --accent-line: rgb(240 202 134 / 0.35);
+
+  /* Meaning */
+  --danger: #ef9a92;
+  --danger-strong: #ffd0cb;
+  --danger-soft: #3c1f24;
+  --success: #93d4aa;
+  --success-strong: #d3f7df;
+  --success-soft: #1b3428;
+  --info: #a9c1f2;
+  --info-soft: #1d2640;
+
+  /* Typography */
+  --font-display: "Cinzel", "Georgia", serif;
+  --font-ui: "Inter Variable", "Inter", "Segoe UI", system-ui, sans-serif;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --text-2xl: 34px;
+  --tracking-caps: 0.12em;
+
+  /* Spacing, radius, elevation */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-2: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-pop: 0 18px 48px rgb(0 0 0 / 0.5);
+  --glow-accent: 0 0 0 1px var(--accent-line), 0 6px 24px rgb(240 202 134 / 0.12);
+  --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / 0.025), rgb(255 255 255 / 0) 120px);
+
+  /* Motion (disabled entirely under prefers-reduced-motion) */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration: 200ms;
+  --duration-slow: 320ms;
+
+  /* Aliases used by earlier rules */
+  --bg: var(--surface-0);
+  --panel: var(--surface-1);
+  --panel-raised: var(--surface-2);
+  --line: var(--border);
+  --muted: var(--text-muted);
+  --gold: var(--accent);
+  --cream: var(--text-strong);
+  --green: var(--success);
+  --control-bg: var(--surface-3);
+  --control-border: var(--border-strong);
+  --primary-bg: var(--accent);
+  --primary-text: var(--accent-ink);
+  --focus: #ffe3a7;
+  --danger-text: var(--danger-strong);
+  --danger-bg: var(--danger-soft);
+  --success-bg: var(--success-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 0ms; --duration: 0ms; --duration-slow: 0ms; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

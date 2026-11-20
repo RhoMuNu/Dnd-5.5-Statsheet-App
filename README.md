@@ -21,7 +21,8 @@ See [Windows release packaging](docs/WINDOWS-RELEASE.md) to build a distributabl
 - React + TypeScript
 - Vite for local development and builds
 - Node.js built-in HTTP server for LAN campaigns
-- Plain CSS for the interface
+- Plain CSS for the interface, with design tokens in `src/theme.css`
+- Cinzel and Inter fonts bundled for offline use (SIL Open Font License)
 
 ## Getting started
 
@@ -84,7 +85,8 @@ src/
     calculations.ts    Derived stats and limited-use class/species resources
   App.tsx              App shell and section navigation
   main.tsx             Browser entry point
-  styles.css           Global styles and responsive layout
+  theme.css            Design tokens: colours, type scale, spacing, motion
+  app.css              Application styles and the shared component layer
 server/
   index.mjs            Persistent campaign API and production web host
   dev.mjs              Starts Vite and the API together for LAN development

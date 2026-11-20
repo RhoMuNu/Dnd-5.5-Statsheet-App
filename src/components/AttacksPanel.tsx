@@ -1,4 +1,7 @@
 import { characterAttacks, removeCharacterAttack } from "../data/inventoryWeapons";
+import { ROLL_MODE_OPTIONS, SegmentedControl } from "./SegmentedControl";
+import { useToast } from "./Toasts";
+import { PanelTitle } from "./Hint";
 import { spendTurn } from "../data/economy";
 import { useDiceRoll } from "./DiceProvider";
 import { useTableActivity } from "../data/tableActivity";
@@ -12,7 +15,8 @@ export function AttacksPanel({ character, onChange, readOnly = false }: { charac
   const dice = useDiceRoll(character.updatedAt);
   const attacks = characterAttacks(character);
   const publish = useTableActivity(character.id);
-  function report(summary: string) { setMessage(summary); publish(summary); }
+  const notify = useToast();
+  function report(summary: string) { setMessage(summary); publish(summary); notify(summary); }
   const stats = calculateCharacterStats(character);
   const [preset, setPreset] = useState("Dagger");
   const [mode, setMode] = useState<RollMode>("normal");
@@ -49,10 +53,10 @@ export function AttacksPanel({ character, onChange, readOnly = false }: { charac
     report(`${entry.name}: [${result.rolls.join(", ") || "no dice"}]${result.sneak.length ? ` + Sneak Attack [${result.sneak.join(", ")}]` : ""} ${modifier(result.bonus)} = ${result.total} ${entry.damageType} damage${critical ? " (critical dice doubled)" : ""}. Apply to the target after a hit.`);
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Cannot apply damage now."); }
   }
-  return <section className="derived-panel gameplay-panel" aria-label="Attacks and damage"><p className="eyebrow">ATTACKS &amp; DAMAGE</p>
+  return <section className="derived-panel gameplay-panel" aria-label="Attacks and damage"><PanelTitle hint={<>Check weapon proficiency and ability after adding. Edit a preset for custom weapons or spells. Equipped standard weapons appear here automatically. Unequipping removes their linked attacks. Ammunition is tracked separately.</>}>ATTACKS &amp; DAMAGE</PanelTitle>
     <fieldset disabled={readOnly}><div className="play-controls"><label>Weapon preset<select value={preset} onChange={(event) => setPreset(event.target.value)}>{WEAPON_PRESETS.map((entry) => <option key={entry.name}>{entry.name}</option>)}</select></label><button type="button" disabled={attacks.length >= 100} onClick={() => onChange?.({ attacks: [...attacks, makeWeaponAttack(character, preset, makeCharacterId())] })}>Add attack</button></div>
-      <p className="setup-note">Check weapon proficiency and ability after adding. Edit a preset for custom weapons or spells. Equipped standard weapons appear here automatically. Unequipping removes their linked attacks. Ammunition is tracked separately.</p>
-      {!dice.classic && <><div className="play-controls"><label>Target AC (optional)<input type="number" min={0} max={50} value={ac} onChange={(event) => setAc(event.target.value)} /></label><label>Roll mode<select value={mode} onChange={(event) => setMode(event.target.value as RollMode)}><option value="normal">Normal</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option></select></label></div>
+      
+      {!dice.classic && <><div className="play-controls"><SegmentedControl label="Roll mode" value={mode} options={[...ROLL_MODE_OPTIONS]} onChange={setMode} compact /><label>Target AC (optional)<input type="number" min={0} max={50} value={ac} onChange={(event) => setAc(event.target.value)} /></label></div>
       <label className="toggle-row"><input type="checkbox" checked={advantage} onChange={(event) => setAdvantage(event.target.checked)} />Situational advantage (e.g. unseen by target)</label>
       <label className="toggle-row"><input type="checkbox" checked={disadvantage} onChange={(event) => setDisadvantage(event.target.checked)} />Situational disadvantage (e.g. long range, fear source visible)</label>
       <label className="toggle-row"><input type="checkbox" checked={reactionAttack} onChange={(event) => setReactionAttack(event.target.checked)} />Reaction attack · confirm opportunity attack / feature trigger</label>

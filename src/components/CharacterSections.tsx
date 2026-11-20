@@ -1,4 +1,6 @@
 import { InventoryItemDetails } from "./InventoryItemDetails";
+import { ROLL_MODE_OPTIONS, SegmentedControl } from "./SegmentedControl";
+import { useToast } from "./Toasts";
 import { NumberField } from "./NumberField";
 import { carriedInventoryWeight, currencyCopper, itemIsCarried, moveInventoryItem, removeInventoryItem, transactCoins } from "../data/inventoryManagement";
 import { rollSpellAttack } from "../data/spellAttacks";
@@ -140,6 +142,7 @@ export function InventoryPage({ character, onChange }: SectionProps) {
 export function SpellbookPage({ character, onChange }: SectionProps) {
   const dice = useDiceRoll(character.updatedAt);
   const publish = useTableActivity(character.id);
+  const notify = useToast();
   const stats = calculateCharacterStats(character);
   const spells = character.spells ?? [];
   const [name, setName] = useState("");
@@ -201,18 +204,18 @@ export function SpellbookPage({ character, onChange }: SectionProps) {
       const rolled = await dice.run(`${spell.name} additional attack`, (die) => rollSpellAttack(character, spell.id, attackClass(spell), spellMode, spellAC.trim() ? Number(spellAC) : null, die));
       if (!rolled) return;
       const summary = `${rolled.physical ? "Physical dice · " : ""}${rolled.result.summary} Additional attack only; no slot or action spent. Record any required later-turn action separately.`;
-      setCastMessage(summary); publish(summary);
+      setCastMessage(summary); publish(summary); notify(summary);
     } catch (reason) { setCastMessage(reason instanceof Error ? reason.message : "Could not roll spell attack."); }
   }
   async function castSpell(spell: CharacterSpell) {
     setResultSpellId(spell.id); setCastMessage("");
     const slot = selectedSlot(spell);
     try {
-      if (dice.classic) { if (character.armorSource === "inventory" && inventoryArmor(character).untrained) throw new Error("Cannot cast while wearing armor without training."); const updates = castCharacterSpell(character, spell.id, slot ? spellSlotKey(slot.pool, slot.spellLevel) : undefined); onChange(updates); setCastMessage(`${spell.name}: casting recorded. Resolve its effects at the table.`); return; }
+      if (dice.classic) { if (character.armorSource === "inventory" && inventoryArmor(character).untrained) throw new Error("Cannot cast while wearing armor without training."); const updates = castCharacterSpell(character, spell.id, slot ? spellSlotKey(slot.pool, slot.spellLevel) : undefined); onChange(updates); setCastMessage(`${spell.name}: casting recorded. Resolve its effects at the table.`); notify(`${spell.name}: casting recorded.`); return; }
       const rolled = await dice.run(`${spell.name} cast`, (die) => resolveSpellCast(character, spell.id, slot ? spellSlotKey(slot.pool, slot.spellLevel) : undefined, spell.className || castingClass || stats.spellcastingProgressions[0]?.className || "", healSelf, die, spellMode, spellAC.trim() && Number.isInteger(Number(spellAC)) ? Number(spellAC) : null));
       if (!rolled) return; const result = rolled.result;
       if (rolled.physical) result.summary = `Physical dice · ${result.summary}`;
-      onChange(result.updates); setCastMessage(result.summary); publish(result.summary);
+      onChange(result.updates); setCastMessage(result.summary); publish(result.summary); notify(result.summary);
     } catch (reason) { setCastMessage(reason instanceof Error ? reason.message : "Could not cast spell."); }
   }
 
@@ -224,10 +227,10 @@ export function SpellbookPage({ character, onChange }: SectionProps) {
     <section className="spellbook-caster-stats" aria-label="Spellcasting bonuses">{stats.spellcastingProgressions.map((entry) => <article key={entry.className}><h3>{entry.className}</h3><dl><div><dt>Spell attack bonus</dt><dd>{entry.attackBonus >= 0 ? "+" : ""}{entry.attackBonus}</dd></div><div><dt>Spell save DC</dt><dd>{entry.saveDC}</dd></div></dl></article>)}{!stats.spellcastingProgressions.length && <p className="collection-helper">Set a spellcasting ability in Play sheet → Setup to calculate your spell attack bonus and save DC.</p>}</section>
     <section className="spellbook-slot-summary" aria-label="Spell slots by level"><h3>Spell slots remaining</h3><div className="spellbook-slot-grid">{slots.map((slot) => <div className={`spellbook-slot-level ${slot.remaining === 0 ? "empty" : ""}`} key={slot.key}><strong>Level {slot.spellLevel}</strong><span>{slot.pool}</span><b>{slot.remaining} / {slot.total} remaining</b></div>)}</div>{!slots.length && <p className="collection-helper">No spell slots. Cantrips do not use slots.</p>}</section>
     {!dice.classic && <details className="spell-cast-settings"><summary>Cast settings</summary><div className="play-controls"><label>Casting class<select value={castingClass || stats.spellcastingProgressions[0]?.className || ""} onChange={(event) => setCastingClass(event.target.value)}>{stats.spellcastingProgressions.map((entry) => <option key={entry.className}>{entry.className}</option>)}</select></label><label className="toggle-row"><input type="checkbox" checked={healSelf} onChange={(event) => setHealSelf(event.target.checked)} />Apply automated healing to my own HP</label></div>
-    <div className="play-controls"><label>Spell attack roll mode<select value={spellMode} onChange={(event) => setSpellMode(event.target.value as RollMode)}><option value="normal">Normal</option><option value="advantage">Advantage</option><option value="disadvantage">Disadvantage</option></select></label><label>Spell target AC (optional)<input type="number" min={0} max={50} value={spellAC} onChange={(event) => setSpellAC(event.target.value)} /></label></div></details>}
+    <div className="play-controls"><SegmentedControl label="Spell attack roll mode" value={spellMode} options={[...ROLL_MODE_OPTIONS]} onChange={setSpellMode} compact /><label>Spell target AC (optional)<input type="number" min={0} max={50} value={spellAC} onChange={(event) => setSpellAC(event.target.value)} /></label></div></details>}
     {castMessage && <p role="status" aria-live="polite">{castMessage}</p>}
 
-    <div className="spellbook-tools"><label>Search spellbook<input type="search" value={spellSearch} onChange={(event) => setSpellSearch(event.target.value)} placeholder="Spell name or school" /></label><label><span>Show</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All spells</option><option value="ready">Ready to cast</option><option value="unready">Not ready</option></select></label><span>{visibleSpells.length} shown</span><button type="button" className="backup-button" onClick={() => setExpandedSpells(new Set(visibleSpells.map((spell) => spell.id)))}>Expand all</button><button type="button" className="backup-button" onClick={() => setExpandedSpells(new Set())}>Collapse all</button></div>
+    <div className="spellbook-tools"><label>Search spellbook<input type="search" value={spellSearch} onChange={(event) => setSpellSearch(event.target.value)} placeholder="Spell name or school" /></label><SegmentedControl label="Show" value={filter} options={[{ value: "all", label: "All" }, { value: "ready", label: "Ready" }, { value: "unready", label: "Not ready" }]} onChange={setFilter} compact /><span>{visibleSpells.length} shown</span><button type="button" className="backup-button" onClick={() => setExpandedSpells(new Set(visibleSpells.map((spell) => spell.id)))}>Expand all</button><button type="button" className="backup-button" onClick={() => setExpandedSpells(new Set())}>Collapse all</button></div>
     <section className="spellbook-list">{visibleSpells.length ? visibleSpells.map((spell) => <details className="spell-card spell-card-collapsible" key={spell.id} open={expandedSpells.has(spell.id)} onToggle={(event) => {
       if (event.target !== event.currentTarget) return;
       const open = event.currentTarget.open;

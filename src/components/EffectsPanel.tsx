@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PanelTitle } from "./Hint";
 import { makeCharacterId, type Character } from "../data/characters";
 import { activeEffects, advanceEffects, EFFECT_PRESETS, makeEffect, type ActiveEffect } from "../data/effects";
 import { combatState } from "../data/gameplay";
@@ -10,8 +11,8 @@ export function EffectsPanel({ character, onChange, readOnly = false }: { charac
   const effects = applied.filter((effect) => !automatic.includes(effect));
   const save = (next: ActiveEffect[]) => onChange?.({ combat: { ...combatState(character), effects: next } });
   const update = (id: string, patch: Partial<ActiveEffect>) => save(effects.map((entry) => entry.id === id ? { ...entry, ...patch } : entry));
-  return <section className="derived-panel gameplay-panel" aria-label="Active effects and feat modifiers"><p className="eyebrow">EFFECTS, FEATS &amp; CUSTOM MODIFIERS</p>
-    <p className="setup-note">Add effects after receiving them or choosing a feat. These modifiers apply to your sheet. Keep effects on each recipient; remove them when their source ends.</p>
+  return <section className="derived-panel gameplay-panel" aria-label="Active effects and feat modifiers"><PanelTitle hint={<>Add effects after receiving them or choosing a feat. These modifiers apply to your sheet. Keep effects on each recipient; remove them when their source ends.</>}>EFFECTS, FEATS &amp; CUSTOM MODIFIERS</PanelTitle>
+    
     {automatic.map((effect) => <p className="setup-note" key={effect.id}><strong>{effect.name}</strong> · applied automatically from your features or background.</p>)}
     <fieldset disabled={readOnly}><div className="play-controls"><label>Effect template<select value={preset} onChange={(event) => setPreset(event.target.value)}>{Object.keys(EFFECT_PRESETS).map((name) => <option key={name}>{name}</option>)}</select></label><button type="button" disabled={effects.length >= 50 || (preset !== "Custom modifier" && effects.some((effect) => effect.name === preset))} onClick={() => save([...effects, { ...makeEffect(preset, makeCharacterId()), ...(preset === "Custom modifier" ? { name: `Custom modifier ${effects.length + 1}` } : {}) }])}>Add effect</button></div>
       {effects.map((effect) => <article className="attack-card" key={effect.id}><strong>{effect.name} · {effect.rounds === null ? "until removed" : `${effect.rounds} rounds remaining`}</strong><div className="play-controls"><button type="button" onClick={() => save(effects.filter((entry) => entry.id !== effect.id))}>End {effect.name}</button></div><details><summary>Edit modifiers &amp; duration</summary>

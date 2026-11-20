@@ -56,6 +56,8 @@ try {
   copyFileSync(nodeLicense, join(stage, "licenses/Node.js-LICENSE.txt"));
   copyFileSync(join(root, "docs/SRD-ATTRIBUTION.md"), join(stage, "licenses/SRD-ATTRIBUTION.md"));
   for (const dependency of ["react", "react-dom", "scheduler"]) copyFileSync(join(root, "node_modules", dependency, "LICENSE"), join(stage, "licenses", `${dependency}-LICENSE.txt`));
+  // Bundled fonts are SIL Open Font License 1.1; the licence text travels with the release.
+  for (const [font, folder] of [["Cinzel", "@fontsource/cinzel"], ["Inter", "@fontsource-variable/inter"]]) copyFileSync(join(root, "node_modules", folder, "LICENSE"), join(stage, "licenses", `${font}-OFL.txt`));
   writeFileSync(join(stage, "release.json"), JSON.stringify({ appVersion: pkg.version, platform: "windows-x64", nodeVersion: runtime.version, nodeSha256: runtime.sha256, builtAt: new Date().toISOString() }, null, 2));
   const releases = join(root, "releases"); mkdirSync(releases, { recursive: true });
   const archive = resolve(releases, name + ".zip");
