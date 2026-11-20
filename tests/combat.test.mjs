@@ -50,7 +50,8 @@ test("damage defense handles resistance, vulnerability, immunity and Petrified w
   assert.equal(adjustedDamage(hero(), 9, "vulnerable"), 18);
   assert.equal(adjustedDamage(hero(), 9, "immune"), 0);
   assert.equal(adjustedDamage(conditioned(["Petrified"]), 9, "resistant"), 4);
-  assert.equal(adjustedDamage(conditioned(["Petrified"]), 9, "vulnerable"), 9);
+  // 2024 order of application: Resistance halves (round down) first, then Vulnerability doubles: 9 → 4 → 8.
+  assert.equal(adjustedDamage(conditioned(["Petrified"]), 9, "vulnerable"), 8);
 });
 test("weapon presets choose finesse and ranged abilities; proficiency and exhaustion affect attacks", () => {
   const character = hero();

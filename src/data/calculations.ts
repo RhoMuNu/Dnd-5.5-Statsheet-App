@@ -7,6 +7,7 @@ import { SKILLS } from "./characters";
 import { classProgressionAtLevel } from "./classProgression";
 import { activeEffects, effectTotal } from "./effects";
 import { activeConditions, exhaustionLevel, isIncapacitated } from "./conditions";
+import { SPECIES_LINEAGES, speciesLineage } from "./creationOptions";
 
 const HIT_DICE: Record<string, number> = {
   barbarian: 12,
@@ -149,12 +150,15 @@ export function calculateCharacterStats(character: Character): CalculatedStats {
 
   const effectiveSize = character.powerfulBuild ? increaseSize(character.size) : character.size;
   const carryingCapacity = character.abilityScores.Strength * SIZE_MULTIPLIER[effectiveSize];
+  // Unarmored Movement and Fast Movement are separate features, so a Monk/Barbarian gains both when their requirements are met.
   let classSpeedBonus = 0;
   if (monkLevel >= 2 && character.armorMode === "unarmored" && !character.hasShield) {
-    classSpeedBonus = monkLevel >= 18 ? 30 : monkLevel >= 14 ? 25 : monkLevel >= 10 ? 20 : monkLevel >= 6 ? 15 : 10;
-    appliedClassFeatures.push(`Monk Unarmored Movement +${classSpeedBonus} ft.`);
-  } else if (barbarianLevel >= 5 && character.armorMode !== "heavy") {
-    classSpeedBonus = 10;
+    const monkBonus = monkLevel >= 18 ? 30 : monkLevel >= 14 ? 25 : monkLevel >= 10 ? 20 : monkLevel >= 6 ? 15 : 10;
+    classSpeedBonus += monkBonus;
+    appliedClassFeatures.push(`Monk Unarmored Movement +${monkBonus} ft.`);
+  }
+  if (barbarianLevel >= 5 && character.armorMode !== "heavy") {
+    classSpeedBonus += 10;
     appliedClassFeatures.push("Barbarian Fast Movement +10 ft.");
   }
   const armorReducesSpeed = character.armorMode === "heavy"
@@ -222,28 +226,43 @@ function spellAbilityFor(className: string, subclass: string, override: AbilityN
 }
 
 function speciesResources(character: Character, proficiencyBonus: number, level: number) {
-  const species = character.species.toLowerCase().split(" (")[0].trim();
-  const source = species === "aasimar" ? [
+  const { base, lineage } = speciesLineage(character.species);
+  const species = base.toLowerCase();
+  type SpeciesResource = { key: string; label: string; value: string; maxUses: number; recovery?: "Short Rest" };
+  // Elf and Tiefling lineages learn a spell at levels 3 and 5 that can each be cast once per Long Rest without a slot.
+  const lineageSpells = (trait: string): SpeciesResource[] => [3, 5].filter((unlock) => level >= unlock).map((unlock, index) => ({
+    key: `species.lineage-spell-${unlock}`, label: `${lineage?.spells?.[index] ?? `Level ${unlock} lineage spell`} · ${trait}`, value: "free cast", maxUses: 1,
+  }));
+  const giantBoon = lineage?.detail ?? "Giant Ancestry boon";
+  const source: SpeciesResource[] = species === "aasimar" ? [
     { key: "species.healing-hands", label: "Healing Hands", value: `${proficiencyBonus}d4 HP`, maxUses: 1 },
     ...(level >= 3 ? [{ key: "species.celestial-revelation", label: "Celestial Revelation", value: "", maxUses: 1 }] : []),
   ] : species === "dragonborn" ? [
     { key: "species.breath-weapon", label: "Breath Weapon", value: "", maxUses: proficiencyBonus },
+    ...(level >= 5 ? [{ key: "species.draconic-flight", label: "Draconic Flight", value: "", maxUses: 1 }] : []),
   ] : species === "dwarf" ? [
     { key: "species.stonecunning", label: "Stonecunning", value: "", maxUses: proficiencyBonus },
-  ] : species === "goliath" ? [
+  ] : species === "elf" ? lineageSpells(SPECIES_LINEAGES.Elf.trait)
+    : species === "tiefling" ? lineageSpells(SPECIES_LINEAGES.Tiefling.trait)
+    : species === "gnome" ? (lineage?.proficiencySpell ? [{ key: "species.lineage-spell", label: `${lineage.proficiencySpell} · ${SPECIES_LINEAGES.Gnome.trait}`, value: "free casts", maxUses: proficiencyBonus }] : [])
+    : species === "goliath" ? [
+    { key: "species.giant-ancestry", label: `${giantBoon} · Giant Ancestry`, value: "", maxUses: proficiencyBonus },
     ...(level >= 5 ? [{ key: "species.large-form", label: "Large Form", value: "", maxUses: 1 }] : []),
   ] : species === "orc" ? [
-    { key: "species.adrenaline-rush", label: "Adrenaline Rush", value: "", maxUses: proficiencyBonus },
-  ] : species === "human" ? [
-    { key: "species.resourceful", label: "Heroic Inspiration · Resourceful", value: "", maxUses: 1 },
+    { key: "species.adrenaline-rush", label: "Adrenaline Rush", value: "", maxUses: proficiencyBonus, recovery: "Short Rest" },
+    { key: "species.relentless-endurance", label: "Relentless Endurance", value: "", maxUses: 1 },
   ] : [];
   return source.map((resource) => ({
     ...resource,
-    recovery: (species === "orc" ? "Short Rest" : "Long Rest") as "Short Rest" | "Long Rest",
-    shortRestRecovery: species === "orc" ? "all" as const : undefined,
+    recovery: resource.recovery ?? "Long Rest" as "Short Rest" | "Long Rest",
+    shortRestRecovery: resource.recovery === "Short Rest" ? "all" as const : undefined,
     used: Math.min(resource.maxUses, Math.max(0, character.resourceUses?.[resource.key] ?? 0)),
-    label: resource.label,
   }));
+}
+
+/** Human Resourceful grants Heroic Inspiration whenever the character finishes a Long Rest. */
+export function gainsInspirationOnLongRest(character: Character): boolean {
+  return speciesLineage(character.species).base.toLowerCase() === "human";
 }
 
 function originFeatResources(character: Character) {
@@ -346,7 +365,7 @@ function classResourcesFor(character: Character, level: number, modifiers: Recor
       return [{ key: "bardic-inspiration", label: "Bardic Inspiration", value: level >= 15 ? "d12" : level >= 10 ? "d10" : level >= 5 ? "d8" : "d6", maxUses: Math.max(1, modifiers.Charisma), recovery: level >= 5 ? "Short Rest" : "Long Rest", shortRestRecovery: "all" }];
     case "cleric":
       return [
-        ...(level >= 2 ? [{ key: "channel-divinity", label: "Channel Divinity", value: "", maxUses: level >= 6 ? 3 : 2, recovery: "Short Rest" as const, shortRestRecovery: "one" as const }] : []),
+        ...(level >= 2 ? [{ key: "channel-divinity", label: "Channel Divinity", value: "", maxUses: level >= 18 ? 4 : level >= 6 ? 3 : 2, recovery: "Short Rest" as const, shortRestRecovery: "one" as const }] : []),
         ...(level >= 10 ? [{ key: "divine-intervention", label: "Divine Intervention", value: "", maxUses: 1, recovery: "Long Rest" as const }] : []),
       ];
     case "druid":
@@ -361,6 +380,7 @@ function classResourcesFor(character: Character, level: number, modifiers: Recor
     case "monk":
       return level >= 2 ? [
         { key: "focus-points", label: "Focus Points", value: "", maxUses: level, recovery: "Short Rest", shortRestRecovery: "all" },
+        { key: "uncanny-metabolism", label: "Uncanny Metabolism", value: "on Initiative", maxUses: 1, recovery: "Long Rest" },
         { label: "Martial Arts die", value: level >= 17 ? "d12" : level >= 11 ? "d10" : level >= 5 ? "d8" : "d6" },
       ] : [{ label: "Martial Arts die", value: "d6" }];
     case "paladin":

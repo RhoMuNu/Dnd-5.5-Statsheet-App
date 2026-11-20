@@ -62,6 +62,11 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const characterPage = !["overview", "builder", "lan"].includes(activeSection) && activeCharacter;
+    document.title = [characterPage ? `${activeCharacter.name} · ${current.title}` : current.title, "TaleForge"].join(" — ");
+  }, [activeSection, activeCharacter?.name, current.title]);
+
+  useEffect(() => {
     document.documentElement.dataset.textSize = largerText ? "large" : "standard";
     try { localStorage.setItem("taleforge.largerText", String(largerText)); } catch { /* The preference still works for this session. */ }
   }, [largerText]);
@@ -108,6 +113,16 @@ function App() {
     if (!character || !window.confirm(`Delete ${character.name} from this browser? This cannot be undone.`)) return;
     setCharacters((existing) => existing.filter((item) => item.id !== id));
     if (selectedCharacterId === id) setSelectedCharacterId(null);
+  }
+
+  function duplicateCharacter(id: string) {
+    const original = characters.find((item) => item.id === id);
+    if (!original) return;
+    const now = new Date().toISOString();
+    const copy: Character = { ...structuredClone(original), id: makeCharacterId(), name: `${original.name} (copy)`.slice(0, 60), createdAt: now, updatedAt: now };
+    setCharacters((existing) => [copy, ...existing]);
+    setSelectedCharacterId(copy.id);
+    setBackupMessage(`Created ${copy.name}. The original is unchanged.`);
   }
 
   function updateCharacter(id: string, updates: Partial<Character>) {
@@ -217,6 +232,7 @@ function App() {
               onSelect={setSelectedCharacterId}
               onEdit={editCharacter}
               onDelete={deleteCharacter}
+              onDuplicate={duplicateCharacter}
               onExport={(character) => exportBackup([character], `${safeFilename(character.name)}.taleforge.json`, character.id)}
               onExportAll={() => exportBackup(characters, "taleforge-character-library.json", activeCharacter?.id ?? null)}
               onImport={importBackup}

@@ -3,7 +3,7 @@ import { spellTurnCost } from "./economy";
 import { inventoryArmor } from "./equipment";
 import { activeEffects, effectTotal } from "./effects";
 import { defaultCombatState, makeCharacterId, type Character } from "./characters";
-import { calculateCharacterStats } from "./calculations";
+import { calculateCharacterStats, gainsInspirationOnLongRest } from "./calculations";
 import { activeConditions, exhaustionLevel, isIncapacitated, type Condition, effectiveRollMode, type RollMode } from "./conditions";
 
 export const combatState = (character: Character) => ({ ...defaultCombatState(), ...character.combat });
@@ -80,6 +80,7 @@ export function restCharacter(character: Character, kind: "Short Rest" | "Long R
     : { ...combat, effects };
   return { resourceUses, customResources, inventory: { ...character.inventory, items: recoverItemCharges(character.inventory.items, kind) }, combat: restedCombat, ...(kind === "Long Rest" ? {
     currentHitPoints: calculateCharacterStats({ ...character, combat: restedCombat }).maxHitPoints, temporaryHitPoints: 0,
+    ...(gainsInspirationOnLongRest(character) ? { heroicInspiration: true } : {}),
   } : {}) };
 }
 
@@ -136,5 +137,6 @@ export function adjustedDamage(character: Character, damage: number, defense: "n
   if (!Number.isInteger(damage) || damage < 0) return 0;
   if (defense === "immune") return 0;
   const resistant = defense === "resistant" || activeConditions(character).includes("Petrified");
-  return Math.floor(damage * (resistant ? 0.5 : 1) * (defense === "vulnerable" ? 2 : 1));
+  // Resistance halves (rounding down) before Vulnerability doubles, so 7 damage becomes 3, then 6.
+  return Math.floor(damage * (resistant ? 0.5 : 1)) * (defense === "vulnerable" ? 2 : 1);
 }

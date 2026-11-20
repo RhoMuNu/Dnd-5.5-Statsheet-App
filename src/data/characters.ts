@@ -367,6 +367,8 @@ function normalizeCreationDetails(value: unknown): CharacterCreationDetails | un
     classEquipmentOption,
     classChoices: typeof details.classChoices === "string" ? details.classChoices.slice(0, 300) : "",
     appearance: typeof details.appearance === "string" ? details.appearance.slice(0, 200) : "",
+    // Keep the Elf Keen Senses / Human Skillful pick so later edits can replace it instead of asking again.
+    ...(SKILLS.some((entry) => entry.name === details.speciesSkillProficiency) ? { speciesSkillProficiency: details.speciesSkillProficiency } : {}),
   };
 }
 

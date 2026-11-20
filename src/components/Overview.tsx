@@ -9,13 +9,24 @@ type OverviewProps = {
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onExport: (character: Character) => void;
   onExportAll: () => void;
   onImport: (contents: string) => void;
   backupMessage: string;
 };
 
-export function Overview({ characters, selectedCharacterId, onCreate, onExplore, onSelect, onEdit, onDelete, onExport, onExportAll, onImport, backupMessage }: OverviewProps) {
+/** "Fighter 3 (Champion) / Wizard 2": every class with its level and subclass. */
+function classSummary(character: Character): string {
+  const entries = Object.entries(character.classLevels ?? {}).filter(([, level]) => level > 0);
+  if (!entries.length) return character.characterClass;
+  return entries.map(([name, level]) => {
+    const subclass = character.classSubclasses?.[name] ?? (character.characterClass === name ? character.subclass : "");
+    return `${name} ${level}${subclass ? ` (${subclass})` : ""}`;
+  }).join(" / ");
+}
+
+export function Overview({ characters, selectedCharacterId, onCreate, onExplore, onSelect, onEdit, onDelete, onDuplicate, onExport, onExportAll, onImport, backupMessage }: OverviewProps) {
   const backupInput = useRef<HTMLInputElement>(null);
   const selectedCharacter = characters.find((character) => character.id === selectedCharacterId) ?? characters[0];
 
@@ -38,11 +49,11 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
           </div>
           <p className="feature-description">
             {selectedCharacter
-              ? [selectedCharacter.concept, [selectedCharacter.species, selectedCharacter.characterClass, selectedCharacter.background].filter(Boolean).join(" · ")].filter(Boolean).join(" — ") || "No character details yet."
+              ? [selectedCharacter.concept, [selectedCharacter.species, classSummary(selectedCharacter), selectedCharacter.background].filter(Boolean).join(" · ")].filter(Boolean).join(" — ") || "No character details yet."
               : "Choose a class, species, and background in the character builder."}
           </p>
           <div className="feature-meta">
-            {selectedCharacter ? <><span><i className="meta-icon">⚔</i> {selectedCharacter.characterClass || "Class not chosen"}</span><span><i className="meta-icon">◷</i> Level {selectedCharacter.level}</span></> : <span><i className="meta-icon">⚔</i> 2024 rules</span>}
+            {selectedCharacter ? <><span><i className="meta-icon">⚔</i> {classSummary(selectedCharacter) || "Class not chosen"}</span><span><i className="meta-icon">◷</i> Level {selectedCharacter.level}</span></> : <span><i className="meta-icon">⚔</i> 2024 rules</span>}
           </div>
           <div className="feature-actions">
             {selectedCharacter ? <>
@@ -86,11 +97,12 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
               <article className={`character-roster-card ${character.id === selectedCharacter?.id ? "selected" : ""}`} key={character.id}>
                 <button className="roster-select" onClick={() => onSelect(character.id)} aria-pressed={character.id === selectedCharacter?.id}>
                   <span className="roster-avatar" aria-hidden="true">{character.name.charAt(0).toUpperCase()}</span>
-                  <span className="roster-copy"><strong>{character.name}</strong><span>{[character.species, character.characterClass, character.background].filter(Boolean).join(" · ") || "New adventurer"}</span></span>
+                  <span className="roster-copy"><strong>{character.name}</strong><span>{[character.species, classSummary(character), character.background].filter(Boolean).join(" · ") || "New adventurer"}</span></span>
                   <span className="roster-level">LV {character.level}</span>
                 </button>
                 <div className="roster-actions">
                   <button onClick={() => onEdit(character.id)} aria-label={`Edit ${character.name}`}>Edit</button>
+                  <button onClick={() => onDuplicate(character.id)} aria-label={`Duplicate ${character.name}`} title="Make an independent copy, e.g. to try a different build">Duplicate</button>
                   <button onClick={() => onExport(character)} aria-label={`Export ${character.name}`}>Export</button>
                   <button onClick={() => onDelete(character.id)} aria-label={`Delete ${character.name}`}>Delete</button>
                 </div>
@@ -103,7 +115,7 @@ export function Overview({ characters, selectedCharacterId, onCreate, onExplore,
       <section className="quick-links">
         <div className="quick-copy">
           <span className="quick-spark" aria-hidden="true">✧</span>
-          <div><strong>Your sheets stay on this device</strong><span>Local saves are automatic in this browser. Use LAN party to share selected sheets with your group.</span></div>
+          <div><strong>Your sheets stay on this device</strong><span>Local saves are automatic in this browser. Use LAN campaign to share selected sheets with your group.</span></div>
         </div>
         <button onClick={onCreate}>Create another <span>→</span></button>
       </section>

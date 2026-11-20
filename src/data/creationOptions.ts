@@ -8,13 +8,13 @@ export const BACKGROUNDS: Record<string, {
   equipmentA: string;
   equipmentB: string;
 }> = {
-  Artisan: { abilities: ["Strength", "Dexterity", "Intelligence"], feat: "Crafter", skills: ["Investigation", "Persuasion"], tool: "Choose Artisan’s Tools", equipmentA: "Artisan’s Tools, 2 Pouches, Traveler’s Clothes, 32 GP", equipmentB: "50 GP" },
   Acolyte: {
     abilities: ["Intelligence", "Wisdom", "Charisma"], feat: "Magic Initiate (Cleric)",
     skills: ["Insight", "Religion"], tool: "Calligrapher’s Supplies",
     equipmentA: "Calligrapher’s Supplies, book of prayers, holy symbol, parchment, robe, 8 GP",
     equipmentB: "50 GP",
   },
+  Artisan: { abilities: ["Strength", "Dexterity", "Intelligence"], feat: "Crafter", skills: ["Investigation", "Persuasion"], tool: "Choose Artisan’s Tools", equipmentA: "Artisan’s Tools, 2 Pouches, Traveler’s Clothes, 32 GP", equipmentB: "50 GP" },
   Charlatan: { abilities: ["Dexterity", "Constitution", "Charisma"], feat: "Skilled", skills: ["Deception", "Sleight of Hand"], tool: "Forgery Kit", equipmentA: "Forgery Kit, Costume, Fine Clothes, 15 GP", equipmentB: "50 GP" },
   Criminal: {
     abilities: ["Dexterity", "Constitution", "Intelligence"], feat: "Alert",
@@ -39,7 +39,7 @@ export const BACKGROUNDS: Record<string, {
   Scribe: { abilities: ["Dexterity", "Intelligence", "Wisdom"], feat: "Skilled", skills: ["Investigation", "Perception"], tool: "Calligrapher’s Supplies", equipmentA: "Calligrapher’s Supplies, Fine Clothes, Lamp, 3 Oil Flasks, Parchment (12 sheets), 23 GP", equipmentB: "50 GP" },
   Soldier: {
     abilities: ["Strength", "Dexterity", "Constitution"], feat: "Savage Attacker",
-    skills: ["Athletics", "Intimidation"], tool: "Gaming Set (your choice)",
+    skills: ["Athletics", "Intimidation"], tool: "Choose a Gaming Set",
     equipmentA: "Spear, Shortbow, 20 Arrows, Gaming Set, Healer’s Kit, Quiver, Traveler’s Clothes, 14 GP",
     equipmentB: "50 GP",
   },
@@ -58,6 +58,54 @@ export const SPECIES: Record<string, { size: "Small" | "Medium"; speed: number; 
   Orc: { size: "Medium", speed: 30, note: "Adrenaline Rush, Darkvision, and Relentless Endurance." },
   Tiefling: { size: "Medium", speed: 30, note: "Darkvision and Fiendish Legacy; choose Abyssal, Chthonic, or Infernal." },
 };
+
+export type SpeciesLineage = { name: string; detail: string; speed?: number; spells?: [string, string]; proficiencySpell?: string };
+
+/** 2024 lineage, legacy, and ancestry choices. `spells` are the level 3 and 5 spells each castable once per Long Rest without a slot. */
+export const SPECIES_LINEAGES: Record<string, { label: string; trait: string; options: SpeciesLineage[] }> = {
+  Dragonborn: { label: "Draconic ancestry", trait: "Draconic Ancestry", options: [
+    { name: "Black", detail: "Acid" }, { name: "Blue", detail: "Lightning" }, { name: "Brass", detail: "Fire" }, { name: "Bronze", detail: "Lightning" }, { name: "Copper", detail: "Acid" },
+    { name: "Gold", detail: "Fire" }, { name: "Green", detail: "Poison" }, { name: "Red", detail: "Fire" }, { name: "Silver", detail: "Cold" }, { name: "White", detail: "Cold" },
+  ] },
+  Elf: { label: "Elven lineage", trait: "Elven Lineage", options: [
+    { name: "Drow", detail: "Darkvision 120 ft. · Dancing Lights", spells: ["Faerie Fire", "Darkness"] },
+    { name: "High Elf", detail: "Prestidigitation", spells: ["Detect Magic", "Misty Step"] },
+    { name: "Wood Elf", detail: "Speed 35 ft. · Druidcraft", speed: 35, spells: ["Longstrider", "Pass without Trace"] },
+  ] },
+  Gnome: { label: "Gnomish lineage", trait: "Gnomish Lineage", options: [
+    { name: "Forest Gnome", detail: "Minor Illusion · Speak with Animals", proficiencySpell: "Speak with Animals" },
+    { name: "Rock Gnome", detail: "Mending, Prestidigitation · clockwork devices" },
+  ] },
+  Goliath: { label: "Giant ancestry", trait: "Giant Ancestry", options: [
+    { name: "Cloud Giant", detail: "Cloud’s Jaunt" }, { name: "Fire Giant", detail: "Fire’s Burn" }, { name: "Frost Giant", detail: "Frost’s Chill" },
+    { name: "Hill Giant", detail: "Hill’s Tumble" }, { name: "Stone Giant", detail: "Stone’s Endurance" }, { name: "Storm Giant", detail: "Storm’s Thunder" },
+  ] },
+  Tiefling: { label: "Fiendish legacy", trait: "Fiendish Legacy", options: [
+    { name: "Abyssal", detail: "Poison resistance · Poison Spray", spells: ["Ray of Sickness", "Hold Person"] },
+    { name: "Chthonic", detail: "Necrotic resistance · Chill Touch", spells: ["False Life", "Ray of Enfeeblement"] },
+    { name: "Infernal", detail: "Fire resistance · Fire Bolt", spells: ["Hellish Rebuke", "Darkness"] },
+  ] },
+};
+
+const LINEAGE_ALIASES: Record<string, [string, string]> = { drow: ["Elf", "Drow"], "high elf": ["Elf", "High Elf"], "wood elf": ["Elf", "Wood Elf"], "forest gnome": ["Gnome", "Forest Gnome"], "rock gnome": ["Gnome", "Rock Gnome"] };
+const simplify = (value: string) => value.trim().toLowerCase().replace(/[’']/g, "").replace(/\s+/g, " ");
+
+/** Splits a saved species such as "Elf (Wood Elf)" into its base species and, when recognized, its 2024 lineage. */
+export function speciesLineage(species: string): { base: string; recorded: string; lineage?: SpeciesLineage } {
+  const match = species.match(/^([^()]+?)\s*(?:\((.*)\))?\s*$/);
+  let base = match?.[1]?.trim() ?? species.trim();
+  let recorded = match?.[2]?.trim() ?? "";
+  const alias = LINEAGE_ALIASES[simplify(base)];
+  if (alias && !recorded) [base, recorded] = alias;
+  const canonical = Object.keys(SPECIES_LINEAGES).find((name) => simplify(name) === simplify(base));
+  if (canonical) base = canonical;
+  const wanted = simplify(recorded);
+  const lineage = wanted ? SPECIES_LINEAGES[base]?.options.find((option) => {
+    const name = simplify(option.name);
+    return wanted === name || name.startsWith(`${wanted} `) || wanted.startsWith(name.split(" ")[0]);
+  }) : undefined;
+  return { base, recorded, lineage };
+}
 
 /** Skill proficiencies granted by species traits that ask the player to choose a skill. */
 export const SPECIES_SKILL_CHOICES: Record<string, SkillName[]> = {
@@ -117,7 +165,11 @@ export const CLASS_ARMOR: Record<string, Record<string, { mode: ArmorMode; baseA
   Wizard: { A: { mode: "unarmored", baseAC: 10, shield: false }, B: { mode: "unarmored", baseAC: 10, shield: false } },
 };
 
-export const LANGUAGES = ["Common", "Common Sign Language", "Abyssal", "Celestial", "Deep Speech", "Draconic", "Dwarvish", "Elvish", "Giant", "Gnomish", "Goblin", "Halfling", "Infernal", "Orc", "Primordial", "Sylvan", "Undercommon"];
+/** 2024 Standard Languages; new characters choose two besides Common. */
+export const STANDARD_LANGUAGES = ["Common Sign Language", "Draconic", "Dwarvish", "Elvish", "Giant", "Gnomish", "Goblin", "Halfling", "Orc"];
+/** 2024 Rare Languages, normally learned through a feature or with the DM’s approval. */
+export const RARE_LANGUAGES = ["Abyssal", "Celestial", "Deep Speech", "Druidic", "Infernal", "Primordial", "Sylvan", "Thieves’ Cant", "Undercommon"];
+export const LANGUAGES = ["Common", ...STANDARD_LANGUAGES, ...RARE_LANGUAGES];
 export const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 export const STANDARD_ARRAY_BY_CLASS: Record<string, Record<AbilityName, number>> = {
   Barbarian: { Strength: 15, Dexterity: 13, Constitution: 14, Intelligence: 10, Wisdom: 12, Charisma: 8 },
@@ -133,6 +185,22 @@ export const STANDARD_ARRAY_BY_CLASS: Record<string, Record<AbilityName, number>
   Warlock: { Strength: 8, Dexterity: 14, Constitution: 13, Intelligence: 12, Wisdom: 10, Charisma: 15 },
   Wizard: { Strength: 8, Dexterity: 12, Constitution: 13, Intelligence: 15, Wisdom: 14, Charisma: 10 },
 };
+
+export const POINT_BUY_MIN = 8;
+export const POINT_BUY_MAX = 15;
+export const POINT_BUY_BUDGET = 27;
+
+/** Validates base scores before background boosts are applied. `maximum` can be raised for older sheets edited later. */
+export function baseAbilityScoreErrors(method: "standard" | "point-buy" | "manual" | "rolled", scores: Record<AbilityName, number>, maximum = 20): string[] {
+  const entries = Object.entries(scores) as [AbilityName, number][];
+  if (method === "point-buy") {
+    if (entries.some(([, score]) => !Number.isInteger(score) || score < POINT_BUY_MIN || score > POINT_BUY_MAX)) return [`Point Buy scores must be whole numbers from ${POINT_BUY_MIN} to ${POINT_BUY_MAX}.`];
+    const spent = entries.reduce((sum, [, score]) => sum + pointBuyCost(score), 0);
+    return spent === POINT_BUY_BUDGET ? [] : [`Point Buy uses exactly ${POINT_BUY_BUDGET} points. You have spent ${spent}.`];
+  }
+  const invalid = entries.filter(([, score]) => !Number.isInteger(score) || score < 1 || score > maximum).map(([ability]) => ability);
+  return invalid.length ? [`Enter a whole-number score from 1 to ${maximum} for ${invalid.join(", ")}.`] : [];
+}
 
 export function pointBuyCost(score: number): number {
   if (score <= 8) return 0;
